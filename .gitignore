@@ -1,3 +1,6 @@
+# uv
+uv.lock
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -99,6 +102,13 @@ ipython_config.py
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
 # uv.lock
+
+# Experiment artifacts
+data/
+runs/
+mlflow.db
+mlflow.db-*
+mlruns/
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.

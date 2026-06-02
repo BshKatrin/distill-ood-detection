@@ -1,0 +1,38 @@
+experiment_name: linear_student_resnet18_cifar10
+output_dir: runs
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar10
+  revision: main
+
+student:
+  kind: linear
+  input_shape: [3, 32, 32]
+  num_classes: 10
+
+optimizer:
+  name: sgd
+  learning_rate: 0.05
+  momentum: 0.9
+  weight_decay: 0.0
+
+training:
+  epochs: 1
+  seed: 42
+  device: auto
+  log_every_steps: 50
+  methods:
+    - mse_one_hot
+    - cross_entropy_probabilities
+
+mlflow:
+  enabled: true
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db
