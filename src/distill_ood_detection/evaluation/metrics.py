@@ -53,13 +53,13 @@ def distillation_validation_metrics(
         kl_divergence = F.kl_div(
             student_log_probabilities,
             teacher_probabilities,
-            reduction="none",
+            reduction="batchmean",
         )
 
         batch_size = labels.numel()
         correct += (predictions == labels).sum().item()
         total += batch_size
-        total_kl += kl_divergence.item()
+        total_kl += kl_divergence.item() * batch_size
 
     return {
         "validation_accuracy": correct / total,

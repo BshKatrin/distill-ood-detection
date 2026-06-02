@@ -9,7 +9,7 @@ from typing import Any, Literal
 import yaml
 
 
-DistillationMethod = Literal["mse_one_hot", "cross_entropy_probabilities"]
+DistillationMethod = Literal["mse", "cross_entropy_probabilities"]
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ class TrainingConfig:
     device: str = "auto"
     log_every_steps: int = 50
     methods: tuple[DistillationMethod, ...] = (
-        "mse_one_hot",
+        "mse",
         "cross_entropy_probabilities",
     )
 

@@ -48,7 +48,7 @@ uv run distill-ood train-student \
 
 The baseline config trains a linear student with two objectives:
 
-- `mse_one_hot`: MSE between student probabilities and a one-hot teacher argmax.
+- `mse`: MSE between student and teacher probabilities.
 - `cross_entropy_probabilities`: cross-entropy against teacher probabilities.
 
 MLflow logging is enabled in the YAML config. Each run logs one parent

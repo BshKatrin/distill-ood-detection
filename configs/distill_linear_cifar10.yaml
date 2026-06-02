@@ -4,7 +4,7 @@ output_dir: runs
 dataset:
   name: cifar10
   data_dir: data
-  batch_size: 256
+  batch_size: 64
   num_workers: 2
   validation_fraction: 0.1
 
@@ -24,12 +24,12 @@ optimizer:
   weight_decay: 0.0
 
 training:
-  epochs: 1
+  epochs: 10
   seed: 42
-  device: auto
+  device: cuda
   log_every_steps: 50
   methods:
-    - mse_one_hot
+    - mse
     - cross_entropy_probabilities
 
 mlflow:

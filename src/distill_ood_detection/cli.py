@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     train_parser.add_argument(
         "--method",
-        choices=("mse_one_hot", "cross_entropy_probabilities"),
+        choices=("mse", "cross_entropy_probabilities"),
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )

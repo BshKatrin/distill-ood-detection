@@ -16,7 +16,7 @@ def distillation_loss(
     """Compute the configured distillation objective."""
 
     teacher_probabilities = F.softmax(teacher_logits, dim=1)
-    if method == "mse_one_hot":
+    if method == "mse":
         teacher_probabilities = F.softmax(teacher_logits, dim=1)
         student_probabilities = F.softmax(student_logits, dim=1)
         return F.mse_loss(student_probabilities, teacher_probabilities)
