@@ -31,4 +31,3 @@ def build_student(config: StudentConfig) -> nn.Module:
     if config.kind != "linear":
         raise ValueError(f"Unsupported student kind: {config.kind}")
     return LinearStudent(config.input_shape, config.num_classes)
-
