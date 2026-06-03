@@ -10,6 +10,15 @@ import yaml
 
 
 DistillationMethod = Literal["mse", "cross_entropy_probabilities"]
+OODDatasetName = Literal["mnist", "svhn"]
+
+
+@dataclass(frozen=True)
+class OODDatasetConfig:
+    """Out-of-distribution dataset associated with the ID dataset."""
+
+    name: OODDatasetName
+    split: str = "test"
 
 
 @dataclass(frozen=True)
@@ -21,6 +30,7 @@ class DatasetConfig:
     batch_size: int = 256
     num_workers: int = 2
     validation_fraction: float = 0.1
+    ood_datasets: tuple[OODDatasetConfig, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -98,7 +108,12 @@ def load_config(path: Path) -> ExperimentConfig:
 def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     """Parse a raw dictionary into typed configuration objects."""
 
-    dataset = DatasetConfig(**raw.get("dataset", {}))
+    dataset_raw = raw.get("dataset", {}).copy()
+    if "ood_datasets" in dataset_raw:
+        dataset_raw["ood_datasets"] = tuple(
+            OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
+        )
+    dataset = DatasetConfig(**dataset_raw)
     teacher = TeacherConfig(**raw.get("teacher", {}))
     student_raw = raw.get("student", {}).copy()
     if "input_shape" in student_raw:

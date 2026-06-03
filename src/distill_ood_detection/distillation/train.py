@@ -37,6 +37,10 @@ def train_student(
     optimizer = build_optimizer(student, optimizer_config)
     history: list[dict[str, float | int]] = []
     best_validation_accuracy = 0.0
+    best_validation_distillation_loss = float("inf")
+    checkpoint_path = output_dir / "latest_student.pt"
+    best_checkpoint_path = output_dir / "best_student.pt"
+    output_dir.mkdir(parents=True, exist_ok=True)
     started_at = time.time()
 
     for epoch in range(1, training_config.epochs + 1):
@@ -62,13 +66,18 @@ def train_student(
 
         train_loss = total_loss / total_examples
         validation_metrics = distillation_validation_metrics(
+            method=method,
             teacher=teacher,
             student=student,
             loader=validation_loader,
             device=device,
         )
         validation_accuracy = validation_metrics["validation_accuracy"]
+        validation_distillation_loss = validation_metrics["validation_distillation_loss"]
         best_validation_accuracy = max(best_validation_accuracy, validation_accuracy)
+        if validation_distillation_loss < best_validation_distillation_loss:
+            best_validation_distillation_loss = validation_distillation_loss
+            torch.save(student.state_dict(), best_checkpoint_path)
         epoch_record = {
             "epoch": epoch,
             "distillation_loss": train_loss,
@@ -85,17 +94,19 @@ def train_student(
                 step=epoch,
             )
 
-    checkpoint_path = output_dir / "student.pt"
-    output_dir.mkdir(parents=True, exist_ok=True)
     torch.save(student.state_dict(), checkpoint_path)
 
     summary = {
         "method": method,
         "epochs": training_config.epochs,
         "best_validation_accuracy": best_validation_accuracy,
+        "best_validation_distillation_loss": best_validation_distillation_loss,
         "final_validation_accuracy": history[-1]["validation_accuracy"],
-        "seconds": round(time.time() - started_at, 3),
+        "final_validation_distillation_loss": history[-1]["validation_distillation_loss"],
+        "latest_checkpoint_path": str(checkpoint_path),
+        "best_checkpoint_path": str(best_checkpoint_path),
         "checkpoint_path": str(checkpoint_path),
+        "seconds": round(time.time() - started_at, 3),
     }
     write_json(output_dir / "metrics.json", summary)
     return summary

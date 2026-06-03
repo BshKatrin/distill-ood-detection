@@ -7,6 +7,11 @@ dataset:
   batch_size: 64
   num_workers: 2
   validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
 
 teacher:
   hf_model_id: edadaltocg/resnet18_cifar10

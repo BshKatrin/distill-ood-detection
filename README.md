@@ -41,9 +41,7 @@ uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml
 Run just one method:
 
 ```bash
-uv run distill-ood train-student \
-  --config configs/distill_linear_cifar10.yaml \
-  --method cross_entropy_probabilities
+uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml --method cross_entropy_probabilities
 ```
 
 The baseline config trains a linear student with two objectives:
@@ -59,3 +57,17 @@ divergence from teacher probabilities to student probabilities.
 ```bash
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```
+
+## Probability Inference
+
+After training, save teacher and student probabilities for the CIFAR-10
+validation split and configured OOD datasets:
+
+```bash
+uv run distill-ood infer-probabilities --config configs/distill_linear_cifar10.yaml
+```
+
+By default this uses each student's best checkpoint. Use `--checkpoint latest`
+or `--checkpoint both` to infer from other saved checkpoints. Artifacts are
+written under `runs/<experiment_name>/probabilities/`, with one `.pt` file per
+dataset/model and a `manifest.json` for notebook discovery.

@@ -7,6 +7,9 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
+from distill_ood_detection.config import DistillationMethod
+from distill_ood_detection.distillation.losses import distillation_loss
+
 
 @torch.no_grad()
 def accuracy(
@@ -30,18 +33,20 @@ def accuracy(
 
 @torch.no_grad()
 def distillation_validation_metrics(
+    method: DistillationMethod,
     teacher: nn.Module,
     student: nn.Module,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
 ) -> dict[str, float]:
-    """Compute validation accuracy and KL divergence from teacher to student."""
+    """Compute validation metrics for student distillation."""
 
     teacher.eval()
     student.eval()
     correct = 0
     total = 0
     total_kl = 0.0
+    total_distillation_loss = 0.0
     for images, labels in loader:
         images = images.to(device)
         labels = labels.to(device)
@@ -60,8 +65,12 @@ def distillation_validation_metrics(
         correct += (predictions == labels).sum().item()
         total += batch_size
         total_kl += kl_divergence.item() * batch_size
+        total_distillation_loss += (
+            distillation_loss(method, student_logits, teacher_logits).item() * batch_size
+        )
 
     return {
         "validation_accuracy": correct / total,
+        "validation_distillation_loss": total_distillation_loss / total,
         "validation_kl_divergence": total_kl / total,
     }
