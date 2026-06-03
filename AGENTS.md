@@ -52,3 +52,12 @@ All Python dependencies must use `uv`.
 ```bash
 uv add <package>
 ```
+
+## Notebook guidelines
+
+- Keep text minimal.
+- Prefer short section titles over explanatory paragraphs.
+- Focus on creating clear plots.
+- For plots, prefer Seaborn for static statistical visuals.
+- Use Plotly when interactivity is useful or necessary.
+- Avoid long textual analysis unless explicitly requested.
