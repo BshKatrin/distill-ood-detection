@@ -15,6 +15,11 @@ Prefer explicit code over abstractions.
 
 Avoid introducing frameworks or patterns unless they reduce duplication across multiple experiments.
 
+## Project vocabulary
+- ID (In-Distribution): Data drawn from the same distribution as the training data, or from the distribution the model is expected to encounter during deployment.
+
+- OOD (Out-of-Distribution): Data that does not follow the training-data distribution and differs significantly from the examples seen during training.
+
 ## Directory responsibilities
 
 - datasets/: dataset loading and transforms.
@@ -24,6 +29,8 @@ Avoid introducing frameworks or patterns unless they reduce duplication across m
 - experiments/: executable entrypoints.
 - configs/: experiment configuration files.
 - docs/: research notes and experiment logs.
+- runs/: training artifacts, including .json files containing training histories
+  and .pt files containing saved model checkpoints
 
 ## Coding guidelines
 
