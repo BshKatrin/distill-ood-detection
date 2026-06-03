@@ -1,4 +1,4 @@
-"""Run probability inference for ID validation and configured OOD datasets."""
+"""Run logit and probability inference for ID and configured OOD datasets."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def run_probability_inference(
     checkpoint: CheckpointSelection = "best",
     method: DistillationMethod | None = None,
 ) -> dict[str, object]:
-    """Infer teacher and student probabilities for ID and configured OOD datasets."""
+    """Infer teacher and student logits/probabilities for ID and OOD datasets."""
 
     set_seed(config.training.seed)
     device = resolve_device(config.training.device)
@@ -50,7 +50,7 @@ def run_probability_inference(
         dataset_dir = output_dir / named_loader.name
         dataset_dir.mkdir(parents=True, exist_ok=True)
         teacher_path = dataset_dir / "teacher.pt"
-        _save_probabilities(
+        _save_inference_artifact(
             path=teacher_path,
             model=teacher,
             loader=named_loader.loader,
@@ -76,7 +76,7 @@ def run_probability_inference(
                 student.to(device)
                 student.eval()
                 probability_path = dataset_dir / f"student_{current_method}_{checkpoint_name}.pt"
-                _save_probabilities(
+                _save_inference_artifact(
                     path=probability_path,
                     model=student,
                     loader=named_loader.loader,
@@ -111,25 +111,28 @@ def run_probability_inference(
 
 
 @torch.no_grad()
-def _save_probabilities(
+def _save_inference_artifact(
     path: Path,
     model: nn.Module,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
     metadata: dict[str, object],
 ) -> None:
+    logits_batches: list[torch.Tensor] = []
     probabilities: list[torch.Tensor] = []
     labels: list[torch.Tensor] = []
     model.eval()
     for images, batch_labels in loader:
         images = images.to(device)
         logits = model(images)
+        logits_batches.append(logits.cpu())
         probabilities.append(F.softmax(logits, dim=1).cpu())
         labels.append(batch_labels.cpu())
 
     torch.save(
         {
             **metadata,
+            "logits": torch.cat(logits_batches, dim=0),
             "probabilities": torch.cat(probabilities, dim=0),
             "labels": torch.cat(labels, dim=0),
         },

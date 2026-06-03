@@ -60,7 +60,7 @@ uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 
 ## Probability Inference
 
-After training, save teacher and student probabilities for the CIFAR-10
+After training, save teacher and student logits/probabilities for the CIFAR-10
 validation split and configured OOD datasets:
 
 ```bash
