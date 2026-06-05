@@ -22,9 +22,10 @@ def run_experiment(
 ) -> list[dict[str, float | int | str]]:
     """Run one or all student distillation methods from an experiment config."""
 
-    set_seed(config.training.seed)
-    device = resolve_device(config.training.device)
-    methods = (method,) if method else config.training.methods
+    training_defaults = config.training.defaults
+    set_seed(training_defaults.seed)
+    device = resolve_device(training_defaults.device)
+    methods = (method,) if method else config.training.enabled_methods()
     experiment_dir = Path(config.output_dir) / config.experiment_name
     experiment_dir.mkdir(parents=True, exist_ok=True)
     write_json(experiment_dir / "resolved_config.json", asdict(config))
@@ -32,7 +33,7 @@ def run_experiment(
         mlflow.set_tracking_uri(config.mlflow.tracking_uri)
         mlflow.set_experiment(config.mlflow.experiment_name)
 
-    loaders = build_cifar10_loaders(config.dataset, seed=config.training.seed)
+    loaders = build_cifar10_loaders(config.dataset, seed=training_defaults.seed)
     teacher = load_teacher(config.teacher, device)
     teacher_metrics = {
         "validation_accuracy": accuracy(teacher, loaders.validation, device),
@@ -53,6 +54,7 @@ def run_experiment(
             mlflow.log_artifact(str(experiment_dir / "resolved_config.json"))
 
         for current_method in methods:
+            method_training_config = config.training.for_method(current_method)
             student = build_student(config.student)
             output_dir = experiment_dir / current_method
             with _mlflow_method_run(config, current_method):
@@ -66,7 +68,7 @@ def run_experiment(
                     validation_loader=loaders.validation,
                     device=device,
                     optimizer_config=config.optimizer.for_method(current_method),
-                    training_config=config.training,
+                    training_config=method_training_config,
                     output_dir=output_dir,
                     mlflow_enabled=config.mlflow.enabled,
                 )

@@ -41,21 +41,22 @@ uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml
 Run just one method:
 
 ```bash
-uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml --method cross_entropy_softmax
+uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml --method cross_entropy
 ```
 
 The baseline config trains a linear student with three objectives:
 
 - `mse_softmax`: MSE between student and teacher probabilities.
-- `cross_entropy_softmax`: `alpha * Loss_soft + (1 - alpha) * Loss_hard`,
+- `cross_entropy`: `alpha * Loss_soft + (1 - alpha) * Loss_hard`,
   where `Loss_soft` is temperature-scaled cross-entropy against teacher
   probabilities and `Loss_hard` is standard cross-entropy against true class
   labels.
 - `mse_logits`: MSE between centered student and teacher logits.
 
-The baseline config sets `training.temperature` and `training.alpha` for the
-`cross_entropy_softmax` objective. The hard-label term uses the usual
-cross-entropy on raw student logits, which corresponds to temperature `1`.
+The baseline config keeps shared loop settings under `training.defaults` and
+method-specific settings under `training.methods`. In practice,
+`training.methods.cross_entropy` sets `temperature` and `alpha`, while
+`mse_softmax` and `mse_logits` use empty method blocks.
 
 MLflow logging is enabled in the YAML config. Each run logs one parent
 experiment run and one nested run per distillation method. Per epoch, the

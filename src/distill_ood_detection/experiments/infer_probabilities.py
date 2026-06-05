@@ -32,18 +32,19 @@ def run_probability_inference(
 ) -> dict[str, object]:
     """Infer teacher and student logits/probabilities for ID and OOD datasets."""
 
-    set_seed(config.training.seed)
-    device = resolve_device(config.training.device)
+    training_defaults = config.training.defaults
+    set_seed(training_defaults.seed)
+    device = resolve_device(training_defaults.device)
     experiment_dir = Path(config.output_dir) / config.experiment_name
     output_dir = experiment_dir / "probabilities"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     loaders = [
-        build_in_distribution_validation_loader(config.dataset, seed=config.training.seed),
+        build_in_distribution_validation_loader(config.dataset, seed=training_defaults.seed),
         *build_ood_loaders(config.dataset),
     ]
     teacher = load_teacher(config.teacher, device)
-    methods = (method,) if method else config.training.methods
+    methods = (method,) if method else config.training.enabled_methods()
 
     artifacts: list[dict[str, object]] = []
     for named_loader in loaders:

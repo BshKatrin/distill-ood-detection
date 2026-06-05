@@ -13,7 +13,11 @@ from tqdm.auto import tqdm
 
 import mlflow
 
-from distill_ood_detection.config import DistillationMethod, OptimizerConfig, TrainingConfig
+from distill_ood_detection.config import (
+    DistillationMethod,
+    OptimizerConfig,
+    ResolvedTrainingMethodConfig,
+)
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.evaluation.metrics import distillation_validation_metrics
 from distill_ood_detection.utils import write_json
@@ -27,7 +31,7 @@ def train_student(
     validation_loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
     optimizer_config: OptimizerConfig,
-    training_config: TrainingConfig,
+    training_config: ResolvedTrainingMethodConfig,
     output_dir: Path,
     mlflow_enabled: bool = True,
 ) -> dict[str, float | int | str]:

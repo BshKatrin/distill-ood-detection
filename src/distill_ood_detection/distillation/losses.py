@@ -34,9 +34,9 @@ def distillation_loss(
         centered_teacher_logits = _center_logits(teacher_logits)
         return F.mse_loss(centered_student_logits, centered_teacher_logits)
 
-    if method == "cross_entropy_softmax":
+    if method == "cross_entropy":
         if labels is None:
-            raise ValueError("labels are required for cross_entropy_softmax distillation")
+            raise ValueError("labels are required for cross_entropy distillation")
         scaled_teacher_probabilities = F.softmax(teacher_logits / temperature, dim=1)
         scaled_student_log_probabilities = F.log_softmax(student_logits / temperature, dim=1)
         loss_soft = (
