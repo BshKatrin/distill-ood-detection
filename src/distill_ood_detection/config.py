@@ -14,7 +14,7 @@ DistillationMethod = Literal[
     "cross_entropy",
     "mse_logits",
 ]
-OODDatasetName = Literal["mnist", "svhn"]
+OODDatasetName = Literal["mnist", "svhn", "cifar100"]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
     "cross_entropy_softmax": "cross_entropy",
 }
