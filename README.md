@@ -80,3 +80,6 @@ By default this uses each student's best checkpoint. Use `--checkpoint latest`
 or `--checkpoint both` to infer from other saved checkpoints. Artifacts are
 written under `runs/<experiment_name>/probabilities/`, with one `.pt` file per
 dataset/model and a `manifest.json` for notebook discovery.
+
+The baseline config evaluates three OOD datasets during inference:
+`MNIST`, `SVHN`, and Hugging Face `uoft-cs/cifar100` on the `test` split.

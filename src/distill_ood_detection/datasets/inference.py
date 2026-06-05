@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 import torch
+from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets import CIFAR10, MNIST, SVHN
 from torchvision.transforms import Compose, Grayscale, Normalize, Resize, ToTensor
@@ -62,15 +64,18 @@ def _ood_dataset(
     dataset_config: DatasetConfig,
     ood_config: OODDatasetConfig,
 ) -> Dataset[tuple[torch.Tensor, int]]:
-    transform = Compose(
-        [
-            Resize((32, 32)),
-            _channels_transform(ood_config.name),
-            ToTensor(),
-            Normalize(CIFAR10_MEAN, CIFAR10_STD),
-        ]
-    )
     data_dir = Path(dataset_config.data_dir)
+    if ood_config.name == "cifar100":
+        return HuggingFaceImageDataset(
+            dataset_id="uoft-cs/cifar100",
+            split=ood_config.split,
+            image_key="img",
+            label_key="fine_label",
+            transform=_cifar_like_transform(),
+            cache_dir=data_dir / "huggingface",
+        )
+
+    transform = _cifar_like_transform(ood_config.name)
     if ood_config.name == "mnist":
         return MNIST(
             root=data_dir,
@@ -88,7 +93,18 @@ def _ood_dataset(
     raise ValueError(f"Unsupported OOD dataset: {ood_config.name}")
 
 
-def _channels_transform(name: str) -> object:
+def _cifar_like_transform(name: str | None = None) -> Compose:
+    return Compose(
+        [
+            Resize((32, 32)),
+            _channels_transform(name),
+            ToTensor(),
+            Normalize(CIFAR10_MEAN, CIFAR10_STD),
+        ]
+    )
+
+
+def _channels_transform(name: str | None) -> object:
     if name == "mnist":
         return Grayscale(num_output_channels=3)
     return _Identity()
@@ -110,3 +126,39 @@ def _loader(
 class _Identity:
     def __call__(self, image: object) -> object:
         return image
+
+
+class HuggingFaceImageDataset(Dataset[tuple[torch.Tensor, int]]):
+    """Torch dataset wrapper around a Hugging Face image dataset split."""
+
+    def __init__(
+        self,
+        dataset_id: str,
+        split: str,
+        image_key: str,
+        label_key: str,
+        transform: Compose,
+        cache_dir: Path,
+    ) -> None:
+        self._dataset = load_dataset(
+            dataset_id,
+            split=split,
+            cache_dir=str(cache_dir),
+        )
+        self._image_key = image_key
+        self._label_key = label_key
+        self._transform = transform
+
+    def __len__(self) -> int:
+        return len(self._dataset)
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, int]:
+        sample = cast(dict[str, Any], self._dataset[index])
+        image = sample[self._image_key]
+        if not hasattr(image, "mode"):
+            raise TypeError(
+                f"Expected PIL image-like object in '{self._image_key}', got {type(image)!r}"
+            )
+        image = image.convert("RGB")
+        label = int(sample[self._label_key])
+        return self._transform(image), label

@@ -12,6 +12,8 @@ dataset:
       split: test
     - name: svhn
       split: test
+    - name: cifar100
+      split: test
 
 teacher:
   hf_model_id: edadaltocg/resnet18_cifar10
