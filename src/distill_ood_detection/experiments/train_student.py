@@ -65,7 +65,7 @@ def run_experiment(
                     train_loader=loaders.train,
                     validation_loader=loaders.validation,
                     device=device,
-                    optimizer_config=config.optimizer,
+                    optimizer_config=config.optimizer.for_method(current_method),
                     training_config=config.training,
                     output_dir=output_dir,
                     mlflow_enabled=config.mlflow.enabled,

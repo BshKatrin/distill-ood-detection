@@ -32,7 +32,6 @@ def train_student(
     mlflow_enabled: bool = True,
 ) -> dict[str, float | int | str]:
     """Train a student against teacher predictions and save trace artifacts."""
-
     student.to(device)
     optimizer = build_optimizer(student, optimizer_config)
     history: list[dict[str, float | int]] = []

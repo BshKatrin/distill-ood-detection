@@ -65,6 +65,20 @@ class OptimizerConfig:
 
 
 @dataclass(frozen=True)
+class OptimizerByMethodConfig:
+    """Optimizer settings for each distillation method."""
+
+    mse_softmax: OptimizerConfig = field(default_factory=OptimizerConfig)
+    cross_entropy_softmax: OptimizerConfig = field(default_factory=OptimizerConfig)
+    mse_logits: OptimizerConfig = field(default_factory=OptimizerConfig)
+
+    def for_method(self, method: DistillationMethod) -> OptimizerConfig:
+        """Return the optimizer settings for one distillation method."""
+
+        return getattr(self, method)
+
+
+@dataclass(frozen=True)
 class TrainingConfig:
     """Training loop settings."""
 
@@ -99,7 +113,7 @@ class ExperimentConfig:
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     teacher: TeacherConfig = field(default_factory=TeacherConfig)
     student: StudentConfig = field(default_factory=StudentConfig)
-    optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
+    optimizer: OptimizerByMethodConfig = field(default_factory=OptimizerByMethodConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
     mlflow: MlflowConfig = field(default_factory=MlflowConfig)
 
@@ -126,7 +140,7 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     if "input_shape" in student_raw:
         student_raw["input_shape"] = tuple(student_raw["input_shape"])
     student = StudentConfig(**student_raw)
-    optimizer = OptimizerConfig(**raw.get("optimizer", {}))
+    optimizer = _parse_optimizer_config(raw.get("optimizer", {}))
     training_raw = raw.get("training", {}).copy()
     if "methods" in training_raw:
         training_raw["methods"] = tuple(training_raw["methods"])
@@ -146,4 +160,33 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
         optimizer=optimizer,
         training=training,
         mlflow=mlflow,
+    )
+
+
+def _parse_optimizer_config(raw: dict[str, Any]) -> OptimizerByMethodConfig:
+    """Parse optimizer settings from a shared or per-method config block."""
+
+    method_names: tuple[DistillationMethod, ...] = (
+        "mse_softmax",
+        "cross_entropy_softmax",
+        "mse_logits",
+    )
+    optimizer_raw = raw.copy()
+    if any(name in optimizer_raw for name in method_names):
+        missing_methods = [name for name in method_names if name not in optimizer_raw]
+        if missing_methods:
+            missing = ", ".join(missing_methods)
+            raise ValueError(
+                "optimizer must define settings for every distillation method when "
+                f"using per-method configuration; missing: {missing}"
+            )
+        return OptimizerByMethodConfig(
+            **{
+                name: OptimizerConfig(**optimizer_raw[name])
+                for name in method_names
+            }
+        )
+    shared_optimizer = OptimizerConfig(**optimizer_raw)
+    return OptimizerByMethodConfig(
+        **{name: shared_optimizer for name in method_names}
     )
