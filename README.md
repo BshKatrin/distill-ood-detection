@@ -41,13 +41,14 @@ uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml
 Run just one method:
 
 ```bash
-uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml --method cross_entropy_probabilities
+uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml --method cross_entropy_softmax
 ```
 
-The baseline config trains a linear student with two objectives:
+The baseline config trains a linear student with three objectives:
 
-- `mse`: MSE between student and teacher probabilities.
-- `cross_entropy_probabilities`: cross-entropy against teacher probabilities.
+- `mse_softmax`: MSE between student and teacher probabilities.
+- `cross_entropy_softmax`: cross-entropy against teacher probabilities.
+- `mse_logits`: MSE between centered student and teacher logits.
 
 MLflow logging is enabled in the YAML config. Each run logs one parent
 experiment run and one nested run per distillation method. Per epoch, the

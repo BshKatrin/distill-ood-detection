@@ -24,7 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     train_parser.add_argument(
         "--method",
-        choices=("mse", "cross_entropy_probabilities"),
+        choices=("mse_softmax", "cross_entropy_softmax", "mse_logits"),
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )
@@ -43,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     infer_parser.add_argument(
         "--method",
-        choices=("mse", "cross_entropy_probabilities"),
+        choices=("mse_softmax", "cross_entropy_softmax", "mse_logits"),
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )

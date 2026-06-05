@@ -34,8 +34,9 @@ training:
   device: cuda
   log_every_steps: 50
   methods:
-    - mse
-    - cross_entropy_probabilities
+    - mse_softmax
+    - cross_entropy_softmax
+    - mse_logits
 
 mlflow:
   enabled: true

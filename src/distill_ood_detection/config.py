@@ -9,7 +9,11 @@ from typing import Any, Literal
 import yaml
 
 
-DistillationMethod = Literal["mse", "cross_entropy_probabilities"]
+DistillationMethod = Literal[
+    "mse_softmax",
+    "cross_entropy_softmax",
+    "mse_logits",
+]
 OODDatasetName = Literal["mnist", "svhn"]
 
 
@@ -69,8 +73,9 @@ class TrainingConfig:
     device: str = "auto"
     log_every_steps: int = 50
     methods: tuple[DistillationMethod, ...] = (
-        "mse",
-        "cross_entropy_probabilities",
+        "mse_softmax",
+        "cross_entropy_softmax",
+        "mse_logits",
     )
 
 
