@@ -14,7 +14,6 @@ from distill_ood_detection.config import DatasetConfig, OODDatasetConfig
 from distill_ood_detection.datasets.cifar10 import (
     CIFAR10_MEAN,
     CIFAR10_STD,
-    split_train_validation,
 )
 
 
@@ -27,30 +26,22 @@ class NamedLoader:
     loader: DataLoader[tuple[torch.Tensor, int]]
 
 
-def build_in_distribution_validation_loader(
-    config: DatasetConfig,
-    seed: int,
-) -> NamedLoader:
-    """Build the deterministic in-distribution validation loader."""
+def build_in_distribution_test_loader(config: DatasetConfig) -> NamedLoader:
+    """Build the in-distribution CIFAR-10 test loader."""
 
     if config.name != "cifar10":
         raise ValueError(f"Unsupported in-distribution dataset: {config.name}")
     transform = Compose([ToTensor(), Normalize(CIFAR10_MEAN, CIFAR10_STD)])
-    train_dataset = CIFAR10(
+    test_dataset = CIFAR10(
         root=Path(config.data_dir),
-        train=True,
+        train=False,
         download=True,
         transform=transform,
     )
-    _, validation_subset = split_train_validation(
-        train_dataset,
-        validation_fraction=config.validation_fraction,
-        seed=seed,
-    )
     return NamedLoader(
-        name=f"{config.name}_validation",
-        split="validation",
-        loader=_loader(validation_subset, config),
+        name=f"{config.name}_test",
+        split="test",
+        loader=_loader(test_dataset, config),
     )
 
 

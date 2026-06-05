@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from distill_ood_detection.config import DistillationMethod, ExperimentConfig
 from distill_ood_detection.datasets.inference import (
     NamedLoader,
-    build_in_distribution_validation_loader,
+    build_in_distribution_test_loader,
     build_ood_loaders,
 )
 from distill_ood_detection.models.student import build_student
@@ -40,7 +40,7 @@ def run_probability_inference(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     loaders = [
-        build_in_distribution_validation_loader(config.dataset, seed=training_defaults.seed),
+        build_in_distribution_test_loader(config.dataset),
         *build_ood_loaders(config.dataset),
     ]
     teacher = load_teacher(config.teacher, device)
