@@ -72,6 +72,8 @@ class TrainingConfig:
     seed: int = 123
     device: str = "auto"
     log_every_steps: int = 50
+    temperature: float = 1.0
+    alpha: float = 0.5
     methods: tuple[DistillationMethod, ...] = (
         "mse_softmax",
         "cross_entropy_softmax",
@@ -129,6 +131,10 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     if "methods" in training_raw:
         training_raw["methods"] = tuple(training_raw["methods"])
     training = TrainingConfig(**training_raw)
+    if training.temperature <= 0.0:
+        raise ValueError("training.temperature must be positive")
+    if not 0.0 <= training.alpha <= 1.0:
+        raise ValueError("training.alpha must be between 0.0 and 1.0")
     mlflow = MlflowConfig(**raw.get("mlflow", {}))
 
     return ExperimentConfig(

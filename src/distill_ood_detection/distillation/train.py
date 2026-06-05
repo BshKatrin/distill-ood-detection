@@ -48,13 +48,21 @@ def train_student(
         total_loss = 0.0
         total_examples = 0
         progress = tqdm(train_loader, desc=f"{method} epoch {epoch}", leave=False)
-        for step, (images, _) in enumerate(progress, start=1):
+        for step, (images, labels) in enumerate(progress, start=1):
             images = images.to(device)
+            labels = labels.to(device)
             optimizer.zero_grad(set_to_none=True)
             with torch.no_grad():
                 teacher_logits = teacher(images)
             student_logits = student(images)
-            loss = distillation_loss(method, student_logits, teacher_logits)
+            loss = distillation_loss(
+                method,
+                student_logits,
+                teacher_logits,
+                labels=labels,
+                temperature=training_config.temperature,
+                alpha=training_config.alpha,
+            )
             loss.backward()
             optimizer.step()
 
@@ -71,6 +79,8 @@ def train_student(
             student=student,
             loader=validation_loader,
             device=device,
+            temperature=training_config.temperature,
+            alpha=training_config.alpha,
         )
         validation_accuracy = validation_metrics["validation_accuracy"]
         validation_distillation_loss = validation_metrics["validation_distillation_loss"]

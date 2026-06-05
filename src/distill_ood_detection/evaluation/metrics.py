@@ -38,6 +38,8 @@ def distillation_validation_metrics(
     student: nn.Module,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
+    temperature: float = 1.0,
+    alpha: float = 0.5,
 ) -> dict[str, float]:
     """Compute validation metrics for student distillation."""
 
@@ -66,7 +68,15 @@ def distillation_validation_metrics(
         total += batch_size
         total_kl += kl_divergence.item() * batch_size
         total_distillation_loss += (
-            distillation_loss(method, student_logits, teacher_logits).item() * batch_size
+            distillation_loss(
+                method,
+                student_logits,
+                teacher_logits,
+                labels=labels,
+                temperature=temperature,
+                alpha=alpha,
+            ).item()
+            * batch_size
         )
 
     return {
