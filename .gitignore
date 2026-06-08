@@ -109,6 +109,7 @@ ipython_config.py
 # Experiment artifacts
 data/
 runs/
+reports/
 mlflow.db
 mlflow.db-*
 mlruns/

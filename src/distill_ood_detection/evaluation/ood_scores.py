@@ -2,94 +2,51 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+MAX_PROBABILITY_DIFFERENCE = "max_probability_difference"
+ABSOLUTE_MAX_PROBABILITY_DIFFERENCE = "absolute_max_probability_difference"
+STUDENT_TEACHER_KL_DIVERGENCE = "student_teacher_kl_divergence"
 
-def max_probability_difference(
-    teacher_probabilities: ArrayLike,
-    student_probabilities: ArrayLike,
+# Signs convert raw scores to the repository convention used by OOD metrics:
+# ID is the positive class, so larger signed scores are more ID-like.
+SIGNS: Mapping[str, int] = {
+    MAX_PROBABILITY_DIFFERENCE: +1,
+    ABSOLUTE_MAX_PROBABILITY_DIFFERENCE: -1,
+    STUDENT_TEACHER_KL_DIVERGENCE: -1,
+}
+
+
+def _maybe_signed(
+    scores: NDArray[np.float64],
+    score_name: str,
+    signed: bool,
 ) -> NDArray[np.float64]:
-    """Compute max_proba_teacher - max_proba_student for each sample.
-
-    The returned values follow the repository's OOD convention: ID samples are
-    the positive class and OOD samples are the negative class.
-
-    Args:
-        teacher_probabilities: Teacher class probabilities with shape
-            ``(n_samples, n_classes)``.
-        student_probabilities: Student class probabilities with shape
-            ``(n_samples, n_classes)``.
-
-    Returns:
-        One score per sample. Higher scores are treated as more ID-like by
-        ``ood_detection_metrics``.
-    """
-
-    teacher_max, student_max = _max_probabilities(
-        teacher_probabilities,
-        student_probabilities,
-    )
-    return teacher_max - student_max
-
-
-def absolute_max_probability_difference(
-    teacher_probabilities: ArrayLike,
-    student_probabilities: ArrayLike,
-) -> NDArray[np.float64]:
-    """Compute abs(max_proba_teacher - max_proba_student) for each sample.
-
-    Args:
-        teacher_probabilities: Teacher class probabilities with shape
-            ``(n_samples, n_classes)``.
-        student_probabilities: Student class probabilities with shape
-            ``(n_samples, n_classes)``.
-
-    Returns:
-        One score per sample. Higher scores are treated as more ID-like by
-        ``ood_detection_metrics``.
-    """
-
-    return np.abs(
-        max_probability_difference(
-            teacher_probabilities,
-            student_probabilities,
-        )
-    )
-
-
-def confidence_ratio(
-    teacher_probabilities: ArrayLike,
-    student_probabilities: ArrayLike,
-) -> NDArray[np.float64]:
-    """Compute log(max_proba_teacher) - log(max_proba_student) per sample.
-
-    Args:
-        teacher_probabilities: Teacher class probabilities with shape
-            ``(n_samples, n_classes)``.
-        student_probabilities: Student class probabilities with shape
-            ``(n_samples, n_classes)``.
-
-    Returns:
-        One score per sample. Higher scores are treated as more ID-like by
-        ``ood_detection_metrics``.
-
-    Raises:
-        ValueError: If either model has a maximum probability less than or equal
-            to zero for any sample.
-    """
-
-    teacher_max, student_max = _max_probabilities(
-        teacher_probabilities,
-        student_probabilities,
-    )
-    if np.any(teacher_max <= 0.0) or np.any(student_max <= 0.0):
-        msg = "confidence_ratio requires positive maximum probabilities."
-        raise ValueError(msg)
-    return np.log(teacher_max) - np.log(student_max)
+    if not signed:
+        return scores
+    try:
+        sign = SIGNS[score_name]
+    except KeyError as error:
+        msg = f"Missing sign for OOD score: {score_name}"
+        raise ValueError(msg) from error
+    return sign * scores
 
 
 def _max_probabilities(
+    teacher_probabilities: ArrayLike,
+    student_probabilities: ArrayLike,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    teacher, student = _probability_matrices(
+        teacher_probabilities,
+        student_probabilities,
+    )
+    return teacher.max(axis=1), student.max(axis=1)
+
+
+def _probability_matrices(
     teacher_probabilities: ArrayLike,
     student_probabilities: ArrayLike,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -101,7 +58,7 @@ def _max_probabilities(
             f"shape, got {teacher.shape} and {student.shape}."
         )
         raise ValueError(msg)
-    return teacher.max(axis=1), student.max(axis=1)
+    return teacher, student
 
 
 def _as_probability_matrix(
@@ -119,3 +76,113 @@ def _as_probability_matrix(
         msg = f"{name} must contain only finite values."
         raise ValueError(msg)
     return array
+
+
+def _kl(p: ArrayLike, q: ArrayLike) -> NDArray[np.float64]:
+    """Kullback-Leibler divergence D(P || Q) for discrete distributions.
+        P : true probability distribution
+        Q : approximating probability distribution
+
+    Parameters
+    ----------
+    p, q : array-like, dtype=float, shape=n
+    Discrete probability distributions.
+    """
+    p = np.asarray(p, dtype=float)
+    q = np.asarray(q, dtype=float)
+    positive_support = p > 0.0
+    if np.any(positive_support & (q == 0.0)):
+        msg = "q must be positive where p is positive to compute KL divergence."
+        raise ValueError(msg)
+    terms = np.zeros_like(p, dtype=float)
+    terms[positive_support] = (
+        p[positive_support] * np.log(p[positive_support] / q[positive_support])
+    )
+    return np.sum(terms, axis=1)
+
+
+def max_probability_difference(
+    teacher_probabilities: ArrayLike,
+    student_probabilities: ArrayLike,
+    signed: bool = False,
+) -> NDArray[np.float64]:
+    """Compute max_proba_teacher - max_proba_student for each sample.
+
+    Args:
+        teacher_probabilities: Teacher class probabilities with shape
+            ``(n_samples, n_classes)``.
+        student_probabilities: Student class probabilities with shape
+            ``(n_samples, n_classes)``.
+        signed: If True, apply this score's sign so higher values are more
+            ID-like.
+
+    Returns:
+        One raw or signed score per sample.
+    """
+
+    teacher_max, student_max = _max_probabilities(
+        teacher_probabilities,
+        student_probabilities,
+    )
+    scores = teacher_max - student_max
+    return _maybe_signed(scores, MAX_PROBABILITY_DIFFERENCE, signed)
+
+
+def absolute_max_probability_difference(
+    teacher_probabilities: ArrayLike,
+    student_probabilities: ArrayLike,
+    signed: bool = False,
+) -> NDArray[np.float64]:
+    """Compute abs(max_proba_teacher - max_proba_student) for each sample.
+
+    Args:
+        teacher_probabilities: Teacher class probabilities with shape
+            ``(n_samples, n_classes)``.
+        student_probabilities: Student class probabilities with shape
+            ``(n_samples, n_classes)``.
+        signed: If True, apply this score's sign so higher values are more
+            ID-like.
+
+    Returns:
+        One raw or signed score per sample.
+    """
+
+    scores = np.abs(
+        max_probability_difference(
+            teacher_probabilities,
+            student_probabilities,
+        )
+    )
+    return _maybe_signed(scores, ABSOLUTE_MAX_PROBABILITY_DIFFERENCE, signed)
+
+
+def student_teacher_kl_divergence(
+    teacher_probabilities: ArrayLike,
+    student_probabilities: ArrayLike,
+    signed: bool = False,
+) -> NDArray[np.float64]:
+    """Compute KL(student || teacher) for each sample.
+
+    Args:
+        teacher_probabilities: Teacher class probabilities with shape
+            ``(n_samples, n_classes)``.
+        student_probabilities: Student class probabilities with shape
+            ``(n_samples, n_classes)``.
+        signed: If True, apply this score's sign so higher values are more
+            ID-like.
+
+    Returns:
+        One raw or signed divergence value per sample.
+
+    Raises:
+        ValueError: If inputs have different shapes, contain invalid values, or
+            teacher probabilities are zero where student probabilities are
+            positive.
+    """
+
+    teacher, student = _probability_matrices(
+        teacher_probabilities,
+        student_probabilities,
+    )
+    scores = _kl(teacher, student)
+    return _maybe_signed(scores, STUDENT_TEACHER_KL_DIVERGENCE, signed)

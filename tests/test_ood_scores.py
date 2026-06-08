@@ -8,9 +8,10 @@ import numpy as np
 
 from distill_ood_detection.evaluation import (
     absolute_max_probability_difference,
-    confidence_ratio,
     max_probability_difference,
+    student_teacher_kl_divergence,
 )
+from distill_ood_detection.evaluation.ood_scores import SIGNS
 
 
 class OODScoreTests(unittest.TestCase):
@@ -34,13 +35,45 @@ class OODScoreTests(unittest.TestCase):
             np.array([0.1, 0.05]),
         )
 
-    def test_confidence_ratio(self) -> None:
+    def test_student_teacher_kl_divergence(self) -> None:
         teacher = np.array([[0.7, 0.3], [0.1, 0.9]])
         student = np.array([[0.4, 0.6], [0.2, 0.8]])
 
         np.testing.assert_allclose(
-            confidence_ratio(teacher, student),
-            np.log(np.array([0.7, 0.9])) - np.log(np.array([0.6, 0.8])),
+            student_teacher_kl_divergence(teacher, student),
+            np.array(
+                [
+                    0.4 * np.log(0.4 / 0.7) + 0.6 * np.log(0.6 / 0.3),
+                    0.2 * np.log(0.2 / 0.1) + 0.8 * np.log(0.8 / 0.9),
+                ]
+            ),
+        )
+
+    def test_signed_scores_follow_id_positive_convention(self) -> None:
+        teacher = np.array([[0.7, 0.3], [0.1, 0.9]])
+        student = np.array([[0.4, 0.6], [0.2, 0.8]])
+
+        np.testing.assert_allclose(
+            max_probability_difference(teacher, student, signed=True),
+            np.array([0.1, 0.1]),
+        )
+        np.testing.assert_allclose(
+            absolute_max_probability_difference(teacher, student, signed=True),
+            np.array([-0.1, -0.1]),
+        )
+        np.testing.assert_allclose(
+            student_teacher_kl_divergence(teacher, student, signed=True),
+            -student_teacher_kl_divergence(teacher, student),
+        )
+
+    def test_defines_sign_for_every_ood_score(self) -> None:
+        self.assertEqual(
+            set(SIGNS),
+            {
+                "absolute_max_probability_difference",
+                "max_probability_difference",
+                "student_teacher_kl_divergence",
+            },
         )
 
     def test_rejects_shape_mismatch(self) -> None:
@@ -50,12 +83,12 @@ class OODScoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             max_probability_difference(teacher, student)
 
-    def test_confidence_ratio_rejects_zero_max_probability(self) -> None:
-        teacher = np.array([[0.0, 0.0]])
-        student = np.array([[0.4, 0.6]])
+    def test_student_teacher_kl_divergence_rejects_zero_teacher_support(self) -> None:
+        teacher = np.array([[1.0, 0.0]])
+        student = np.array([[0.8, 0.2]])
 
         with self.assertRaises(ValueError):
-            confidence_ratio(teacher, student)
+            student_teacher_kl_divergence(teacher, student)
 
 
 if __name__ == "__main__":
