@@ -78,6 +78,10 @@ def _logit_matrices(
     return teacher, student
 
 
+def _center_outputs(outputs: NDArray[np.float64]) -> NDArray[np.float64]:
+    return outputs - outputs.mean(axis=1, keepdims=True)
+
+
 def _as_probability_matrix(
     probabilities: ArrayLike,
     name: str,
@@ -217,7 +221,7 @@ def logit_l2_distance(
     student_logits: ArrayLike,
     signed: bool = False,
 ) -> NDArray[np.float64]:
-    """Compute L2 distance between teacher and student logits per sample.
+    """Compute L2 distance between centered teacher and student logits.
 
     Args:
         teacher_logits: Teacher logits with shape ``(n_samples, n_classes)``.
@@ -233,5 +237,7 @@ def logit_l2_distance(
     """
 
     teacher, student = _logit_matrices(teacher_logits, student_logits)
-    scores = np.linalg.norm(teacher - student, ord=2, axis=1)
+    centered_teacher = _center_outputs(teacher)
+    centered_student = _center_outputs(student)
+    scores = np.linalg.norm(centered_teacher - centered_student, ord=2, axis=1)
     return _maybe_signed(scores, LOGIT_L2_DISTANCE, signed)

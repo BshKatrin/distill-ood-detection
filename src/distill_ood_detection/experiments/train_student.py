@@ -12,7 +12,7 @@ from distill_ood_detection.datasets.cifar10 import build_cifar10_loaders
 from distill_ood_detection.distillation.train import train_student
 from distill_ood_detection.evaluation.metrics import accuracy
 from distill_ood_detection.models.student import build_student
-from distill_ood_detection.models.teacher import load_teacher
+from distill_ood_detection.models.teacher import TeacherFeatureExtractor, load_teacher
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
 
@@ -35,6 +35,11 @@ def run_experiment(
 
     loaders = build_cifar10_loaders(config.dataset, seed=training_defaults.seed)
     teacher = load_teacher(config.teacher, device)
+    feature_extractor = (
+        TeacherFeatureExtractor(teacher, config.student.feature_layer)
+        if config.student.feature_layer is not None
+        else None
+    )
     teacher_metrics = {
         "validation_accuracy": accuracy(teacher, loaders.validation, device),
         "test_accuracy": accuracy(teacher, loaders.test, device),
@@ -71,8 +76,14 @@ def run_experiment(
                     training_config=method_training_config,
                     output_dir=output_dir,
                     mlflow_enabled=config.mlflow.enabled,
+                    feature_extractor=feature_extractor,
                 )
-                summary["test_accuracy"] = accuracy(student, loaders.test, device)
+                summary["test_accuracy"] = accuracy(
+                    student,
+                    loaders.test,
+                    device,
+                    feature_extractor=feature_extractor,
+                )
                 write_json(output_dir / "metrics.json", summary)
                 if config.mlflow.enabled:
                     mlflow.log_metric("test_accuracy", summary["test_accuracy"])

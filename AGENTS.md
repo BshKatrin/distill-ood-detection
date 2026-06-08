@@ -25,6 +25,9 @@ Avoid introducing frameworks or patterns unless they reduce duplication across m
 
 - Far-OOD: OOD samples that differ substantially from the in-distribution data in semantics, appearance, or underlying data-generating process. These samples are generally easier to distinguish from ID samples. Example: CIFAR-10 as ID and MNIST as OOD.
 
+- OOD Score: A scalar measure of confidence used for OOD detection. Higher values indicate ID samples; lower values indicate OOD samples.
+- MSP (Maximum Softmax Probability): An OOD score defined as the maximum softmax probability of the teacher model. MSP is a baseline for OOD detection.
+
 ## Directory responsibilities
 
 - datasets/: dataset loading and transforms.

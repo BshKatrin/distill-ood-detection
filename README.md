@@ -50,6 +50,12 @@ Train the three-hidden-layer MLP student:
 uv run distill-ood train-student --config configs/distill_mlp_cifar10.yaml
 ```
 
+Train an MLP student on frozen teacher features from a hidden layer instead of raw pixels:
+
+```bash
+uv run distill-ood train-student --config configs/distill_feature_linear_layer3_cifar10.yaml
+```
+
 The baseline config trains a linear student with three objectives:
 
 - `mse_softmax`: MSE between student and teacher probabilities.
@@ -68,6 +74,22 @@ MLflow logging is enabled in the YAML config. Each run logs one parent
 experiment run and one nested run per distillation method. Per epoch, the
 student run logs distillation loss, validation accuracy, and validation KL
 divergence `KL(teacher || student)`.
+
+## Feature Students
+
+PyTorch students can consume frozen teacher features by setting
+`student.feature_layer` in the YAML config. In that case `student.input_shape`
+must match the selected teacher layer output shape. For the CIFAR ResNet-18
+teacher, useful feature layers include:
+
+- `layer2`: `[128, 16, 16]`
+- `layer3`: `[256, 8, 8]`
+- `layer4`: `[512, 4, 4]`
+- `avgpool`: `[512, 1, 1]`
+
+The config `configs/distill_feature_mlp_layer3_cifar10.yaml` uses `layer3`.
+Training still distills against the teacher logits, but the student receives
+the configured teacher features as input.
 
 ## Tree Students
 
@@ -103,6 +125,12 @@ validation split and configured OOD datasets:
 
 ```bash
 uv run distill-ood infer-probabilities --config configs/distill_linear_cifar10.yaml
+```
+
+For feature students, use the matching feature-student config:
+
+```bash
+uv run distill-ood infer-probabilities --config configs/distill_feature_mlp_layer3_cifar10.yaml
 ```
 
 By default this uses each student's best checkpoint. Use `--checkpoint latest`

@@ -16,16 +16,22 @@ def accuracy(
     model: nn.Module,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
+    feature_extractor: nn.Module | None = None,
 ) -> float:
     """Compute top-1 classification accuracy."""
 
     model.eval()
+    if feature_extractor is not None:
+        feature_extractor.eval()
     correct = 0
     total = 0
     for images, labels in loader:
         images = images.to(device)
         labels = labels.to(device)
-        predictions = model(images).argmax(dim=1)
+        inputs = images
+        if feature_extractor is not None:
+            _, inputs = feature_extractor(images)
+        predictions = model(inputs).argmax(dim=1)
         correct += (predictions == labels).sum().item()
         total += labels.numel()
     return correct / total
@@ -40,11 +46,14 @@ def distillation_validation_metrics(
     device: torch.device,
     temperature: float = 1.0,
     alpha: float = 0.5,
+    feature_extractor: nn.Module | None = None,
 ) -> dict[str, float]:
     """Compute validation metrics for student distillation."""
 
     teacher.eval()
     student.eval()
+    if feature_extractor is not None:
+        feature_extractor.eval()
     correct = 0
     total = 0
     total_kl = 0.0
@@ -52,8 +61,12 @@ def distillation_validation_metrics(
     for images, labels in loader:
         images = images.to(device)
         labels = labels.to(device)
-        teacher_logits = teacher(images)
-        student_logits = student(images)
+        if feature_extractor is None:
+            teacher_logits = teacher(images)
+            student_inputs = images
+        else:
+            teacher_logits, student_inputs = feature_extractor(images)
+        student_logits = student(student_inputs)
         predictions = student_logits.argmax(dim=1)
         teacher_probabilities = F.softmax(teacher_logits, dim=1)
         student_log_probabilities = F.log_softmax(student_logits, dim=1)

@@ -29,6 +29,44 @@ class CifarResNet18(ResNet):
         self.maxpool = nn.Identity()
 
 
+class TeacherFeatureExtractor(nn.Module):
+    """Return teacher logits and intermediate features from one forward pass."""
+
+    def __init__(self, teacher: nn.Module, feature_layer: str) -> None:
+        super().__init__()
+        self.teacher = teacher
+        self.feature_layer = feature_layer
+        self._features: torch.Tensor | None = None
+        try:
+            layer = teacher.get_submodule(feature_layer)
+        except AttributeError as error:
+            msg = f"Teacher does not have feature layer: {feature_layer}"
+            raise ValueError(msg) from error
+        self._hook = layer.register_forward_hook(self._capture_features)
+
+    def forward(self, images: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return ``(teacher_logits, features)`` for a batch of images."""
+
+        self._features = None
+        logits = self.teacher(images)
+        if self._features is None:
+            raise RuntimeError(f"Feature hook did not run for layer: {self.feature_layer}")
+        return logits, self._features
+
+    def close(self) -> None:
+        """Remove the feature hook."""
+
+        self._hook.remove()
+
+    def _capture_features(
+        self,
+        _module: nn.Module,
+        _inputs: tuple[object, ...],
+        output: torch.Tensor,
+    ) -> None:
+        self._features = output
+
+
 def load_teacher(config: TeacherConfig, device: torch.device) -> nn.Module:
     """Load the pretrained ResNet-18 CIFAR-10 teacher from Hugging Face."""
 

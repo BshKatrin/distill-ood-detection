@@ -57,6 +57,7 @@ class StudentConfig:
     input_shape: tuple[int, int, int] = (3, 32, 32)
     num_classes: int = 10
     hidden_channels: tuple[int, ...] = field(default_factory=tuple)
+    feature_layer: str | None = None
 
 
 @dataclass(frozen=True)
@@ -309,6 +310,8 @@ def _parse_student_config(raw: dict[str, Any]) -> StudentConfig:
             "student.hidden_channels must define at least one hidden layer "
             "for MLP students"
         )
+    if student.kind == "random_forest" and student.feature_layer is not None:
+        raise ValueError("student.feature_layer is only supported for PyTorch students")
     if any(hidden_channel <= 0 for hidden_channel in student.hidden_channels):
         raise ValueError("student.hidden_channels values must be positive")
     return student

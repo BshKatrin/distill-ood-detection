@@ -49,6 +49,34 @@ def collect_model_outputs(
     )
 
 
+@torch.no_grad()
+def collect_feature_model_outputs(
+    model: nn.Module,
+    feature_extractor: nn.Module,
+    loader: DataLoader[tuple[torch.Tensor, int]],
+    device: torch.device,
+) -> ModelOutputs:
+    """Collect outputs for a student that consumes teacher features."""
+
+    logits_batches: list[torch.Tensor] = []
+    probabilities: list[torch.Tensor] = []
+    labels: list[torch.Tensor] = []
+    model.eval()
+    feature_extractor.eval()
+    for images, batch_labels in loader:
+        images = images.to(device)
+        _, features = feature_extractor(images)
+        logits = model(features)
+        logits_batches.append(logits.cpu())
+        probabilities.append(F.softmax(logits, dim=1).cpu())
+        labels.append(batch_labels.cpu())
+    return ModelOutputs(
+        logits=torch.cat(logits_batches, dim=0),
+        probabilities=torch.cat(probabilities, dim=0),
+        labels=torch.cat(labels, dim=0),
+    )
+
+
 def save_model_outputs(
     path: Path,
     outputs: ModelOutputs,

@@ -34,9 +34,13 @@ def train_student(
     training_config: ResolvedTrainingMethodConfig,
     output_dir: Path,
     mlflow_enabled: bool = True,
+    feature_extractor: nn.Module | None = None,
 ) -> dict[str, float | int | str]:
     """Train a student against teacher predictions and save trace artifacts."""
     student.to(device)
+    if feature_extractor is not None:
+        feature_extractor.to(device)
+        feature_extractor.eval()
     optimizer = build_optimizer(student, optimizer_config)
     history: list[dict[str, float | int]] = []
     best_validation_accuracy = 0.0
@@ -56,8 +60,12 @@ def train_student(
             labels = labels.to(device)
             optimizer.zero_grad(set_to_none=True)
             with torch.no_grad():
-                teacher_logits = teacher(images)
-            student_logits = student(images)
+                if feature_extractor is None:
+                    teacher_logits = teacher(images)
+                    student_inputs = images
+                else:
+                    teacher_logits, student_inputs = feature_extractor(images)
+            student_logits = student(student_inputs)
             loss = distillation_loss(
                 method,
                 student_logits,
@@ -84,6 +92,7 @@ def train_student(
             device=device,
             temperature=training_config.temperature,
             alpha=training_config.alpha,
+            feature_extractor=feature_extractor,
         )
         validation_accuracy = validation_metrics["validation_accuracy"]
         validation_distillation_loss = validation_metrics["validation_distillation_loss"]

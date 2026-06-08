@@ -50,13 +50,13 @@ class OODScoreTests(unittest.TestCase):
             ),
         )
 
-    def test_logit_l2_distance(self) -> None:
+    def test_logit_l2_distance_uses_centered_logits(self) -> None:
         teacher = np.array([[1.0, 2.0, 3.0], [0.0, 4.0, 8.0]])
-        student = np.array([[1.0, 0.0, 3.0], [3.0, 0.0, 8.0]])
+        student = np.array([[6.0, 7.0, 8.0], [2.0, 4.0, 6.0]])
 
         np.testing.assert_allclose(
             logit_l2_distance(teacher, student),
-            np.array([2.0, 5.0]),
+            np.array([0.0, np.sqrt(8.0)]),
         )
 
     def test_signed_scores_follow_id_positive_convention(self) -> None:

@@ -24,6 +24,14 @@ class StudentModelTests(unittest.TestCase):
             ("mse_softmax", "cross_entropy", "mse_logits"),
         )
 
+    def test_loads_feature_mlp_config(self) -> None:
+        config = load_config(Path("configs/distill_feature_mlp_layer3_cifar10.yaml"))
+
+        self.assertEqual(config.student.kind, "mlp")
+        self.assertEqual(config.student.feature_layer, "layer3")
+        self.assertEqual(config.student.input_shape, (256, 8, 8))
+        self.assertEqual(config.student.hidden_channels, (1024, 512, 256))
+
     def test_builds_mlp_student(self) -> None:
         config = StudentConfig(
             kind="mlp",
@@ -45,6 +53,18 @@ class StudentModelTests(unittest.TestCase):
                 "kind": "mlp",
                 "input_shape": [3, 32, 32],
                 "num_classes": 10,
+            },
+        }
+
+        with self.assertRaises(ValueError):
+            parse_config(raw)
+
+    def test_rejects_feature_layer_for_random_forest(self) -> None:
+        raw = {
+            "experiment_name": "bad_feature_tree_config",
+            "student": {
+                "kind": "random_forest",
+                "feature_layer": "layer3",
             },
         }
 

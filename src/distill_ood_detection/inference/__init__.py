@@ -2,6 +2,7 @@
 
 from distill_ood_detection.inference.outputs import (
     ModelOutputs,
+    collect_feature_model_outputs,
     collect_model_outputs,
     collect_tree_model_outputs,
     predict_tree_model_outputs,
@@ -10,6 +11,7 @@ from distill_ood_detection.inference.outputs import (
 
 __all__ = [
     "ModelOutputs",
+    "collect_feature_model_outputs",
     "collect_model_outputs",
     "collect_tree_model_outputs",
     "predict_tree_model_outputs",

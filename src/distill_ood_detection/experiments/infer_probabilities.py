@@ -22,12 +22,13 @@ from distill_ood_detection.datasets.inference import (
     build_ood_loaders,
 )
 from distill_ood_detection.inference import (
+    collect_feature_model_outputs,
     collect_model_outputs,
     collect_tree_model_outputs,
     save_model_outputs,
 )
 from distill_ood_detection.models.student import build_student
-from distill_ood_detection.models.teacher import load_teacher
+from distill_ood_detection.models.teacher import TeacherFeatureExtractor, load_teacher
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
 CheckpointSelection = Literal["best", "latest", "both"]
@@ -62,6 +63,11 @@ def run_probability_inference(
         ]
     )
     teacher = load_teacher(config.teacher, device)
+    feature_extractor = (
+        TeacherFeatureExtractor(teacher, config.student.feature_layer)
+        if config.student.feature_layer is not None
+        else None
+    )
     if config.student.kind == "random_forest" and method is not None:
         raise ValueError("--method is only supported for PyTorch students; use --tree-mode instead")
     if config.student.kind != "random_forest" and tree_mode is not None:
@@ -108,6 +114,7 @@ def run_probability_inference(
                     device=device,
                     checkpoint=checkpoint,
                     method=method,
+                    feature_extractor=feature_extractor,
                 )
             )
 
@@ -131,6 +138,7 @@ def _infer_torch_students(
     device: torch.device,
     checkpoint: CheckpointSelection,
     method: DistillationMethod | None,
+    feature_extractor: TeacherFeatureExtractor | None,
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
     methods = (method,) if method else config.training.enabled_methods()
@@ -147,29 +155,42 @@ def _infer_torch_students(
             student.to(device)
             student.eval()
             probability_path = dataset_dir / f"student_{current_method}_{checkpoint_name}.pt"
+            metadata = {
+                "model": "student",
+                "student_kind": config.student.kind,
+                "method": current_method,
+                "checkpoint": checkpoint_name,
+                "checkpoint_path": str(checkpoint_path),
+                "dataset": dataset_name,
+                "split": split,
+            }
+            if config.student.feature_layer is not None:
+                metadata["feature_layer"] = config.student.feature_layer
             save_model_outputs(
                 path=probability_path,
-                outputs=collect_model_outputs(student, loader, device),
-                metadata={
-                    "model": "student",
-                    "student_kind": config.student.kind,
-                    "method": current_method,
-                    "checkpoint": checkpoint_name,
-                    "checkpoint_path": str(checkpoint_path),
-                    "dataset": dataset_name,
-                    "split": split,
-                },
+                outputs=(
+                    collect_model_outputs(student, loader, device)
+                    if feature_extractor is None
+                    else collect_feature_model_outputs(
+                        student,
+                        feature_extractor,
+                        loader,
+                        device,
+                    )
+                ),
+                metadata=metadata,
             )
-            artifacts.append(
-                {
-                    "dataset": dataset_name,
-                    "model": "student",
-                    "student_kind": config.student.kind,
-                    "method": current_method,
-                    "checkpoint": checkpoint_name,
-                    "path": str(probability_path),
-                }
-            )
+            artifact = {
+                "dataset": dataset_name,
+                "model": "student",
+                "student_kind": config.student.kind,
+                "method": current_method,
+                "checkpoint": checkpoint_name,
+                "path": str(probability_path),
+            }
+            if config.student.feature_layer is not None:
+                artifact["feature_layer"] = config.student.feature_layer
+            artifacts.append(artifact)
     return artifacts
 
 
