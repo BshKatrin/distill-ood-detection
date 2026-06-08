@@ -56,6 +56,7 @@ class StudentConfig:
     kind: str = "linear"
     input_shape: tuple[int, int, int] = (3, 32, 32)
     num_classes: int = 10
+    hidden_channels: tuple[int, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -267,7 +268,9 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     student_raw = raw.get("student", {}).copy()
     if "input_shape" in student_raw:
         student_raw["input_shape"] = tuple(student_raw["input_shape"])
-    student = StudentConfig(**student_raw)
+    if "hidden_channels" in student_raw:
+        student_raw["hidden_channels"] = tuple(student_raw["hidden_channels"])
+    student = _parse_student_config(student_raw)
     optimizer = _parse_optimizer_config(raw.get("optimizer", {}))
     training = _parse_training_config(
         raw.get("training", {}),
@@ -287,6 +290,28 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
         tree=tree,
         mlflow=mlflow,
     )
+
+
+def _parse_student_config(raw: dict[str, Any]) -> StudentConfig:
+    """Parse neural-network student settings."""
+
+    student = StudentConfig(**raw)
+    if student.kind not in {"linear", "mlp", "random_forest"}:
+        raise ValueError(f"Unsupported student kind: {student.kind}")
+    if len(student.input_shape) != 3:
+        raise ValueError("student.input_shape must contain channel, height, and width")
+    if any(dimension <= 0 for dimension in student.input_shape):
+        raise ValueError("student.input_shape dimensions must be positive")
+    if student.num_classes <= 0:
+        raise ValueError("student.num_classes must be positive")
+    if student.kind == "mlp" and not student.hidden_channels:
+        raise ValueError(
+            "student.hidden_channels must define at least one hidden layer "
+            "for MLP students"
+        )
+    if any(hidden_channel <= 0 for hidden_channel in student.hidden_channels):
+        raise ValueError("student.hidden_channels values must be positive")
+    return student
 
 
 def _parse_tree_config(raw: dict[str, Any]) -> TreeConfig:

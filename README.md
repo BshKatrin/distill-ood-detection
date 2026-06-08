@@ -44,6 +44,12 @@ Run just one method:
 uv run distill-ood train-student --config configs/distill_linear_cifar10.yaml --method cross_entropy
 ```
 
+Train the three-hidden-layer MLP student:
+
+```bash
+uv run distill-ood train-student --config configs/distill_mlp_cifar10.yaml
+```
+
 The baseline config trains a linear student with three objectives:
 
 - `mse_softmax`: MSE between student and teacher probabilities.

@@ -1,4 +1,4 @@
-"""Train linear students from a pretrained CIFAR-10 ResNet-18 teacher."""
+"""Train PyTorch students from a pretrained CIFAR-10 ResNet-18 teacher."""
 
 from __future__ import annotations
 
