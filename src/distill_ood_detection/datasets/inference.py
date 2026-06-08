@@ -16,6 +16,7 @@ from distill_ood_detection.config import DatasetConfig, OODDatasetConfig
 from distill_ood_detection.datasets.cifar10 import (
     CIFAR10_MEAN,
     CIFAR10_STD,
+    split_train_validation,
 )
 
 
@@ -44,6 +45,32 @@ def build_in_distribution_test_loader(config: DatasetConfig) -> NamedLoader:
         name=f"{config.name}_test",
         split="test",
         loader=_loader(test_dataset, config),
+    )
+
+
+def build_in_distribution_train_loader(config: DatasetConfig, seed: int) -> NamedLoader:
+    """Build the in-distribution CIFAR-10 training split loader."""
+
+    if config.name != "cifar10":
+        raise ValueError(f"Unsupported in-distribution dataset: {config.name}")
+    train_subset, _ = _cifar10_train_validation_subsets(config, seed)
+    return NamedLoader(
+        name=f"{config.name}_train",
+        split="train",
+        loader=_loader(train_subset, config),
+    )
+
+
+def build_in_distribution_validation_loader(config: DatasetConfig, seed: int) -> NamedLoader:
+    """Build the in-distribution CIFAR-10 validation split loader."""
+
+    if config.name != "cifar10":
+        raise ValueError(f"Unsupported in-distribution dataset: {config.name}")
+    _, validation_subset = _cifar10_train_validation_subsets(config, seed)
+    return NamedLoader(
+        name=f"{config.name}_validation",
+        split="validation",
+        loader=_loader(validation_subset, config),
     )
 
 
@@ -91,6 +118,24 @@ def _ood_dataset(
             transform=transform,
         )
     raise ValueError(f"Unsupported OOD dataset: {ood_config.name}")
+
+
+def _cifar10_train_validation_subsets(
+    config: DatasetConfig,
+    seed: int,
+) -> tuple[Dataset[tuple[torch.Tensor, int]], Dataset[tuple[torch.Tensor, int]]]:
+    transform = Compose([ToTensor(), Normalize(CIFAR10_MEAN, CIFAR10_STD)])
+    train_dataset = CIFAR10(
+        root=Path(config.data_dir),
+        train=True,
+        download=True,
+        transform=transform,
+    )
+    return split_train_validation(
+        train_dataset,
+        validation_fraction=config.validation_fraction,
+        seed=seed,
+    )
 
 
 def _cifar_like_transform(name: str | None = None) -> Compose:

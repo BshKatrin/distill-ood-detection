@@ -61,7 +61,30 @@ method-specific settings under `training.methods`. In practice,
 MLflow logging is enabled in the YAML config. Each run logs one parent
 experiment run and one nested run per distillation method. Per epoch, the
 student run logs distillation loss, validation accuracy, and validation KL
-divergence from teacher probabilities to student probabilities.
+divergence `KL(teacher || student)`.
+
+## Tree Students
+
+Train sklearn random-forest students from teacher outputs:
+
+```bash
+uv run distill-ood train-tree-student --config configs/distill_random_forest_cifar10.yaml
+```
+
+Run only one tree distillation mode:
+
+```bash
+uv run distill-ood train-tree-student --config configs/distill_random_forest_cifar10.yaml --mode softmax
+```
+
+The tree config supports two modes:
+
+- `logits`: fit a multi-output random-forest regressor to teacher logits.
+- `softmax`: fit to `alpha * softmax(teacher_logits / temperature) +
+(1 - alpha) * one_hot(label)`.
+
+Teacher inference on the deterministic CIFAR-10 training split is saved under
+`runs/<experiment_name>/teacher_inference/cifar10_train/teacher.pt`.
 
 ```bash
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
@@ -77,9 +100,11 @@ uv run distill-ood infer-probabilities --config configs/distill_linear_cifar10.y
 ```
 
 By default this uses each student's best checkpoint. Use `--checkpoint latest`
-or `--checkpoint both` to infer from other saved checkpoints. Artifacts are
-written under `runs/<experiment_name>/probabilities/`, with one `.pt` file per
-dataset/model and a `manifest.json` for notebook discovery.
+or `--checkpoint both` to infer from other saved checkpoints. Add
+`--include-train` or `--include-validation` to include the deterministic ID
+training or validation split. Artifacts are written under
+`runs/<experiment_name>/probabilities/`, with one `.pt` file per dataset/model
+and a `manifest.json` for notebook discovery.
 
 The baseline config evaluates three OOD datasets during inference:
 `MNIST`, `SVHN`, and Hugging Face `uoft-cs/cifar100` on the `test` split.

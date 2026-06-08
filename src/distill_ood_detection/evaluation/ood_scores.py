@@ -161,7 +161,7 @@ def student_teacher_kl_divergence(
     student_probabilities: ArrayLike,
     signed: bool = False,
 ) -> NDArray[np.float64]:
-    """Compute KL(student || teacher) for each sample.
+    """Compute KL(teacher || student) for each sample.
 
     Args:
         teacher_probabilities: Teacher class probabilities with shape
@@ -176,7 +176,7 @@ def student_teacher_kl_divergence(
 
     Raises:
         ValueError: If inputs have different shapes, contain invalid values, or
-            teacher probabilities are zero where student probabilities are
+            student probabilities are zero where teacher probabilities are
             positive.
     """
 

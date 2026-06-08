@@ -7,6 +7,7 @@ from pathlib import Path
 
 from distill_ood_detection.config import DistillationMethod, load_config
 from distill_ood_detection.experiments.infer_probabilities import run_probability_inference
+from distill_ood_detection.experiments.train_tree_student import run_tree_experiment
 from distill_ood_detection.experiments.train_student import run_experiment
 
 
@@ -28,6 +29,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )
+    tree_parser = subparsers.add_parser("train-tree-student")
+    tree_parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/distill_random_forest_cifar10.yaml"),
+        help="Path to a YAML tree experiment config.",
+    )
+    tree_parser.add_argument(
+        "--mode",
+        choices=("logits", "softmax"),
+        default=None,
+        help="Run only one tree distillation mode. Defaults to all modes in config.",
+    )
     infer_parser = subparsers.add_parser("infer-probabilities")
     infer_parser.add_argument(
         "--config",
@@ -47,6 +61,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )
+    infer_parser.add_argument(
+        "--include-train",
+        action="store_true",
+        help="Also infer the deterministic ID training split.",
+    )
+    infer_parser.add_argument(
+        "--include-validation",
+        action="store_true",
+        help="Also infer the deterministic ID validation split.",
+    )
     return parser
 
 
@@ -58,12 +82,17 @@ def main() -> None:
     if args.command == "train-student":
         config = load_config(args.config)
         run_experiment(config, method=args.method)
+    if args.command == "train-tree-student":
+        config = load_config(args.config)
+        run_tree_experiment(config, mode=args.mode)
     if args.command == "infer-probabilities":
         config = load_config(args.config)
         run_probability_inference(
             config,
             checkpoint=args.checkpoint,
             method=args.method,
+            include_train=args.include_train,
+            include_validation=args.include_validation,
         )
 
 

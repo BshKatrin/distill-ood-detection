@@ -1,0 +1,56 @@
+experiment_name: random_forest_student_resnet18_cifar10
+output_dir: runs
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar100
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar10
+  revision: main
+
+student:
+  kind: random_forest
+  input_shape: [3, 32, 32]
+  num_classes: 10
+
+training:
+  defaults:
+    epochs: 1
+    seed: 42
+    device: cuda
+    log_every_steps: 50
+  methods:
+    mse_softmax: null
+    mse_logits: null
+    cross_entropy: null
+
+tree:
+  random_forest:
+    n_estimators: 200
+    max_depth: null
+    min_samples_split: 2
+    min_samples_leaf: 1
+    max_features: sqrt
+    bootstrap: true
+    n_jobs: -1
+  methods:
+    logits: {}
+    softmax:
+      temperature: 1.0
+      alpha: 1.0
+
+mlflow:
+  enabled: true
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db

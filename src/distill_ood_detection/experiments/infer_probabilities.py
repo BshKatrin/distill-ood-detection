@@ -8,16 +8,15 @@ from pathlib import Path
 from typing import Literal
 
 import torch
-from torch import nn
-from torch.nn import functional as F
-from torch.utils.data import DataLoader
 
 from distill_ood_detection.config import DistillationMethod, ExperimentConfig
 from distill_ood_detection.datasets.inference import (
-    NamedLoader,
     build_in_distribution_test_loader,
+    build_in_distribution_train_loader,
+    build_in_distribution_validation_loader,
     build_ood_loaders,
 )
+from distill_ood_detection.inference import collect_model_outputs, save_model_outputs
 from distill_ood_detection.models.student import build_student
 from distill_ood_detection.models.teacher import load_teacher
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
@@ -29,6 +28,8 @@ def run_probability_inference(
     config: ExperimentConfig,
     checkpoint: CheckpointSelection = "best",
     method: DistillationMethod | None = None,
+    include_train: bool = False,
+    include_validation: bool = False,
 ) -> dict[str, object]:
     """Infer teacher and student logits/probabilities for ID and OOD datasets."""
 
@@ -39,10 +40,17 @@ def run_probability_inference(
     output_dir = experiment_dir / "probabilities"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    loaders = [
-        build_in_distribution_test_loader(config.dataset),
-        *build_ood_loaders(config.dataset),
-    ]
+    loaders = []
+    if include_train:
+        loaders.append(build_in_distribution_train_loader(config.dataset, training_defaults.seed))
+    if include_validation:
+        loaders.append(build_in_distribution_validation_loader(config.dataset, training_defaults.seed))
+    loaders.extend(
+        [
+            build_in_distribution_test_loader(config.dataset),
+            *build_ood_loaders(config.dataset),
+        ]
+    )
     teacher = load_teacher(config.teacher, device)
     methods = (method,) if method else config.training.enabled_methods()
 
@@ -51,11 +59,9 @@ def run_probability_inference(
         dataset_dir = output_dir / named_loader.name
         dataset_dir.mkdir(parents=True, exist_ok=True)
         teacher_path = dataset_dir / "teacher.pt"
-        _save_inference_artifact(
+        save_model_outputs(
             path=teacher_path,
-            model=teacher,
-            loader=named_loader.loader,
-            device=device,
+            outputs=collect_model_outputs(teacher, named_loader.loader, device),
             metadata={
                 "model": "teacher",
                 "dataset": named_loader.name,
@@ -77,11 +83,9 @@ def run_probability_inference(
                 student.to(device)
                 student.eval()
                 probability_path = dataset_dir / f"student_{current_method}_{checkpoint_name}.pt"
-                _save_inference_artifact(
+                save_model_outputs(
                     path=probability_path,
-                    model=student,
-                    loader=named_loader.loader,
-                    device=device,
+                    outputs=collect_model_outputs(student, named_loader.loader, device),
                     metadata={
                         "model": "student",
                         "method": current_method,
@@ -109,36 +113,6 @@ def run_probability_inference(
     }
     write_json(output_dir / "manifest.json", manifest)
     return manifest
-
-
-@torch.no_grad()
-def _save_inference_artifact(
-    path: Path,
-    model: nn.Module,
-    loader: DataLoader[tuple[torch.Tensor, int]],
-    device: torch.device,
-    metadata: dict[str, object],
-) -> None:
-    logits_batches: list[torch.Tensor] = []
-    probabilities: list[torch.Tensor] = []
-    labels: list[torch.Tensor] = []
-    model.eval()
-    for images, batch_labels in loader:
-        images = images.to(device)
-        logits = model(images)
-        logits_batches.append(logits.cpu())
-        probabilities.append(F.softmax(logits, dim=1).cpu())
-        labels.append(batch_labels.cpu())
-
-    torch.save(
-        {
-            **metadata,
-            "logits": torch.cat(logits_batches, dim=0),
-            "probabilities": torch.cat(probabilities, dim=0),
-            "labels": torch.cat(labels, dim=0),
-        },
-        path,
-    )
 
 
 def _selected_checkpoints(checkpoint: CheckpointSelection) -> tuple[Literal["best", "latest"], ...]:

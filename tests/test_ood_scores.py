@@ -43,8 +43,8 @@ class OODScoreTests(unittest.TestCase):
             student_teacher_kl_divergence(teacher, student),
             np.array(
                 [
-                    0.4 * np.log(0.4 / 0.7) + 0.6 * np.log(0.6 / 0.3),
-                    0.2 * np.log(0.2 / 0.1) + 0.8 * np.log(0.8 / 0.9),
+                    0.7 * np.log(0.7 / 0.4) + 0.3 * np.log(0.3 / 0.6),
+                    0.1 * np.log(0.1 / 0.2) + 0.9 * np.log(0.9 / 0.8),
                 ]
             ),
         )
@@ -83,9 +83,9 @@ class OODScoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             max_probability_difference(teacher, student)
 
-    def test_student_teacher_kl_divergence_rejects_zero_teacher_support(self) -> None:
-        teacher = np.array([[1.0, 0.0]])
-        student = np.array([[0.8, 0.2]])
+    def test_student_teacher_kl_divergence_rejects_zero_student_support(self) -> None:
+        teacher = np.array([[0.8, 0.2]])
+        student = np.array([[1.0, 0.0]])
 
         with self.assertRaises(ValueError):
             student_teacher_kl_divergence(teacher, student)

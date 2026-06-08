@@ -14,6 +14,7 @@ DistillationMethod = Literal[
     "cross_entropy",
     "mse_logits",
 ]
+TreeDistillationMode = Literal["logits", "softmax"]
 OODDatasetName = Literal["mnist", "svhn", "cifar100"]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
     "cross_entropy_softmax": "cross_entropy",
@@ -55,6 +56,73 @@ class StudentConfig:
     kind: str = "linear"
     input_shape: tuple[int, int, int] = (3, 32, 32)
     num_classes: int = 10
+
+
+@dataclass(frozen=True)
+class RandomForestConfig:
+    """Random forest settings for tree-based students."""
+
+    n_estimators: int = 200
+    max_depth: int | None = None
+    min_samples_split: int = 2
+    min_samples_leaf: int = 1
+    max_features: str | int | float | None = "sqrt"
+    bootstrap: bool = True
+    n_jobs: int | None = -1
+
+
+@dataclass(frozen=True)
+class TreeMethodConfig:
+    """Method-specific settings for tree distillation."""
+
+    temperature: float | None = None
+    alpha: float | None = None
+
+
+@dataclass(frozen=True)
+class TreeMethodsConfig:
+    """Enabled tree distillation modes."""
+
+    logits: TreeMethodConfig | None = field(default_factory=TreeMethodConfig)
+    softmax: TreeMethodConfig | None = field(default_factory=TreeMethodConfig)
+
+    def enabled_modes(self) -> tuple[TreeDistillationMode, ...]:
+        """Return enabled tree distillation modes in a deterministic order."""
+
+        return tuple(
+            mode
+            for mode in ("logits", "softmax")
+            if getattr(self, mode) is not None
+        )
+
+
+@dataclass(frozen=True)
+class ResolvedTreeMethodConfig:
+    """Fully resolved settings for one tree distillation mode."""
+
+    temperature: float = 1.0
+    alpha: float = 1.0
+
+
+@dataclass(frozen=True)
+class TreeConfig:
+    """Tree-based student experiment settings."""
+
+    random_forest: RandomForestConfig = field(default_factory=RandomForestConfig)
+    methods: TreeMethodsConfig = field(default_factory=TreeMethodsConfig)
+
+    def enabled_modes(self) -> tuple[TreeDistillationMode, ...]:
+        """Return enabled tree distillation modes in a deterministic order."""
+
+        return self.methods.enabled_modes()
+
+    def for_mode(self, mode: TreeDistillationMode) -> ResolvedTreeMethodConfig:
+        """Resolve the training configuration for one tree distillation mode."""
+
+        method_config = getattr(self.methods, mode)
+        if method_config is None:
+            raise ValueError(f"Tree configuration does not enable mode: {mode}")
+        return _resolve_tree_method_config(mode, method_config)
 
 
 @dataclass(frozen=True)
@@ -174,6 +242,7 @@ class ExperimentConfig:
     student: StudentConfig = field(default_factory=StudentConfig)
     optimizer: OptimizerByMethodConfig = field(default_factory=OptimizerByMethodConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
+    tree: TreeConfig = field(default_factory=TreeConfig)
     mlflow: MlflowConfig = field(default_factory=MlflowConfig)
 
 
@@ -200,7 +269,11 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
         student_raw["input_shape"] = tuple(student_raw["input_shape"])
     student = StudentConfig(**student_raw)
     optimizer = _parse_optimizer_config(raw.get("optimizer", {}))
-    training = _parse_training_config(raw.get("training", {}))
+    training = _parse_training_config(
+        raw.get("training", {}),
+        require_methods=student.kind != "random_forest",
+    )
+    tree = _parse_tree_config(raw.get("tree", {}))
     mlflow = MlflowConfig(**raw.get("mlflow", {}))
 
     return ExperimentConfig(
@@ -211,8 +284,71 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
         student=student,
         optimizer=optimizer,
         training=training,
+        tree=tree,
         mlflow=mlflow,
     )
+
+
+def _parse_tree_config(raw: dict[str, Any]) -> TreeConfig:
+    """Parse tree-based student settings."""
+
+    tree_raw = raw.copy()
+    random_forest = RandomForestConfig(**tree_raw.pop("random_forest", {}))
+    methods = _parse_tree_methods(tree_raw.pop("methods", None))
+    if tree_raw:
+        unknown = ", ".join(sorted(tree_raw))
+        raise ValueError(f"Unsupported tree config fields: {unknown}")
+    tree = TreeConfig(random_forest=random_forest, methods=methods)
+    if random_forest.n_estimators <= 0:
+        raise ValueError("tree.random_forest.n_estimators must be positive")
+    if random_forest.min_samples_split < 2:
+        raise ValueError("tree.random_forest.min_samples_split must be at least 2")
+    if random_forest.min_samples_leaf <= 0:
+        raise ValueError("tree.random_forest.min_samples_leaf must be positive")
+    if not tree.enabled_modes():
+        raise ValueError("tree.methods must enable at least one mode")
+    for mode in tree.enabled_modes():
+        tree.for_mode(mode)
+    return tree
+
+
+def _parse_tree_methods(raw_methods: Any) -> TreeMethodsConfig:
+    """Parse enabled tree distillation modes."""
+
+    mode_names: tuple[TreeDistillationMode, ...] = ("logits", "softmax")
+    if raw_methods is None:
+        methods_raw: dict[str, Any] = {name: {} for name in mode_names}
+    elif isinstance(raw_methods, list):
+        methods_raw = {mode: {} for mode in raw_methods}
+    elif isinstance(raw_methods, dict):
+        methods_raw = raw_methods.copy()
+    else:
+        raise ValueError("tree.methods must be a mapping from mode name to config")
+
+    unknown_modes = [name for name in methods_raw if name not in mode_names]
+    if unknown_modes:
+        unknown = ", ".join(sorted(unknown_modes))
+        raise ValueError(f"Unsupported tree methods: {unknown}")
+
+    return TreeMethodsConfig(
+        **{
+            mode: _parse_tree_method_config(mode, methods_raw.get(mode))
+            for mode in mode_names
+        }
+    )
+
+
+def _parse_tree_method_config(
+    mode: TreeDistillationMode,
+    raw: Any,
+) -> TreeMethodConfig | None:
+    """Parse settings for one tree distillation mode."""
+
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError(f"tree.methods.{mode} must be a mapping")
+    return TreeMethodConfig(**raw)
 
 
 def _parse_optimizer_config(raw: dict[str, Any]) -> OptimizerByMethodConfig:
@@ -247,7 +383,7 @@ def _parse_optimizer_config(raw: dict[str, Any]) -> OptimizerByMethodConfig:
     )
 
 
-def _parse_training_config(raw: dict[str, Any]) -> TrainingConfig:
+def _parse_training_config(raw: dict[str, Any], require_methods: bool = True) -> TrainingConfig:
     """Parse shared and method-specific training settings."""
 
     training_raw = raw.copy()
@@ -269,7 +405,7 @@ def _parse_training_config(raw: dict[str, Any]) -> TrainingConfig:
         raise ValueError("training.defaults.epochs must be positive")
     if defaults.log_every_steps <= 0:
         raise ValueError("training.defaults.log_every_steps must be positive")
-    if not training.enabled_methods():
+    if require_methods and not training.enabled_methods():
         raise ValueError("training.methods must enable at least one distillation method")
     for method in training.enabled_methods():
         training.for_method(method)
@@ -372,6 +508,27 @@ def _resolve_method_training_config(
         device=defaults.device,
         log_every_steps=defaults.log_every_steps,
     )
+
+
+def _resolve_tree_method_config(
+    mode: TreeDistillationMode,
+    method_config: TreeMethodConfig,
+) -> ResolvedTreeMethodConfig:
+    """Resolve and validate settings for one tree distillation mode."""
+
+    if mode == "softmax":
+        temperature = method_config.temperature if method_config.temperature is not None else 1.0
+        alpha = method_config.alpha if method_config.alpha is not None else 1.0
+        if temperature <= 0.0:
+            raise ValueError("tree.methods.softmax.temperature must be positive")
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError("tree.methods.softmax.alpha must be between 0.0 and 1.0")
+        return ResolvedTreeMethodConfig(temperature=temperature, alpha=alpha)
+    if method_config.temperature is not None:
+        raise ValueError("tree.methods.logits.temperature is not supported")
+    if method_config.alpha is not None:
+        raise ValueError("tree.methods.logits.alpha is not supported")
+    return ResolvedTreeMethodConfig()
 
 
 def _normalize_method_name(method: str) -> DistillationMethod:
