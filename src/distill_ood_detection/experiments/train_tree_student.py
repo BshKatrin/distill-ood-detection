@@ -24,7 +24,11 @@ from distill_ood_detection.datasets.inference import (
     build_in_distribution_train_loader,
     build_in_distribution_validation_loader,
 )
-from distill_ood_detection.inference import ModelOutputs, save_model_outputs
+from distill_ood_detection.inference import (
+    ModelOutputs,
+    predict_tree_model_outputs,
+    save_model_outputs,
+)
 from distill_ood_detection.models.teacher import load_teacher
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
@@ -258,7 +262,7 @@ def _tree_metrics(
     num_classes: int,
     prefix: str,
 ) -> dict[str, float]:
-    student_logits, student_probabilities = _predict_outputs(model, mode, features)
+    student_logits, student_probabilities = predict_tree_model_outputs(model, mode, features)
     teacher_probabilities = _softmax(teacher_logits)
     predictions = student_logits.argmax(axis=1)
     target = _target_matrix(
@@ -276,25 +280,6 @@ def _tree_metrics(
         f"{prefix}_target_mse": float(target_mse),
         f"{prefix}_kl_divergence": float(kl_divergence),
     }
-
-
-def _predict_outputs(
-    model: RandomForestRegressor,
-    mode: TreeDistillationMode,
-    features: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    predictions = np.asarray(model.predict(features), dtype=np.float32)
-    if mode == "logits":
-        return predictions, _softmax(predictions)
-
-    probabilities = np.clip(predictions, 1e-12, None)
-    row_sums = probabilities.sum(axis=1, keepdims=True)
-    zero_rows = row_sums.squeeze(axis=1) <= 0.0
-    if np.any(zero_rows):
-        probabilities[zero_rows] = 1.0 / probabilities.shape[1]
-        row_sums = probabilities.sum(axis=1, keepdims=True)
-    probabilities = probabilities / row_sums
-    return np.log(probabilities), probabilities
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:

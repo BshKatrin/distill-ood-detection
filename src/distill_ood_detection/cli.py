@@ -62,6 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run only one distillation method. Defaults to all methods in config.",
     )
     infer_parser.add_argument(
+        "--tree-mode",
+        choices=("logits", "softmax"),
+        default=None,
+        help="Run only one tree distillation mode. Defaults to all modes in config.",
+    )
+    infer_parser.add_argument(
         "--include-train",
         action="store_true",
         help="Also infer the deterministic ID training split.",
@@ -91,6 +97,7 @@ def main() -> None:
             config,
             checkpoint=args.checkpoint,
             method=args.method,
+            tree_mode=args.tree_mode,
             include_train=args.include_train,
             include_validation=args.include_validation,
         )

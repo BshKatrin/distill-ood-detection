@@ -108,3 +108,14 @@ and a `manifest.json` for notebook discovery.
 
 The baseline config evaluates three OOD datasets during inference:
 `MNIST`, `SVHN`, and Hugging Face `uoft-cs/cifar100` on the `test` split.
+
+For random-forest students, use the tree config. This saves teacher outputs and
+one student artifact per enabled tree mode for CIFAR-10 test and configured OOD
+test splits:
+
+```bash
+uv run distill-ood infer-probabilities --config configs/distill_random_forest_cifar10.yaml
+```
+
+Run only one random-forest mode with `--tree-mode logits` or
+`--tree-mode softmax`.
