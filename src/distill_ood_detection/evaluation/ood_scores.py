@@ -1,4 +1,4 @@
-"""OOD detection scores from teacher and student probabilities."""
+"""OOD detection scores from teacher and student outputs."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from numpy.typing import ArrayLike, NDArray
 MAX_PROBABILITY_DIFFERENCE = "max_probability_difference"
 ABSOLUTE_MAX_PROBABILITY_DIFFERENCE = "absolute_max_probability_difference"
 STUDENT_TEACHER_KL_DIVERGENCE = "student_teacher_kl_divergence"
+LOGIT_L2_DISTANCE = "logit_l2_distance"
 
 # Signs convert raw scores to the repository convention used by OOD metrics:
 # ID is the positive class, so larger signed scores are more ID-like.
@@ -17,6 +18,7 @@ SIGNS: Mapping[str, int] = {
     MAX_PROBABILITY_DIFFERENCE: +1,
     ABSOLUTE_MAX_PROBABILITY_DIFFERENCE: -1,
     STUDENT_TEACHER_KL_DIVERGENCE: -1,
+    LOGIT_L2_DISTANCE: -1,
 }
 
 
@@ -61,16 +63,38 @@ def _probability_matrices(
     return teacher, student
 
 
+def _logit_matrices(
+    teacher_logits: ArrayLike,
+    student_logits: ArrayLike,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    teacher = _as_output_matrix(teacher_logits, "teacher_logits")
+    student = _as_output_matrix(student_logits, "student_logits")
+    if teacher.shape != student.shape:
+        msg = (
+            "teacher_logits and student_logits must have the same "
+            f"shape, got {teacher.shape} and {student.shape}."
+        )
+        raise ValueError(msg)
+    return teacher, student
+
+
 def _as_probability_matrix(
     probabilities: ArrayLike,
     name: str,
 ) -> NDArray[np.float64]:
-    array = np.asarray(probabilities, dtype=float)
+    return _as_output_matrix(probabilities, name)
+
+
+def _as_output_matrix(
+    outputs: ArrayLike,
+    name: str,
+) -> NDArray[np.float64]:
+    array = np.asarray(outputs, dtype=float)
     if array.ndim != 2:
         msg = f"{name} must be a two-dimensional array."
         raise ValueError(msg)
     if array.shape[1] == 0:
-        msg = f"{name} must contain at least one class probability."
+        msg = f"{name} must contain at least one class output."
         raise ValueError(msg)
     if not np.all(np.isfinite(array)):
         msg = f"{name} must contain only finite values."
@@ -186,3 +210,28 @@ def student_teacher_kl_divergence(
     )
     scores = _kl(teacher, student)
     return _maybe_signed(scores, STUDENT_TEACHER_KL_DIVERGENCE, signed)
+
+
+def logit_l2_distance(
+    teacher_logits: ArrayLike,
+    student_logits: ArrayLike,
+    signed: bool = False,
+) -> NDArray[np.float64]:
+    """Compute L2 distance between teacher and student logits per sample.
+
+    Args:
+        teacher_logits: Teacher logits with shape ``(n_samples, n_classes)``.
+        student_logits: Student logits with shape ``(n_samples, n_classes)``.
+        signed: If True, apply this score's sign so higher values are more
+            ID-like.
+
+    Returns:
+        One raw or signed L2 distance per sample.
+
+    Raises:
+        ValueError: If inputs have different shapes or contain invalid values.
+    """
+
+    teacher, student = _logit_matrices(teacher_logits, student_logits)
+    scores = np.linalg.norm(teacher - student, ord=2, axis=1)
+    return _maybe_signed(scores, LOGIT_L2_DISTANCE, signed)

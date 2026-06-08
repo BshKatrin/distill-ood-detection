@@ -8,6 +8,7 @@ import numpy as np
 
 from distill_ood_detection.evaluation import (
     absolute_max_probability_difference,
+    logit_l2_distance,
     max_probability_difference,
     student_teacher_kl_divergence,
 )
@@ -49,9 +50,20 @@ class OODScoreTests(unittest.TestCase):
             ),
         )
 
+    def test_logit_l2_distance(self) -> None:
+        teacher = np.array([[1.0, 2.0, 3.0], [0.0, 4.0, 8.0]])
+        student = np.array([[1.0, 0.0, 3.0], [3.0, 0.0, 8.0]])
+
+        np.testing.assert_allclose(
+            logit_l2_distance(teacher, student),
+            np.array([2.0, 5.0]),
+        )
+
     def test_signed_scores_follow_id_positive_convention(self) -> None:
         teacher = np.array([[0.7, 0.3], [0.1, 0.9]])
         student = np.array([[0.4, 0.6], [0.2, 0.8]])
+        teacher_logits = np.array([[1.0, 2.0], [3.0, 5.0]])
+        student_logits = np.array([[2.0, 2.0], [0.0, 1.0]])
 
         np.testing.assert_allclose(
             max_probability_difference(teacher, student, signed=True),
@@ -65,12 +77,17 @@ class OODScoreTests(unittest.TestCase):
             student_teacher_kl_divergence(teacher, student, signed=True),
             -student_teacher_kl_divergence(teacher, student),
         )
+        np.testing.assert_allclose(
+            logit_l2_distance(teacher_logits, student_logits, signed=True),
+            -logit_l2_distance(teacher_logits, student_logits),
+        )
 
     def test_defines_sign_for_every_ood_score(self) -> None:
         self.assertEqual(
             set(SIGNS),
             {
                 "absolute_max_probability_difference",
+                "logit_l2_distance",
                 "max_probability_difference",
                 "student_teacher_kl_divergence",
             },
@@ -82,6 +99,9 @@ class OODScoreTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             max_probability_difference(teacher, student)
+
+        with self.assertRaises(ValueError):
+            logit_l2_distance(teacher, student)
 
     def test_student_teacher_kl_divergence_rejects_zero_student_support(self) -> None:
         teacher = np.array([[0.8, 0.2]])
