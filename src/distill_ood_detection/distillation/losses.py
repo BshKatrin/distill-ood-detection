@@ -24,11 +24,6 @@ def distillation_loss(
 ) -> torch.Tensor:
     """Compute the configured distillation objective."""
 
-    teacher_probabilities = F.softmax(teacher_logits, dim=1)
-    if method == "mse_softmax":
-        student_probabilities = F.softmax(student_logits, dim=1)
-        return F.mse_loss(student_probabilities, teacher_probabilities)
-
     if method == "mse_logits":
         centered_student_logits = _center_logits(student_logits)
         centered_teacher_logits = _center_logits(teacher_logits)
@@ -43,5 +38,5 @@ def distillation_loss(
             -(scaled_teacher_probabilities * scaled_student_log_probabilities).sum(dim=1).mean()
         )
         loss_hard = F.cross_entropy(student_logits, labels)
-        return alpha * loss_soft + (1.0 - alpha) * loss_hard
+        return alpha * (temperature**2) * loss_soft + (1.0 - alpha) * loss_hard
     raise ValueError(f"Unsupported distillation method: {method}")

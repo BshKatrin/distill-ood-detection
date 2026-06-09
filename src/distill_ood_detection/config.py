@@ -10,11 +10,10 @@ import yaml
 
 
 DistillationMethod = Literal[
-    "mse_softmax",
     "cross_entropy",
     "mse_logits",
 ]
-TreeDistillationMode = Literal["logits", "softmax"]
+TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["mnist", "svhn", "cifar100"]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
     "cross_entropy_softmax": "cross_entropy",
@@ -86,14 +85,13 @@ class TreeMethodsConfig:
     """Enabled tree distillation modes."""
 
     logits: TreeMethodConfig | None = field(default_factory=TreeMethodConfig)
-    softmax: TreeMethodConfig | None = field(default_factory=TreeMethodConfig)
 
     def enabled_modes(self) -> tuple[TreeDistillationMode, ...]:
         """Return enabled tree distillation modes in a deterministic order."""
 
         return tuple(
             mode
-            for mode in ("logits", "softmax")
+            for mode in ("logits",)
             if getattr(self, mode) is not None
         )
 
@@ -141,7 +139,6 @@ class OptimizerConfig:
 class OptimizerByMethodConfig:
     """Optimizer settings for each distillation method."""
 
-    mse_softmax: OptimizerConfig = field(default_factory=OptimizerConfig)
     cross_entropy: OptimizerConfig = field(default_factory=OptimizerConfig)
     mse_logits: OptimizerConfig = field(default_factory=OptimizerConfig)
 
@@ -173,7 +170,6 @@ class MethodTrainingConfig:
 class TrainingByMethodConfig:
     """Enabled distillation methods and their method-specific settings."""
 
-    mse_softmax: MethodTrainingConfig | None = field(default_factory=MethodTrainingConfig)
     cross_entropy: MethodTrainingConfig | None = field(default_factory=MethodTrainingConfig)
     mse_logits: MethodTrainingConfig | None = field(default_factory=MethodTrainingConfig)
 
@@ -182,7 +178,7 @@ class TrainingByMethodConfig:
 
         return tuple(
             method
-            for method in ("mse_softmax", "cross_entropy", "mse_logits")
+            for method in ("cross_entropy", "mse_logits")
             if getattr(self, method) is not None
         )
 
@@ -343,7 +339,7 @@ def _parse_tree_config(raw: dict[str, Any]) -> TreeConfig:
 def _parse_tree_methods(raw_methods: Any) -> TreeMethodsConfig:
     """Parse enabled tree distillation modes."""
 
-    mode_names: tuple[TreeDistillationMode, ...] = ("logits", "softmax")
+    mode_names: tuple[TreeDistillationMode, ...] = ("logits",)
     if raw_methods is None:
         methods_raw: dict[str, Any] = {name: {} for name in mode_names}
     elif isinstance(raw_methods, list):
@@ -383,7 +379,6 @@ def _parse_optimizer_config(raw: dict[str, Any]) -> OptimizerByMethodConfig:
     """Parse optimizer settings from a shared or per-method config block."""
 
     method_names: tuple[DistillationMethod, ...] = (
-        "mse_softmax",
         "cross_entropy",
         "mse_logits",
     )
@@ -448,7 +443,6 @@ def _parse_training_methods(
     """Parse per-method training settings."""
 
     method_names: tuple[DistillationMethod, ...] = (
-        "mse_softmax",
         "cross_entropy",
         "mse_logits",
     )
@@ -544,14 +538,6 @@ def _resolve_tree_method_config(
 ) -> ResolvedTreeMethodConfig:
     """Resolve and validate settings for one tree distillation mode."""
 
-    if mode == "softmax":
-        temperature = method_config.temperature if method_config.temperature is not None else 1.0
-        alpha = method_config.alpha if method_config.alpha is not None else 1.0
-        if temperature <= 0.0:
-            raise ValueError("tree.methods.softmax.temperature must be positive")
-        if not 0.0 <= alpha <= 1.0:
-            raise ValueError("tree.methods.softmax.alpha must be between 0.0 and 1.0")
-        return ResolvedTreeMethodConfig(temperature=temperature, alpha=alpha)
     if method_config.temperature is not None:
         raise ValueError("tree.methods.logits.temperature is not supported")
     if method_config.alpha is not None:

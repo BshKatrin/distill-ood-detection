@@ -40,7 +40,7 @@ class TreeInferenceOutputTests(unittest.TestCase):
         np.testing.assert_allclose(outputs.probabilities.sum(dim=1).numpy(), np.ones(2))
         self.assertEqual(outputs.labels.tolist(), [0, 1])
 
-    def test_softmax_mode_normalizes_predictions(self) -> None:
+    def test_rejects_removed_cross_entropy_mode(self) -> None:
         model = _FixedPredictionModel(
             np.array(
                 [
@@ -52,11 +52,8 @@ class TreeInferenceOutputTests(unittest.TestCase):
         )
         loader = _loader()
 
-        outputs = collect_tree_model_outputs(model, "softmax", loader)
-
-        np.testing.assert_allclose(outputs.probabilities.sum(dim=1).numpy(), np.ones(2))
-        np.testing.assert_allclose(outputs.probabilities[0].numpy(), np.array([0.5, 0.5]))
-        self.assertTrue(torch.all(torch.isfinite(outputs.logits)))
+        with self.assertRaises(ValueError):
+            collect_tree_model_outputs(model, "cross_entropy", loader)
 
 
 def _loader() -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:

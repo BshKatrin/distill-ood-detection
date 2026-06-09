@@ -16,7 +16,6 @@ from torch.utils.data import DataLoader
 
 from distill_ood_detection.config import (
     ExperimentConfig,
-    ResolvedTreeMethodConfig,
     TreeDistillationMode,
 )
 from distill_ood_detection.datasets.inference import (
@@ -94,13 +93,12 @@ def run_tree_experiment(
         for current_mode in modes:
             output_dir = experiment_dir / current_mode
             output_dir.mkdir(parents=True, exist_ok=True)
-            method_config = config.tree.for_mode(current_mode)
+            config.tree.for_mode(current_mode)
             with _mlflow_mode_run(config, current_mode):
                 if config.mlflow.enabled:
                     mlflow.log_param("tree_distillation_mode", current_mode)
                 summary = _train_random_forest_student(
                     mode=current_mode,
-                    method_config=method_config,
                     train_data=train_data,
                     validation_loader=validation_loader.loader,
                     test_loader=test_loader.loader,
@@ -129,7 +127,6 @@ def run_tree_experiment(
 
 def _train_random_forest_student(
     mode: TreeDistillationMode,
-    method_config: ResolvedTreeMethodConfig,
     train_data: "_TreeDataset",
     validation_loader: DataLoader[tuple[torch.Tensor, int]],
     test_loader: DataLoader[tuple[torch.Tensor, int]],
@@ -142,9 +139,6 @@ def _train_random_forest_student(
     targets = _target_matrix(
         mode=mode,
         teacher_logits=train_data.outputs.logits.numpy(),
-        labels=train_data.outputs.labels.numpy(),
-        num_classes=config.student.num_classes,
-        method_config=method_config,
     )
     model = RandomForestRegressor(
         n_estimators=config.tree.random_forest.n_estimators,
@@ -164,7 +158,6 @@ def _train_random_forest_student(
             {
                 "model": model,
                 "mode": mode,
-                "method_config": asdict(method_config),
                 "student": asdict(config.student),
                 "random_forest": asdict(config.tree.random_forest),
             },
@@ -174,33 +167,27 @@ def _train_random_forest_student(
     train_metrics = _tree_metrics(
         model=model,
         mode=mode,
-        method_config=method_config,
         features=train_data.features,
         teacher_logits=train_data.outputs.logits.numpy(),
         labels=train_data.outputs.labels.numpy(),
-        num_classes=config.student.num_classes,
         prefix="train",
     )
     validation_data = _collect_tree_dataset(teacher, validation_loader, device)
     validation_metrics = _tree_metrics(
         model=model,
         mode=mode,
-        method_config=method_config,
         features=validation_data.features,
         teacher_logits=validation_data.outputs.logits.numpy(),
         labels=validation_data.outputs.labels.numpy(),
-        num_classes=config.student.num_classes,
         prefix="validation",
     )
     test_data = _collect_tree_dataset(teacher, test_loader, device)
     test_metrics = _tree_metrics(
         model=model,
         mode=mode,
-        method_config=method_config,
         features=test_data.features,
         teacher_logits=test_data.outputs.logits.numpy(),
         labels=test_data.outputs.labels.numpy(),
-        num_classes=config.student.num_classes,
         prefix="test",
     )
 
@@ -219,8 +206,6 @@ def _train_random_forest_student(
         "method": mode,
         "mode": mode,
         "n_estimators": config.tree.random_forest.n_estimators,
-        "temperature": method_config.temperature,
-        "alpha": method_config.alpha,
         **train_metrics,
         **validation_metrics,
         **test_metrics,
@@ -234,32 +219,18 @@ def _train_random_forest_student(
 def _target_matrix(
     mode: TreeDistillationMode,
     teacher_logits: np.ndarray,
-    labels: np.ndarray,
-    num_classes: int,
-    method_config: ResolvedTreeMethodConfig,
 ) -> np.ndarray:
     if mode == "logits":
         return _center_logits(teacher_logits).astype(np.float32)
-
-    teacher_probabilities = _softmax(
-        teacher_logits / method_config.temperature,
-    )
-    hard_targets = np.eye(num_classes, dtype=np.float32)[labels]
-    targets = (
-        method_config.alpha * teacher_probabilities
-        + (1.0 - method_config.alpha) * hard_targets
-    )
-    return targets.astype(np.float32)
+    raise ValueError(f"Unsupported tree distillation mode: {mode}")
 
 
 def _tree_metrics(
     model: RandomForestRegressor,
     mode: TreeDistillationMode,
-    method_config: ResolvedTreeMethodConfig,
     features: np.ndarray,
     teacher_logits: np.ndarray,
     labels: np.ndarray,
-    num_classes: int,
     prefix: str,
 ) -> dict[str, float]:
     student_logits, student_probabilities = predict_tree_model_outputs(model, mode, features)
@@ -268,11 +239,8 @@ def _tree_metrics(
     target = _target_matrix(
         mode=mode,
         teacher_logits=teacher_logits,
-        labels=labels,
-        num_classes=num_classes,
-        method_config=method_config,
     )
-    prediction_target = _center_logits(student_logits) if mode == "logits" else student_probabilities
+    prediction_target = _center_logits(student_logits)
     target_mse = np.mean((prediction_target - target) ** 2)
     kl_divergence = _kl_divergence(teacher_probabilities, student_probabilities)
     return {

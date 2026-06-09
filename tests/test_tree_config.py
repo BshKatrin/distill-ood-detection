@@ -16,18 +16,16 @@ class TreeConfigTests(unittest.TestCase):
 
         self.assertEqual(config.student.kind, "random_forest")
         self.assertEqual(config.training.enabled_methods(), ())
-        self.assertEqual(config.tree.enabled_modes(), ("logits", "softmax"))
+        self.assertEqual(config.tree.enabled_modes(), ("logits",))
         self.assertEqual(config.tree.random_forest.n_estimators, 200)
-        self.assertEqual(config.tree.for_mode("softmax").temperature, 1.0)
-        self.assertEqual(config.tree.for_mode("softmax").alpha, 1.0)
 
-    def test_rejects_temperature_for_logits_mode(self) -> None:
+    def test_rejects_cross_entropy_mode(self) -> None:
         raw = {
             "experiment_name": "bad_tree_config",
+            "student": {"kind": "random_forest"},
             "tree": {
                 "methods": {
-                    "logits": {"temperature": 2.0},
-                    "softmax": None,
+                    "cross_entropy": {},
                 }
             },
         }
@@ -35,13 +33,26 @@ class TreeConfigTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_config(raw)
 
-    def test_rejects_softmax_alpha_outside_unit_interval(self) -> None:
+    def test_rejects_legacy_softmax_mode(self) -> None:
+        raw = {
+            "experiment_name": "bad_tree_config",
+            "student": {"kind": "random_forest"},
+            "tree": {
+                "methods": {
+                    "softmax": {},
+                }
+            },
+        }
+
+        with self.assertRaises(ValueError):
+            parse_config(raw)
+
+    def test_rejects_temperature_for_logits_mode(self) -> None:
         raw = {
             "experiment_name": "bad_tree_config",
             "tree": {
                 "methods": {
-                    "logits": None,
-                    "softmax": {"alpha": 1.5},
+                    "logits": {"temperature": 2.0},
                 }
             },
         }

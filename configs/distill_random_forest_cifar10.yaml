@@ -30,10 +30,7 @@ training:
     seed: 42
     device: cuda
     log_every_steps: 50
-  methods:
-    mse_softmax: null
-    mse_logits: null
-    cross_entropy: null
+  methods: {}
 
 tree:
   random_forest:
@@ -46,9 +43,6 @@ tree:
     n_jobs: -1
   methods:
     logits: {}
-    softmax:
-      temperature: 1.0
-      alpha: 1.0
 
 mlflow:
   enabled: true

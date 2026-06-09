@@ -27,11 +27,6 @@ student:
   num_classes: 10
 
 optimizer:
-  mse_softmax:
-    name: sgd
-    learning_rate: 0.005
-    momentum: 0.9
-    weight_decay: 0.001
   mse_logits:
     name: sgd
     learning_rate: 0.005
@@ -50,11 +45,10 @@ training:
     device: auto
     log_every_steps: 50
   methods:
-    mse_softmax: {}
     mse_logits: {}
     cross_entropy:
-      temperature: 1.0
-      alpha: 0.7
+      temperature: 4.0
+      alpha: 0.8
 
 mlflow:
   enabled: true

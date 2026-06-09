@@ -6,7 +6,6 @@ import unittest
 
 import numpy as np
 
-from distill_ood_detection.config import ResolvedTreeMethodConfig
 from distill_ood_detection.experiments.train_tree_student import _target_matrix
 
 
@@ -25,14 +24,23 @@ class TreeStudentTrainingTests(unittest.TestCase):
         targets = _target_matrix(
             mode="logits",
             teacher_logits=logits,
-            labels=np.array([0, 1]),
-            num_classes=3,
-            method_config=ResolvedTreeMethodConfig(),
         )
 
         expected = logits - logits.mean(axis=1, keepdims=True)
         np.testing.assert_allclose(targets, expected)
         np.testing.assert_allclose(targets.mean(axis=1), np.zeros(2), atol=1e-7)
+
+    def test_rejects_removed_cross_entropy_mode(self) -> None:
+        logits = np.array(
+            [
+                [1.0, 2.0, 0.0],
+                [-1.0, 0.0, 3.0],
+            ],
+            dtype=np.float32,
+        )
+
+        with self.assertRaises(ValueError):
+            _target_matrix(mode="cross_entropy", teacher_logits=logits)
 
 
 if __name__ == "__main__":

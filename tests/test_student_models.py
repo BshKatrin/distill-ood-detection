@@ -21,16 +21,16 @@ class StudentModelTests(unittest.TestCase):
         self.assertEqual(config.student.hidden_channels, (1024, 512, 256))
         self.assertEqual(
             config.training.enabled_methods(),
-            ("mse_softmax", "cross_entropy", "mse_logits"),
+            ("cross_entropy", "mse_logits"),
         )
 
-    def test_loads_feature_mlp_config(self) -> None:
-        config = load_config(Path("configs/distill_feature_mlp_layer3_cifar10.yaml"))
+    def test_loads_feature_linear_config(self) -> None:
+        config = load_config(Path("configs/distill_feature_linear_layer3_cifar10.yaml"))
 
-        self.assertEqual(config.student.kind, "mlp")
+        self.assertEqual(config.student.kind, "linear")
         self.assertEqual(config.student.feature_layer, "layer3")
         self.assertEqual(config.student.input_shape, (256, 8, 8))
-        self.assertEqual(config.student.hidden_channels, (1024, 512, 256))
+        self.assertEqual(config.student.hidden_channels, ())
 
     def test_builds_mlp_student(self) -> None:
         config = StudentConfig(

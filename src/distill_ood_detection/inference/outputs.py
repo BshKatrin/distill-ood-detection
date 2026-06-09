@@ -128,15 +128,7 @@ def predict_tree_model_outputs(
     predictions = np.asarray(model.predict(features), dtype=np.float32)
     if mode == "logits":
         return predictions, _softmax(predictions)
-
-    probabilities = np.clip(predictions, 1e-12, None)
-    row_sums = probabilities.sum(axis=1, keepdims=True)
-    zero_rows = row_sums.squeeze(axis=1) <= 0.0
-    if np.any(zero_rows):
-        probabilities[zero_rows] = 1.0 / probabilities.shape[1]
-        row_sums = probabilities.sum(axis=1, keepdims=True)
-    probabilities = probabilities / row_sums
-    return np.log(probabilities).astype(np.float32), probabilities.astype(np.float32)
+    raise ValueError(f"Unsupported tree distillation mode: {mode}")
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:

@@ -56,10 +56,9 @@ Train an MLP student on frozen teacher features from a hidden layer instead of r
 uv run distill-ood train-student --config configs/distill_feature_linear_layer3_cifar10.yaml
 ```
 
-The baseline config trains a linear student with three objectives:
+The baseline config trains a linear student with two objectives:
 
-- `mse_softmax`: MSE between student and teacher probabilities.
-- `cross_entropy`: `alpha * Loss_soft + (1 - alpha) * Loss_hard`,
+- `cross_entropy`: `alpha * temperature^2 * Loss_soft + (1 - alpha) * Loss_hard`,
   where `Loss_soft` is temperature-scaled cross-entropy against teacher
   probabilities and `Loss_hard` is standard cross-entropy against true class
   labels.
@@ -68,7 +67,7 @@ The baseline config trains a linear student with three objectives:
 The baseline config keeps shared loop settings under `training.defaults` and
 method-specific settings under `training.methods`. In practice,
 `training.methods.cross_entropy` sets `temperature` and `alpha`, while
-`mse_softmax` and `mse_logits` use empty method blocks.
+`mse_logits` uses an empty method block.
 
 MLflow logging is enabled in the YAML config. Each run logs one parent
 experiment run and one nested run per distillation method. Per epoch, the
@@ -99,17 +98,9 @@ Train sklearn random-forest students from teacher outputs:
 uv run distill-ood train-tree-student --config configs/distill_random_forest_cifar10.yaml
 ```
 
-Run only one tree distillation mode:
+The tree config supports one mode:
 
-```bash
-uv run distill-ood train-tree-student --config configs/distill_random_forest_cifar10.yaml --mode softmax
-```
-
-The tree config supports two modes:
-
-- `logits`: fit a multi-output random-forest regressor to teacher logits.
-- `softmax`: fit to `alpha * softmax(teacher_logits / temperature) +
-(1 - alpha) * one_hot(label)`.
+- `logits`: fit a multi-output random-forest regressor to centered teacher logits.
 
 Teacher inference on the deterministic CIFAR-10 training split is saved under
 `runs/<experiment_name>/teacher_inference/cifar10_train/teacher.pt`.
@@ -130,7 +121,7 @@ uv run distill-ood infer-probabilities --config configs/distill_linear_cifar10.y
 For feature students, use the matching feature-student config:
 
 ```bash
-uv run distill-ood infer-probabilities --config configs/distill_feature_mlp_layer3_cifar10.yaml
+uv run distill-ood infer-probabilities --config configs/distill_feature_linear_layer3_cifar10.yaml
 ```
 
 By default this uses each student's best checkpoint. Use `--checkpoint latest`
@@ -144,12 +135,10 @@ The baseline config evaluates three OOD datasets during inference:
 `MNIST`, `SVHN`, and Hugging Face `uoft-cs/cifar100` on the `test` split.
 
 For random-forest students, use the tree config. This saves teacher outputs and
-one student artifact per enabled tree mode for CIFAR-10 test and configured OOD
-test splits:
+one student artifact for CIFAR-10 test and configured OOD test splits:
 
 ```bash
 uv run distill-ood infer-probabilities --config configs/distill_random_forest_cifar10.yaml
 ```
 
-Run only one random-forest mode with `--tree-mode logits` or
-`--tree-mode softmax`.
+Use `--tree-mode logits` to run only the enabled random-forest mode explicitly.

@@ -67,7 +67,7 @@ class OODScoreTests(unittest.TestCase):
 
         np.testing.assert_allclose(
             max_probability_difference(teacher, student, signed=True),
-            np.array([0.1, 0.1]),
+            np.array([-0.1, -0.1]),
         )
         np.testing.assert_allclose(
             absolute_max_probability_difference(teacher, student, signed=True),

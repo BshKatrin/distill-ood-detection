@@ -25,7 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     train_parser.add_argument(
         "--method",
-        choices=("mse_softmax", "cross_entropy", "mse_logits"),
+        choices=("cross_entropy", "mse_logits"),
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )
@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     tree_parser.add_argument(
         "--mode",
-        choices=("logits", "softmax"),
+        choices=("logits",),
         default=None,
         help="Run only one tree distillation mode. Defaults to all modes in config.",
     )
@@ -57,13 +57,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     infer_parser.add_argument(
         "--method",
-        choices=("mse_softmax", "cross_entropy", "mse_logits"),
+        choices=("cross_entropy", "mse_logits"),
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )
     infer_parser.add_argument(
         "--tree-mode",
-        choices=("logits", "softmax"),
+        choices=("logits",),
         default=None,
         help="Run only one tree distillation mode. Defaults to all modes in config.",
     )

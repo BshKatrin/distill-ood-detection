@@ -299,7 +299,7 @@ def _load_tree_student(path: Path) -> tuple[object, TreeDistillationMode]:
         raise ValueError(f"Tree checkpoint must contain a dictionary: {path}")
     model = checkpoint.get("model")
     mode = checkpoint.get("mode")
-    if mode not in ("logits", "softmax"):
+    if mode != "logits":
         raise ValueError(f"Tree checkpoint has invalid mode {mode!r}: {path}")
     if model is None:
         raise ValueError(f"Tree checkpoint is missing model: {path}")
