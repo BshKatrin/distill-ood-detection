@@ -5,8 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from distill_ood_detection.config import DistillationMethod, load_config
-from distill_ood_detection.evaluation.report import build_ood_report, build_ood_reports
+from distill_ood_detection.config import load_config
 from distill_ood_detection.experiments.infer_probabilities import run_probability_inference
 from distill_ood_detection.experiments.train_tree_student import run_tree_experiment
 from distill_ood_detection.experiments.train_student import run_experiment
@@ -78,38 +77,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also infer the deterministic ID validation split.",
     )
-    report_parser = subparsers.add_parser("report-ood")
-    report_inputs = report_parser.add_mutually_exclusive_group(required=True)
-    report_inputs.add_argument(
-        "--manifest",
-        type=Path,
-        help="Path to a probability inference manifest.json.",
-    )
-    report_inputs.add_argument(
-        "--run-dirs",
-        type=Path,
-        nargs="+",
-        help="Experiment run directories containing probabilities/manifest.json.",
-    )
-    report_parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=None,
-        help=(
-            "Directory for ood_metrics.json, plots, and ood_report.html. "
-            "Defaults to manifest parent for --manifest; required for multiple --run-dirs."
-        ),
-    )
-    report_parser.add_argument(
-        "--no-html",
-        action="store_true",
-        help="Only write ood_metrics.json.",
-    )
-    report_parser.add_argument(
-        "--no-plots",
-        action="store_true",
-        help="Skip histogram PNG generation.",
-    )
     return parser
 
 
@@ -134,23 +101,6 @@ def main() -> None:
             include_train=args.include_train,
             include_validation=args.include_validation,
         )
-    if args.command == "report-ood":
-        if args.manifest is not None:
-            build_ood_report(
-                manifest_path=args.manifest,
-                output_dir=args.output_dir,
-                write_html=not args.no_html,
-                write_plots=not args.no_plots,
-            )
-        else:
-            if args.output_dir is None:
-                parser.error("--output-dir is required when using --run-dirs")
-            build_ood_reports(
-                run_dirs=args.run_dirs,
-                output_dir=args.output_dir,
-                write_html=not args.no_html,
-                write_plots=not args.no_plots,
-            )
 
 
 if __name__ == "__main__":

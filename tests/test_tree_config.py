@@ -19,6 +19,18 @@ class TreeConfigTests(unittest.TestCase):
         self.assertEqual(config.tree.enabled_modes(), ("logits",))
         self.assertEqual(config.tree.random_forest.n_estimators, 200)
 
+    def test_loads_cifar100_random_forest_config(self) -> None:
+        config = load_config(Path("configs/distill_random_forest_cifar100.yaml"))
+
+        self.assertEqual(config.dataset.name, "cifar100")
+        self.assertEqual(config.teacher.hf_model_id, "edadaltocg/resnet18_cifar100")
+        self.assertEqual(config.teacher.num_classes, 100)
+        self.assertEqual(config.student.num_classes, 100)
+        self.assertEqual(
+            tuple(ood.name for ood in config.dataset.ood_datasets),
+            ("cifar10", "mnist", "svhn"),
+        )
+
     def test_rejects_cross_entropy_mode(self) -> None:
         raw = {
             "experiment_name": "bad_tree_config",

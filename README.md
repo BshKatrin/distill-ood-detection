@@ -1,8 +1,7 @@
 # distill-ood-detection
 
-Research code for distilling a Hugging Face CIFAR-10 ResNet-18 teacher
-(`edadaltocg/resnet18_cifar10`) into simple student models for OOD-detection
-experiments.
+Research code for distilling Hugging Face CIFAR ResNet-18 teachers into simple
+student models for OOD-detection experiments.
 
 ## Repository layout
 
@@ -142,3 +141,25 @@ uv run distill-ood infer-probabilities --config configs/distill_random_forest_ci
 ```
 
 Use `--tree-mode logits` to run only the enabled random-forest mode explicitly.
+
+## CIFAR-100 ID Experiments
+
+The CIFAR-100 experiment configs use `edadaltocg/resnet18_cifar100` as teacher,
+train 100-class students, and evaluate CIFAR-10, MNIST, and SVHN as OOD
+datasets.
+
+```bash
+uv run distill-ood train-student --config configs/distill_linear_cifar100.yaml
+uv run distill-ood train-student --config configs/distill_mlp_cifar100.yaml
+uv run distill-ood train-student --config configs/distill_feature_linear_layer3_cifar100.yaml
+uv run distill-ood train-tree-student --config configs/distill_random_forest_cifar100.yaml
+```
+
+After training, save best-checkpoint probabilities:
+
+```bash
+uv run distill-ood infer-probabilities --config configs/distill_linear_cifar100.yaml
+uv run distill-ood infer-probabilities --config configs/distill_mlp_cifar100.yaml
+uv run distill-ood infer-probabilities --config configs/distill_feature_linear_layer3_cifar100.yaml
+uv run distill-ood infer-probabilities --config configs/distill_random_forest_cifar100.yaml
+```

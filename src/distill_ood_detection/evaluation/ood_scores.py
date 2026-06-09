@@ -15,7 +15,7 @@ LOGIT_L2_DISTANCE = "logit_l2_distance"
 # Signs convert raw scores to the repository convention used by OOD metrics:
 # ID is the positive class, so larger signed scores are more ID-like.
 SIGNS: Mapping[str, int] = {
-    MAX_PROBABILITY_DIFFERENCE: -1,
+    MAX_PROBABILITY_DIFFERENCE: +1,
     ABSOLUTE_MAX_PROBABILITY_DIFFERENCE: -1,
     STUDENT_TEACHER_KL_DIVERGENCE: -1,
     LOGIT_L2_DISTANCE: -1,

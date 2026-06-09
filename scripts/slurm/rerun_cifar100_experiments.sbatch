@@ -8,6 +8,12 @@
 #SBATCH --output=slurm/%x-%j.out
 
 set -euo pipefail
+export PYTHONUNBUFFERED=1
+export UV_NO_PROGRESS=1
+PS4='[$(date --iso-8601=seconds)] + '
+set -x
+
+trap 'status=$?; echo "[$(date --iso-8601=seconds)] Failed at line ${LINENO} with exit status ${status}"; exit "${status}"' ERR
 
 PROJECT_DIR="${PROJECT_DIR:-${SLURM_SUBMIT_DIR}}"
 cd "${PROJECT_DIR}"
@@ -15,7 +21,7 @@ cd "${PROJECT_DIR}"
 mkdir -p slurm
 
 echo "[$(date --iso-8601=seconds)] Syncing uv environment"
-uv sync
+uv sync --locked
 
 torch_configs=(
   "configs/distill_linear_cifar100.yaml"
@@ -29,41 +35,24 @@ tree_configs=(
 
 for config in "${torch_configs[@]}"; do
   echo "[$(date --iso-8601=seconds)] Training PyTorch student: ${config}"
-  uv run distill-ood train-student \
+  uv run --no-sync distill-ood train-student \
     --config "${config}"
 
   echo "[$(date --iso-8601=seconds)] Inferring best PyTorch student probabilities: ${config}"
-  uv run distill-ood infer-probabilities \
+  uv run --no-sync distill-ood infer-probabilities \
     --config "${config}" \
     --checkpoint best
 done
 
 for config in "${tree_configs[@]}"; do
   echo "[$(date --iso-8601=seconds)] Training tree student: ${config}"
-  uv run distill-ood train-tree-student \
+  uv run --no-sync distill-ood train-tree-student \
     --config "${config}"
 
   echo "[$(date --iso-8601=seconds)] Inferring best tree student probabilities: ${config}"
-  uv run distill-ood infer-probabilities \
+  uv run --no-sync distill-ood infer-probabilities \
     --config "${config}" \
     --checkpoint best
 done
 
-experiment_names=(
-  "linear_student_resnet18_cifar100"
-  "mlp_student_resnet18_cifar100"
-  "feature_mlp_layer3_student_resnet18_cifar100"
-  "random_forest_student_resnet18_cifar100"
-)
-
-run_dirs=()
-for experiment_name in "${experiment_names[@]}"; do
-  run_dirs+=("runs/${experiment_name}")
-done
-
-echo "[$(date --iso-8601=seconds)] Reporting aggregate OOD metrics"
-uv run distill-ood report-ood \
-  --run-dirs "${run_dirs[@]}" \
-  --output-dir reports/cifar100
-
-echo "[$(date --iso-8601=seconds)] CIFAR-100 training, inference, and reporting complete"
+echo "[$(date --iso-8601=seconds)] CIFAR-100 training and inference complete"
