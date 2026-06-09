@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=ce_students
 #SBATCH --partition=electronic
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:3
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=12:00:00
+#SBATCH --time=120
 #SBATCH --output=slurm/%x-%j.out
 
 set -euo pipefail
