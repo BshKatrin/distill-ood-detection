@@ -4,18 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
 
 import torch
-from datasets import load_dataset
 from torch.utils.data import DataLoader, Dataset
-from torchvision.datasets import CIFAR10, MNIST, SVHN
+from torchvision.datasets import CIFAR10, CIFAR100, MNIST, SVHN
 from torchvision.transforms import Compose, Grayscale, Normalize, Resize, ToTensor
 
 from distill_ood_detection.config import DatasetConfig, OODDatasetConfig
 from distill_ood_detection.datasets.cifar10 import (
-    CIFAR10_MEAN,
-    CIFAR10_STD,
+    cifar_normalization,
+    cifar_transform,
     split_train_validation,
 )
 
@@ -30,16 +28,13 @@ class NamedLoader:
 
 
 def build_in_distribution_test_loader(config: DatasetConfig) -> NamedLoader:
-    """Build the in-distribution CIFAR-10 test loader."""
+    """Build the in-distribution CIFAR test loader."""
 
-    if config.name != "cifar10":
-        raise ValueError(f"Unsupported in-distribution dataset: {config.name}")
-    transform = Compose([ToTensor(), Normalize(CIFAR10_MEAN, CIFAR10_STD)])
-    test_dataset = CIFAR10(
+    test_dataset = _cifar_dataset_class(config.name)(
         root=Path(config.data_dir),
         train=False,
         download=True,
-        transform=transform,
+        transform=cifar_transform(config.name),
     )
     return NamedLoader(
         name=f"{config.name}_test",
@@ -49,11 +44,9 @@ def build_in_distribution_test_loader(config: DatasetConfig) -> NamedLoader:
 
 
 def build_in_distribution_train_loader(config: DatasetConfig, seed: int) -> NamedLoader:
-    """Build the in-distribution CIFAR-10 training split loader."""
+    """Build the in-distribution CIFAR training split loader."""
 
-    if config.name != "cifar10":
-        raise ValueError(f"Unsupported in-distribution dataset: {config.name}")
-    train_subset, _ = _cifar10_train_validation_subsets(config, seed)
+    train_subset, _ = _cifar_train_validation_subsets(config, seed)
     return NamedLoader(
         name=f"{config.name}_train",
         split="train",
@@ -62,11 +55,9 @@ def build_in_distribution_train_loader(config: DatasetConfig, seed: int) -> Name
 
 
 def build_in_distribution_validation_loader(config: DatasetConfig, seed: int) -> NamedLoader:
-    """Build the in-distribution CIFAR-10 validation split loader."""
+    """Build the in-distribution CIFAR validation split loader."""
 
-    if config.name != "cifar10":
-        raise ValueError(f"Unsupported in-distribution dataset: {config.name}")
-    _, validation_subset = _cifar10_train_validation_subsets(config, seed)
+    _, validation_subset = _cifar_train_validation_subsets(config, seed)
     return NamedLoader(
         name=f"{config.name}_validation",
         split="validation",
@@ -92,17 +83,22 @@ def _ood_dataset(
     ood_config: OODDatasetConfig,
 ) -> Dataset[tuple[torch.Tensor, int]]:
     data_dir = Path(dataset_config.data_dir)
+    transform = _cifar_like_transform(dataset_config.name, ood_config.name)
+    if ood_config.name == "cifar10":
+        return CIFAR10(
+            root=data_dir,
+            train=ood_config.split == "train",
+            download=True,
+            transform=transform,
+        )
     if ood_config.name == "cifar100":
-        return HuggingFaceImageDataset(
-            dataset_id="uoft-cs/cifar100",
-            split=ood_config.split,
-            image_key="img",
-            label_key="fine_label",
-            transform=_cifar_like_transform(),
-            cache_dir=data_dir / "huggingface",
+        return CIFAR100(
+            root=data_dir,
+            train=ood_config.split == "train",
+            download=True,
+            transform=transform,
         )
 
-    transform = _cifar_like_transform(ood_config.name)
     if ood_config.name == "mnist":
         return MNIST(
             root=data_dir,
@@ -120,16 +116,15 @@ def _ood_dataset(
     raise ValueError(f"Unsupported OOD dataset: {ood_config.name}")
 
 
-def _cifar10_train_validation_subsets(
+def _cifar_train_validation_subsets(
     config: DatasetConfig,
     seed: int,
 ) -> tuple[Dataset[tuple[torch.Tensor, int]], Dataset[tuple[torch.Tensor, int]]]:
-    transform = Compose([ToTensor(), Normalize(CIFAR10_MEAN, CIFAR10_STD)])
-    train_dataset = CIFAR10(
+    train_dataset = _cifar_dataset_class(config.name)(
         root=Path(config.data_dir),
         train=True,
         download=True,
-        transform=transform,
+        transform=cifar_transform(config.name),
     )
     return split_train_validation(
         train_dataset,
@@ -138,13 +133,22 @@ def _cifar10_train_validation_subsets(
     )
 
 
-def _cifar_like_transform(name: str | None = None) -> Compose:
+def _cifar_dataset_class(name: str) -> type[CIFAR10] | type[CIFAR100]:
+    if name == "cifar10":
+        return CIFAR10
+    if name == "cifar100":
+        return CIFAR100
+    raise ValueError(f"Unsupported in-distribution dataset: {name}")
+
+
+def _cifar_like_transform(id_name: str, ood_name: str | None = None) -> Compose:
+    mean, std = cifar_normalization(id_name)
     return Compose(
         [
             Resize((32, 32)),
-            _channels_transform(name),
+            _channels_transform(ood_name),
             ToTensor(),
-            Normalize(CIFAR10_MEAN, CIFAR10_STD),
+            Normalize(mean, std),
         ]
     )
 
@@ -172,38 +176,3 @@ class _Identity:
     def __call__(self, image: object) -> object:
         return image
 
-
-class HuggingFaceImageDataset(Dataset[tuple[torch.Tensor, int]]):
-    """Torch dataset wrapper around a Hugging Face image dataset split."""
-
-    def __init__(
-        self,
-        dataset_id: str,
-        split: str,
-        image_key: str,
-        label_key: str,
-        transform: Compose,
-        cache_dir: Path,
-    ) -> None:
-        self._dataset = load_dataset(
-            dataset_id,
-            split=split,
-            cache_dir=str(cache_dir),
-        )
-        self._image_key = image_key
-        self._label_key = label_key
-        self._transform = transform
-
-    def __len__(self) -> int:
-        return len(self._dataset)
-
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, int]:
-        sample = cast(dict[str, Any], self._dataset[index])
-        image = sample[self._image_key]
-        if not hasattr(image, "mode"):
-            raise TypeError(
-                f"Expected PIL image-like object in '{self._image_key}', got {type(image)!r}"
-            )
-        image = image.convert("RGB")
-        label = int(sample[self._label_key])
-        return self._transform(image), label

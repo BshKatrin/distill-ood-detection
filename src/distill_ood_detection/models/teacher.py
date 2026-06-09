@@ -14,7 +14,7 @@ from distill_ood_detection.config import TeacherConfig
 
 
 class CifarResNet18(ResNet):
-    """ResNet-18 variant with the CIFAR-10 stem used by the HF checkpoint."""
+    """ResNet-18 variant with the CIFAR stem used by the HF checkpoint."""
 
     def __init__(self, num_classes: int = 10) -> None:
         super().__init__(block=BasicBlock, layers=[2, 2, 2, 2], num_classes=num_classes)
@@ -68,9 +68,9 @@ class TeacherFeatureExtractor(nn.Module):
 
 
 def load_teacher(config: TeacherConfig, device: torch.device) -> nn.Module:
-    """Load the pretrained ResNet-18 CIFAR-10 teacher from Hugging Face."""
+    """Load the pretrained ResNet-18 CIFAR teacher from Hugging Face."""
 
-    model = CifarResNet18(num_classes=10)
+    model = CifarResNet18(num_classes=config.num_classes)
     state_dict = _download_state_dict(config)
     model.load_state_dict(state_dict)
     model.to(device)

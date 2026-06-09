@@ -56,11 +56,14 @@ experiment_names=(
   "random_forest_student_resnet18_cifar100"
 )
 
+run_dirs=()
 for experiment_name in "${experiment_names[@]}"; do
-  manifest="runs/${experiment_name}/probabilities/manifest.json"
-  echo "[$(date --iso-8601=seconds)] Reporting OOD metrics: ${manifest}"
-  uv run distill-ood report-ood \
-    --manifest "${manifest}"
+  run_dirs+=("runs/${experiment_name}")
 done
+
+echo "[$(date --iso-8601=seconds)] Reporting aggregate OOD metrics"
+uv run distill-ood report-ood \
+  --run-dirs "${run_dirs[@]}" \
+  --output-dir reports/cifar100
 
 echo "[$(date --iso-8601=seconds)] CIFAR-100 training, inference, and reporting complete"

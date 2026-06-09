@@ -14,7 +14,7 @@ DistillationMethod = Literal[
     "mse_logits",
 ]
 TreeDistillationMode = Literal["logits"]
-OODDatasetName = Literal["mnist", "svhn", "cifar100"]
+OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
     "cross_entropy_softmax": "cross_entropy",
 }
@@ -46,6 +46,7 @@ class TeacherConfig:
 
     hf_model_id: str = "edadaltocg/resnet18_cifar10"
     revision: str = "main"
+    num_classes: int = 10
 
 
 @dataclass(frozen=True)
@@ -262,6 +263,8 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
         )
     dataset = DatasetConfig(**dataset_raw)
     teacher = TeacherConfig(**raw.get("teacher", {}))
+    if teacher.num_classes <= 0:
+        raise ValueError("teacher.num_classes must be positive")
     student_raw = raw.get("student", {}).copy()
     if "input_shape" in student_raw:
         student_raw["input_shape"] = tuple(student_raw["input_shape"])

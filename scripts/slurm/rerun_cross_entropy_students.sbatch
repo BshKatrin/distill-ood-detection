@@ -23,16 +23,15 @@ configs=(
 )
 
 for config in "${configs[@]}"; do
-  echo "[$(date --iso-8601=seconds)] Training cross_entropy: ${config}"
-  uv run distill-ood train-student \
-    --config "${config}" \
-    --method cross_entropy
+  # echo "[$(date --iso-8601=seconds)] Training cross_entropy: ${config}"
+  # uv run distill-ood train-student \
+  #   --config "${config}" \
+  #   --method cross_entropy
 
   echo "[$(date --iso-8601=seconds)] Inferring best student probabilities: ${config}"
   uv run distill-ood infer-probabilities \
-    --config "${config}" \
-    --method cross_entropy \
-    --checkpoint best
+    --checkpoint best \
+    --config "${config}" 
 done
 
 echo "[$(date --iso-8601=seconds)] Done"
