@@ -16,12 +16,14 @@ set -x
 trap 'status=$?; echo "[$(date --iso-8601=seconds)] Failed at line ${LINENO} with exit status ${status}"; exit "${status}"' ERR
 
 PROJECT_DIR="${PROJECT_DIR:-${SLURM_SUBMIT_DIR}}"
+export PYTHONPATH="${PROJECT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 cd "${PROJECT_DIR}"
 
 mkdir -p slurm
 
 echo "[$(date --iso-8601=seconds)] Syncing uv environment"
-uv sync --locked
+uv --version
+uv sync --locked --no-install-project
 
 torch_configs=(
   "configs/distill_linear_cifar100.yaml"
@@ -35,22 +37,22 @@ tree_configs=(
 
 for config in "${torch_configs[@]}"; do
   echo "[$(date --iso-8601=seconds)] Training PyTorch student: ${config}"
-  uv run --no-sync distill-ood train-student \
+  uv run --no-sync python -m distill_ood_detection.cli train-student \
     --config "${config}"
 
   echo "[$(date --iso-8601=seconds)] Inferring best PyTorch student probabilities: ${config}"
-  uv run --no-sync distill-ood infer-probabilities \
+  uv run --no-sync python -m distill_ood_detection.cli infer-probabilities \
     --config "${config}" \
     --checkpoint best
 done
 
 for config in "${tree_configs[@]}"; do
   echo "[$(date --iso-8601=seconds)] Training tree student: ${config}"
-  uv run --no-sync distill-ood train-tree-student \
+  uv run --no-sync python -m distill_ood_detection.cli train-tree-student \
     --config "${config}"
 
   echo "[$(date --iso-8601=seconds)] Inferring best tree student probabilities: ${config}"
-  uv run --no-sync distill-ood infer-probabilities \
+  uv run --no-sync python -m distill_ood_detection.cli infer-probabilities \
     --config "${config}" \
     --checkpoint best
 done
