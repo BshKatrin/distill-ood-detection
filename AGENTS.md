@@ -69,3 +69,23 @@ uv add <package>
 - For plots, prefer Seaborn for static statistical visuals.
 - Use Plotly when interactivity is useful or necessary.
 - Avoid long textual analysis unless explicitly requested.
+
+## Supercluster access
+
+Cluster access instructions are intentionally not stored in this public file.
+
+If cluster work is requested, first check for the local-only file:
+
+```bash
+docs/supercluster.local.md
+```
+
+That file may contain private SSH aliases, authentication notes, GPU partition names,
+module-loading commands, scratch paths, and job-submission examples.
+
+### Rules
+
+- Do not print secrets, passphrases, tokens, private hostnames, or private usernames in responses.
+- Do not commit `docs/supercluster.local.md`.
+- If `docs/supercluster.local.md` is missing, ask the user for the non-sensitive cluster details needed for the task, or ask them to create it from `docs/supercluster.template.md`.
+- Prefer documented cluster commands from `docs/supercluster.local.md` over guessing.
