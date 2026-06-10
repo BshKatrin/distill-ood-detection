@@ -18,6 +18,7 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
 
 - MSP (Maximum Softmax Probability): Maximum softmax probability of the **teacher** model. MSP is the baseline OOD Score.
   - `sign: +1`
+  - **Status**: Not implemented in `ood_scores.py`.
 
 - KL (teacher || student): KL divergence from the teacher probability distribution to the student probability distribution.
   - `sign: -1`
@@ -28,5 +29,10 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
 - Absolute max probability difference: Absolute value of the maximum teacher probability minus the maximum student probability.
   - `sign: -1`
 
-- Centered-logit L2 distance: L2 distance between zero-meaned teacher logits and zero-meaned student logits.
+- Centered-logit L2 distance: L2 distance between mean-centered teacher logits and mean-centered student logits.
   - `sign: -1`
+
+## Implementation
+
+- OOD Score functions are implemented in [ood_scores.py](../../src/distill_ood_detection/evaluation/ood_scores.py).
+- Aggregate OOD detection metrics, such as ROC-AUC and FPR@95 TPR, are implemented in [ood_metrics.py](../../src/distill_ood_detection/evaluation/ood_metrics.py).

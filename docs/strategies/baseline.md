@@ -4,9 +4,9 @@ This strategy follows the standard teacher–student distillation setup without 
 
 ## Teacher Model
 
-The teacher is a relatively strong CNN model: ResNet-18
+Use a relatively strong CNN teacher model: ResNet-18.
 
-The teacher is trained on the ID classification task and provides the supervision signal for the student.
+Train the teacher on the ID classification task. During distillation, the teacher provides the supervision signal for the student.
 
 ## Student Models
 
@@ -18,7 +18,7 @@ The following student architectures are evaluated:
 
 ## Student Inputs
 
-2 input representations are explored:
+Two input representations are explored:
 
 ### Raw Pixels
 
@@ -36,6 +36,11 @@ The student receives feature representations extracted from an intermediate teac
 The student is trained to reproduce the teacher outputs using one of the objectives:
 
 - `mse_logits`
-- `kl_divergence`
+- `cross_entropy`
 
-See `docs/objectives/` for details.
+See [Objectives](../objectives/README.md) for details.
+
+## Implementation
+
+- PyTorch student training is implemented in [train_student.py](../../src/distill_ood_detection/experiments/train_student.py).
+- Random-forest student training is implemented in [train_tree_student.py](../../src/distill_ood_detection/experiments/train_tree_student.py).

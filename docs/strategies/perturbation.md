@@ -8,9 +8,9 @@ The student must receive enough information to be perturbation-aware: it should 
 
 ## Teacher Model
 
-The teacher is a relatively strong CNN model: ResNet-18
+Use a relatively strong CNN teacher model: ResNet-18.
 
-The teacher is trained on the ID classification task and provides the supervision signal for the student.
+Train the teacher on the ID classification task. During distillation, the teacher provides the supervision signal for the student.
 
 ## Student Models
 
@@ -29,7 +29,7 @@ The following student architectures are evaluated:
 5. [Student] Predict `y_tilde_student`.
 6. Compute the distillation loss between `y_tilde_teacher` and `y_tilde_student`.
 
-`y_tilde_teacher` and `y_tilde_student` may be represented either as logits or as probability distributssh ions after softmax, depending on the selected distillation objective.
+`y_tilde_teacher` and `y_tilde_student` may be represented either as logits or as probability distributions after softmax, depending on the selected distillation objective.
 
 ### Perturbation strategies
 
@@ -37,7 +37,13 @@ The following student architectures are evaluated:
 
 This perturbation strategy modifies an intermediate teacher embedding `z` by clipping its values to an upper percentile threshold.
 
-Given a percentile `u \in [0, 1]`, the clipping threshold is computed as the `u`-percentile of the relevant subset of values. Each element is then clipped as `z' = min(z, threshold)`.
+For each stochastic draw, sample `u` from a uniform distribution:
+
+`u ~ Uniform(u_min, u_max)`
+
+where `0 <= u_min < u_max <= 1`.
+
+Given the sampled percentile `u`, compute the clipping threshold as the `u`-percentile of the relevant subset of values. Each element is then clipped as `z' = min(z, threshold)`.
 
 Examples:
 
@@ -45,7 +51,7 @@ Examples:
 - `u = 0.9` corresponds to clipping at the 90th percentile.
 - Smaller values of `u` produce stronger perturbations.
 
-The intermediate embedding is extracted from a convolutional layer and has shape (i, j, d) where `i, j` are spatial coordinates and `c` is the channel dimension.
+The intermediate embedding is extracted from a convolutional layer and has shape `(i, j, d)`, where `i, j` are spatial coordinates and `d` is the channel dimension.
 
 ##### Clipping modes
 
@@ -55,12 +61,12 @@ The intermediate embedding is extracted from a convolutional layer and has shape
 
 ## OOD Score
 
-The perturbation strategy is stochastic. Therefore, the OOD score for a sample is estimated as the expected score over multiple perturbation draws.
+The perturbation strategy is stochastic. Therefore, the OOD Score for a sample is estimated as the expected score over multiple perturbation draws.
 
 For each test sample:
 
 1. Generate `K > 0` independent perturbations.
-2. Compute the selected OOD score for each perturbation.
+2. Compute the selected OOD Score for each perturbation.
 3. Average the scores across all perturbations.
 
 ## Distillation Objective
@@ -68,6 +74,6 @@ For each test sample:
 Train the student to reproduce the teacher output using one of the following objectives:
 
 - `mse_logits`
-- `kl_divergence`
+- `cross_entropy`
 
-See `docs/objectives/` for details.
+See [Objectives](../objectives/README.md) for details.

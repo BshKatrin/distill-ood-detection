@@ -1,6 +1,6 @@
 # HPC system access Template
 
-This file is safe to commit. Copy it to `docs/hpc.local.md` and fill
+This file is safe to commit. Copy it to `docs/hpc/hpc.local.md` and fill
 in the private/local values there.
 
 Do not put passphrases, tokens, passwords, private usernames, or private host
@@ -64,6 +64,6 @@ uv sync
 
 ## Safety
 
-- Keep private cluster details in `docs/hpc.local.md`.
-- Do not commit `docs/hpc.local.md`.
+- Keep private cluster details in `docs/hpc/hpc.local.md`.
+- Do not commit `docs/hpc/hpc.local.md`.
 - Do not print secrets or passphrases in responses or logs.

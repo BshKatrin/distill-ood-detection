@@ -17,19 +17,20 @@ Avoid introducing frameworks or patterns unless they reduce duplication across m
 
 ## Directory responsibilities
 
-- datasets/: dataset loading and transforms.
-- models/: neural network definitions only.
-- distillation/: distillation losses and training logic.
-- evaluation/: metrics, OOD scores, plots.
-- experiments/: executable entrypoints.
-- configs/: experiment configuration files.
-- docs/: research notes and experiment logs.
-- runs/: training artifacts, including .json files containing training histories and .pt files containing saved model checkpoints
+- `src/distill_ood_detection/datasets/`: dataset loading and transforms.
+- `src/distill_ood_detection/models/`: neural network definitions only.
+- `src/distill_ood_detection/distillation/`: distillation losses and training logic.
+- `src/distill_ood_detection/evaluation/`: metrics, OOD Scores, and plots.
+- `src/distill_ood_detection/experiments/`: executable entrypoints.
+- `configs/`: experiment configuration files.
+- `docs/`: project documentation, strategy notes, objectives, and OOD Score definitions.
+- `runs/`: training artifacts, including `.json` files containing training histories and `.pt` files containing saved model checkpoints.
 
 ### Project documentation (docs)
 
 - Project-specific terminology and vocabulary is defined in `docs/vocabulary.md`. When you encounter an unknown abbreviation (e.g. ID, OOD) consult the relevant vocabulary documentation. Use the project terminology exactly as defined there.
-- Before making non-trivial changes, read `docs/index.md` to find the relevant project documentation. Use `docs/index.md` as the source of truth for different conducted experiments
+- Before making non-trivial changes, read `docs/index.md` to find the relevant project documentation.
+- If HPC or GPU cluster access is requested, read `docs/hpc/README.md` and follow its local-configuration rules.
 
 Do not duplicate long explanations here. Add or update detailed documentation in `docs/`, then link it from `docs/index.md`.
 

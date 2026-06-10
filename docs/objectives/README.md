@@ -1,4 +1,6 @@
-# Distillation objective functions
+# Distillation Objective Functions
+
+Implemented objective functions are defined in [losses.py](../../src/distill_ood_detection/distillation/losses.py).
 
 ## `mse_logits`
 
@@ -20,9 +22,9 @@ The student is trained using a weighted combination of two cross-entropy objecti
 
 2. **Hard-target loss**
    - Standard cross-entropy with ground-truth labels.
-   - Student probabilities are computed using temperature `1`.
+   - Student logits are used directly, equivalent to temperature `1`.
 
-The final loss is L = α · T² · L_soft + β · L_hard
+The final loss is `L = alpha * T^2 * L_soft + (1 - alpha) * L_hard`
 
 where:
 
@@ -30,15 +32,17 @@ where:
 - `L_hard` is the cross-entropy with ground-truth labels.
 - `T` is the distillation temperature.
 - The `T²` factor compensates for the `1/T²` scaling of gradients from the soft-target loss.
-- `β < α`, giving more weight to the teacher signal than to the hard labels.
+- `alpha` controls the weight of the teacher signal.
 
 ## `kl_divergence`
+
+**Status**: Not implemented as a training objective in `distillation_loss`.
 
 Kullback–Leibler (KL) divergence between the teacher and student output probability distributions.
 
 Minimize:
 
-D_KL(P_teacher || P_student)
+`D_KL(P_teacher || P_student)`
 
 where:
 
@@ -47,4 +51,4 @@ where:
 
 ## References
 
-- Hinton, Vinyals, Dean (2015), "Distilling the Knowledge in a Neural Network". URL : https://arxiv.org/abs/1503.02531
+- Hinton, Vinyals, Dean (2015), "Distilling the Knowledge in a Neural Network". URL: https://arxiv.org/abs/1503.02531

@@ -8,7 +8,11 @@ student models for OOD-detection experiments.
 - `src/distill_ood_detection/`: importable Python package.
 - `configs/`: reproducible YAML experiment definitions.
 - `runs/`: generated metrics, checkpoints, and resolved configs.
-- `docs/`: research notes and experiment logs.
+- `docs/`: project documentation, strategy notes, objectives, and OOD Score definitions.
+- `AGENTS.md`: instructions for AI agents working in this repository.
+
+For project terminology, research strategy documentation, objective definitions,
+and OOD Score conventions, start with [`docs/index.md`](docs/index.md).
 
 ## Environment
 
@@ -56,12 +60,9 @@ uv run distill-ood train-student --config configs/distill_feature_linear_layer3_
 ```
 
 The baseline config trains a linear student with two objectives:
-
-- `cross_entropy`: `alpha * temperature^2 * Loss_soft + (1 - alpha) * Loss_hard`,
-  where `Loss_soft` is temperature-scaled cross-entropy against teacher
-  probabilities and `Loss_hard` is standard cross-entropy against true class
-  labels.
-- `mse_logits`: MSE between centered student and teacher logits.
+`cross_entropy` and `mse_logits`. See
+[`docs/objectives/README.md`](docs/objectives/README.md) for objective
+definitions.
 
 The baseline config keeps shared loop settings under `training.defaults` and
 method-specific settings under `training.methods`. In practice,
@@ -72,6 +73,12 @@ MLflow logging is enabled in the YAML config. Each run logs one parent
 experiment run and one nested run per distillation method. Per epoch, the
 student run logs distillation loss, validation accuracy, and validation KL
 divergence `KL(teacher || student)`.
+
+View logged runs with:
+
+```bash
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
+```
 
 ## Feature Students
 
@@ -85,7 +92,7 @@ teacher, useful feature layers include:
 - `layer4`: `[512, 4, 4]`
 - `avgpool`: `[512, 1, 1]`
 
-The config `configs/distill_feature_mlp_layer3_cifar10.yaml` uses `layer3`.
+The config `configs/distill_feature_linear_layer3_cifar10.yaml` uses `layer3`.
 Training still distills against the teacher logits, but the student receives
 the configured teacher features as input.
 
@@ -103,10 +110,6 @@ The tree config supports one mode:
 
 Teacher inference on the deterministic CIFAR-10 training split is saved under
 `runs/<experiment_name>/teacher_inference/cifar10_train/teacher.pt`.
-
-```bash
-uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
-```
 
 ## Probability Inference
 

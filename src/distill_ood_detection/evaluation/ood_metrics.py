@@ -15,11 +15,6 @@ def ood_detection_metrics(
 ) -> dict[str, float]:
     """Compute ROC-AUC and FPR@95 for OOD detection scores.
 
-    Convention: ID samples are positive examples with label 1, and OOD samples
-    are negative examples with label 0. ``pred_labels`` contains ID confidence
-    scores, currently maximum softmax probabilities, where higher scores mean
-    more ID-like and lower scores mean more OOD-like.
-
     Args:
         true_labels: Binary labels with 1 for ID samples and 0 for OOD samples.
         pred_labels: ID confidence scores for the same samples.
