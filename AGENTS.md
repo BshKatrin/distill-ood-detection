@@ -15,19 +15,6 @@ Prefer explicit code over abstractions.
 
 Avoid introducing frameworks or patterns unless they reduce duplication across multiple experiments.
 
-## Project vocabulary
-
-- ID (In-Distribution): Data drawn from the same distribution as the training data, or from the distribution the model is expected to encounter during deployment.
-
-- OOD (Out-of-Distribution): Data that does not follow the training-data distribution and differs significantly from the examples seen during training.
-
-- Near-OOD: OOD samples that are semantically or visually similar to the in-distribution data. These samples typically share many characteristics with ID data and are therefore more difficult to distinguish from ID samples. Example: CIFAR-10 as ID and CIFAR-100 as OOD.
-
-- Far-OOD: OOD samples that differ substantially from the in-distribution data in semantics, appearance, or underlying data-generating process. These samples are generally easier to distinguish from ID samples. Example: CIFAR-10 as ID and MNIST as OOD.
-
-- OOD Score: A scalar measure of confidence used for OOD detection. Higher values indicate ID samples; lower values indicate OOD samples.
-- MSP (Maximum Softmax Probability): An OOD score defined as the maximum softmax probability of the teacher model. MSP is a baseline for OOD detection.
-
 ## Directory responsibilities
 
 - datasets/: dataset loading and transforms.
@@ -37,8 +24,14 @@ Avoid introducing frameworks or patterns unless they reduce duplication across m
 - experiments/: executable entrypoints.
 - configs/: experiment configuration files.
 - docs/: research notes and experiment logs.
-- runs/: training artifacts, including .json files containing training histories
-  and .pt files containing saved model checkpoints
+- runs/: training artifacts, including .json files containing training histories and .pt files containing saved model checkpoints
+
+### Project documentation (docs)
+
+- Project-specific terminology and vocabulary is defined in `docs/vocabulary.md`. When you encounter an unknown abbreviation (e.g. ID, OOD) consult the relevant vocabulary documentation. Use the project terminology exactly as defined there.
+- Before making non-trivial changes, read `docs/index.md` to find the relevant project documentation. Use `docs/index.md` as the source of truth for different conducted experiments
+
+Do not duplicate long explanations here. Add or update detailed documentation in `docs/`, then link it from `docs/index.md`.
 
 ## Coding guidelines
 
@@ -69,23 +62,3 @@ uv add <package>
 - For plots, prefer Seaborn for static statistical visuals.
 - Use Plotly when interactivity is useful or necessary.
 - Avoid long textual analysis unless explicitly requested.
-
-## Supercluster access
-
-Cluster access instructions are intentionally not stored in this public file.
-
-If cluster work is requested, first check for the local-only file:
-
-```bash
-docs/supercluster.local.md
-```
-
-That file may contain private SSH aliases, authentication notes, GPU partition names,
-module-loading commands, scratch paths, and job-submission examples.
-
-### Rules
-
-- Do not print secrets, passphrases, tokens, private hostnames, or private usernames in responses.
-- Do not commit `docs/supercluster.local.md`.
-- If `docs/supercluster.local.md` is missing, ask the user for the non-sensitive cluster details needed for the task, or ask them to create it from `docs/supercluster.template.md`.
-- Prefer documented cluster commands from `docs/supercluster.local.md` over guessing.
