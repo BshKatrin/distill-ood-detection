@@ -37,13 +37,11 @@ tree_configs=(
 
 for config in "${torch_configs[@]}"; do
   echo "[$(date --iso-8601=seconds)] Training PyTorch student: ${config}"
-  uv run --no-sync python -m distill_ood_detection.cli train-student \
-    --config "${config}"
+  uv run distill-ood train-student --config "${config}"
 
   echo "[$(date --iso-8601=seconds)] Inferring best PyTorch student probabilities: ${config}"
-  uv run --no-sync python -m distill_ood_detection.cli infer-probabilities \
-    --config "${config}" \
-    --checkpoint best
+  uv run distill-ood infer-probabilities --config "${config}" --checkpoint best 
+
 done
 
 for config in "${tree_configs[@]}"; do
@@ -52,9 +50,8 @@ for config in "${tree_configs[@]}"; do
     --config "${config}"
 
   echo "[$(date --iso-8601=seconds)] Inferring best tree student probabilities: ${config}"
-  uv run --no-sync python -m distill_ood_detection.cli infer-probabilities \
-    --config "${config}" \
-    --checkpoint best
+  uv run distill-ood infer-probabilities --config "${config}" --checkpoint best 
+  
 done
 
 echo "[$(date --iso-8601=seconds)] CIFAR-100 training and inference complete"

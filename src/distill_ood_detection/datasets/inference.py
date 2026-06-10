@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets import CIFAR10, CIFAR100, MNIST, SVHN
-from torchvision.transforms import Compose, Grayscale, Normalize, Resize, ToTensor
+from torchvision.transforms import Compose, Grayscale, Normalize, Pad, Resize, ToTensor
 
 from distill_ood_detection.config import DatasetConfig, OODDatasetConfig
 from distill_ood_detection.datasets.cifar10 import (
@@ -145,12 +145,18 @@ def _cifar_like_transform(id_name: str, ood_name: str | None = None) -> Compose:
     mean, std = cifar_normalization(id_name)
     return Compose(
         [
-            Resize((32, 32)),
+            _spatial_transform(ood_name),
             _channels_transform(ood_name),
             ToTensor(),
             Normalize(mean, std),
         ]
     )
+
+
+def _spatial_transform(name: str | None) -> object:
+    if name == "mnist":
+        return Pad(2)
+    return Resize((32, 32))
 
 
 def _channels_transform(name: str | None) -> object:
@@ -175,4 +181,3 @@ def _loader(
 class _Identity:
     def __call__(self, image: object) -> object:
         return image
-
