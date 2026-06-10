@@ -31,6 +31,7 @@ Avoid introducing frameworks or patterns unless they reduce duplication across m
 - Project-specific terminology and vocabulary is defined in `docs/vocabulary.md`. When you encounter an unknown abbreviation (e.g. ID, OOD) consult the relevant vocabulary documentation. Use the project terminology exactly as defined there.
 - Before making non-trivial changes, read `docs/index.md` to find the relevant project documentation.
 - If HPC or GPU cluster access is requested, read `docs/hpc/README.md` and follow its local-configuration rules.
+- If a documented section is marked `Not implemented` and you implement it, remove the `Not implemented` status in the same change.
 
 Do not duplicate long explanations here. Add or update detailed documentation in `docs/`, then link it from `docs/index.md`.
 
