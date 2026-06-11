@@ -6,9 +6,6 @@ import argparse
 from pathlib import Path
 
 from distill_ood_detection.config import load_config
-from distill_ood_detection.experiments.infer_probabilities import run_probability_inference
-from distill_ood_detection.experiments.train_tree_student import run_tree_experiment
-from distill_ood_detection.experiments.train_student import run_experiment
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -86,12 +83,20 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     if args.command == "train-student":
+        from distill_ood_detection.experiments.train_student import run_experiment
+
         config = load_config(args.config)
         run_experiment(config, method=args.method)
     if args.command == "train-tree-student":
+        from distill_ood_detection.experiments.train_tree_student import run_tree_experiment
+
         config = load_config(args.config)
         run_tree_experiment(config, mode=args.mode)
     if args.command == "infer-probabilities":
+        from distill_ood_detection.experiments.infer_probabilities import (
+            run_probability_inference,
+        )
+
         config = load_config(args.config)
         run_probability_inference(
             config,
