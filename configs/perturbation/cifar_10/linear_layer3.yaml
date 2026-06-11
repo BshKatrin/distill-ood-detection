@@ -22,7 +22,7 @@ teacher:
 student:
   kind: linear
   feature_layer: layer3
-  input_shape: [256, 8, 8]
+  input_shape: [16385]
   num_classes: 10
 
 strategy:
@@ -31,7 +31,7 @@ strategy:
     u_min: 0.5
     u_max: 1.0
     clipping_mode: constant
-    evaluation_draws: 5
+    evaluation_draws: 50
 
 optimizer:
   mse_logits:

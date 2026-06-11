@@ -2,7 +2,7 @@
 
 This strategy is a perturbation-based stochastic distillation algorithm. The core idea is to perturb an intermediate image embedding produced by the teacher model, then train the student to predict the teacher output for that perturbed embedding.
 
-The student must receive enough information to be perturbation-aware: it should observe both the original embedding and the perturbation applied to that embedding.
+The student must receive enough information to be perturbation-aware: it should observe both the perturbed embedding and the sampled perturbation applied to the original embedding.
 
 ## Teacher Model
 
@@ -23,7 +23,7 @@ The following student architectures are evaluated:
 1. [Teacher] Extract an intermediate image embedding from the teacher model. Denote this embedding as `z`.
 2. [Teacher] Sample a perturbation `u` and apply it to `z` to obtain the perturbed embedding `z_tilde`.
 3. [Teacher] Continue the teacher forward pass from `z_tilde` through the remaining teacher layers to obtain `y_tilde_teacher`.
-4. [Student] Concatenate `z` and `u`, then provide the concatenated vector to the student as input.
+4. [Student] Concatenate `z_tilde` and `u`, then provide the concatenated vector to the student as input.
 5. [Student] Predict `y_tilde_student`.
 6. Compute the distillation loss between `y_tilde_teacher` and `y_tilde_student`.
 
@@ -35,13 +35,16 @@ The following student architectures are evaluated:
 
 This perturbation strategy modifies an intermediate teacher embedding `z` by clipping its values to an upper percentile threshold.
 
-For each stochastic draw, sample `u` from a uniform distribution:
+For each stochastic draw, sample `u` from a uniform distribution. Depending on
+the clipping mode, `u` may be a scalar, spatial matrix, or channel vector:
 
 `u ~ Uniform(u_min, u_max)`
 
 where `0 <= u_min < u_max <= 1`.
 
-Given the sampled percentile `u`, compute the clipping threshold as the `u`-percentile of the relevant subset of values. Each element is then clipped as `z' = min(z, threshold)`.
+Given each sampled percentile in `u`, compute the clipping threshold as that
+percentile of the relevant subset of values. Each element is then clipped as
+`z' = min(z, threshold)`.
 
 Examples:
 
@@ -53,9 +56,9 @@ The intermediate embedding is extracted from a convolutional layer and has shape
 
 ##### Clipping modes
 
-- `constant`: a single clipping threshold is computed using all values in the embedding. The same threshold is applied to every element.
-- `spatial_dependent`: a separate clipping threshold is computed for each spatial location `(i, j)` using all channel values at that location.
-- `channel_dependent`: a separate clipping threshold is computed for each channel `d` using all spatial values in that channel. The threshold is shared across spatial locations.
+- `constant`: `u` is a scalar. A single clipping threshold is computed using all values in the embedding. The same threshold is applied to every element.
+- `spatial_dependent`: `u` has shape `(i, j)`. A separate clipping threshold is computed for each spatial location `(i, j)` using all channel values at that location.
+- `channel_dependent`: `u` has shape `(d)`. A separate clipping threshold is computed for each channel `d` using all spatial values in that channel. The threshold is shared across spatial locations.
 
 ## OOD Score
 
@@ -79,7 +82,7 @@ See [Objectives](../objectives/README.md) for details.
 
 ## Implementation
 
-- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py).
+- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`.
 - ResNet feature continuation is implemented by `ResNetFeatureForwarder` in [teacher.py](../../src/distill_ood_detection/models/teacher.py).
 - PyTorch student training is implemented in [train_student.py](../../src/distill_ood_detection/experiments/train_student.py).
 - Random-forest student training is implemented in [train_tree_student.py](../../src/distill_ood_detection/experiments/train_tree_student.py).
