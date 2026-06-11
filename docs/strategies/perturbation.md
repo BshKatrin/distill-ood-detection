@@ -1,7 +1,5 @@
 # Perturbation Strategy
 
-**Status**: Not implemented
-
 This strategy is a perturbation-based stochastic distillation algorithm. The core idea is to perturb an intermediate image embedding produced by the teacher model, then train the student to predict the teacher output for that perturbed embedding.
 
 The student must receive enough information to be perturbation-aware: it should observe both the original embedding and the perturbation applied to that embedding.
@@ -75,5 +73,13 @@ Train the student to reproduce the teacher output using one of the following obj
 
 - `mse_logits`
 - `cross_entropy`
+- `kl_divergence`
 
 See [Objectives](../objectives/README.md) for details.
+
+## Implementation
+
+- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py).
+- ResNet feature continuation is implemented by `ResNetFeatureForwarder` in [teacher.py](../../src/distill_ood_detection/models/teacher.py).
+- PyTorch student training is implemented in [train_student.py](../../src/distill_ood_detection/experiments/train_student.py).
+- Random-forest student training is implemented in [train_tree_student.py](../../src/distill_ood_detection/experiments/train_tree_student.py).

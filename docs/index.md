@@ -7,6 +7,7 @@ Sections marked "Not implemented" describe planned work. All other sections corr
 ## Start here
 
 - [Strategies](strategies/README.md): OOD distillation training strategies and their rationale.
+- [Configs](configs.md): Experiment configuration layout and naming conventions.
 - [HPC](hpc/README.md): High-performance computing cluster access. Read this only when HPC or GPU cluster access is requested.
 - [Objectives](objectives/README.md): Distillation objective functions for deep-learning students.
 - [OOD Scores](ood_scores/README.md): Per-sample scores that quantify whether a sample is more ID-like or OOD-like.

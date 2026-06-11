@@ -22,7 +22,7 @@ Avoid introducing frameworks or patterns unless they reduce duplication across m
 - `src/distill_ood_detection/distillation/`: distillation losses and training logic.
 - `src/distill_ood_detection/evaluation/`: metrics, OOD Scores, and plots.
 - `src/distill_ood_detection/experiments/`: executable entrypoints.
-- `configs/`: experiment configuration files.
+- `configs/`: experiment configuration files. See `docs/configs.md` for the config directory structure.
 - `docs/`: project documentation, strategy notes, objectives, and OOD Score definitions.
 - `runs/`: training artifacts, including `.json` files containing training histories and `.pt` files containing saved model checkpoints.
 

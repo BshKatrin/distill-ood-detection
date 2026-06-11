@@ -36,8 +36,6 @@ where:
 
 ## `kl_divergence`
 
-**Status**: Not implemented as a training objective in `distillation_loss`.
-
 Kullback–Leibler (KL) divergence between the teacher and student output probability distributions.
 
 Minimize:
