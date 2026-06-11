@@ -346,12 +346,6 @@ def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> Stud
             "student.hidden_channels must define at least one hidden layer "
             "for MLP students"
         )
-    if (
-        student.kind == "random_forest"
-        and student.feature_layer is not None
-        and strategy.name != "perturbation"
-    ):
-        raise ValueError("student.feature_layer is only supported for PyTorch students")
     if any(hidden_channel <= 0 for hidden_channel in student.hidden_channels):
         raise ValueError("student.hidden_channels values must be positive")
     return student

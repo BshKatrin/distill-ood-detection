@@ -59,17 +59,21 @@ class StudentModelTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_config(raw)
 
-    def test_rejects_feature_layer_for_random_forest(self) -> None:
+    def test_accepts_feature_layer_for_random_forest(self) -> None:
         raw = {
-            "experiment_name": "bad_feature_tree_config",
+            "experiment_name": "feature_tree_config",
             "student": {
                 "kind": "random_forest",
                 "feature_layer": "layer3",
+                "input_shape": [256, 8, 8],
             },
         }
 
-        with self.assertRaises(ValueError):
-            parse_config(raw)
+        config = parse_config(raw)
+
+        self.assertEqual(config.student.kind, "random_forest")
+        self.assertEqual(config.student.feature_layer, "layer3")
+        self.assertEqual(config.student.input_shape, (256, 8, 8))
 
     def test_parses_kl_divergence_and_perturbation_strategy(self) -> None:
         raw = {

@@ -204,6 +204,36 @@ def collect_tree_model_outputs(
 
 
 @torch.no_grad()
+def collect_feature_tree_model_outputs(
+    model: Any,
+    mode: TreeDistillationMode,
+    feature_extractor: nn.Module,
+    loader: DataLoader[tuple[torch.Tensor, int]],
+    device: torch.device,
+) -> ModelOutputs:
+    """Collect outputs for a tree student that consumes teacher features."""
+
+    feature_batches: list[np.ndarray] = []
+    label_batches: list[torch.Tensor] = []
+    feature_extractor.eval()
+    for images, batch_labels in loader:
+        images = images.to(device)
+        _, features = feature_extractor(images)
+        feature_batches.append(
+            torch.flatten(features, start_dim=1).cpu().numpy().astype(np.float32)
+        )
+        label_batches.append(batch_labels.cpu())
+
+    features_array = np.concatenate(feature_batches, axis=0)
+    logits, probabilities = predict_tree_model_outputs(model, mode, features_array)
+    return ModelOutputs(
+        logits=torch.from_numpy(logits),
+        probabilities=torch.from_numpy(probabilities),
+        labels=torch.cat(label_batches, dim=0),
+    )
+
+
+@torch.no_grad()
 def collect_perturbation_tree_model_outputs(
     model: Any,
     mode: TreeDistillationMode,

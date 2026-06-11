@@ -29,7 +29,11 @@ from distill_ood_detection.inference import (
     predict_tree_model_outputs,
     save_model_outputs,
 )
-from distill_ood_detection.models.teacher import ResNetFeatureForwarder, load_teacher
+from distill_ood_detection.models.teacher import (
+    ResNetFeatureForwarder,
+    TeacherFeatureExtractor,
+    load_teacher,
+)
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
 
@@ -71,11 +75,17 @@ def run_tree_experiment(
         if config.strategy.name == "perturbation"
         else None
     )
+    feature_extractor = (
+        TeacherFeatureExtractor(teacher, config.student.feature_layer)
+        if config.student.feature_layer is not None and perturbation_forwarder is None
+        else None
+    )
 
     train_data = _collect_tree_dataset(
         teacher,
         train_loader.loader,
         device,
+        feature_extractor=feature_extractor,
         perturbation_forwarder=perturbation_forwarder,
         config=config,
     )
@@ -119,6 +129,7 @@ def run_tree_experiment(
                     device=device,
                     config=config,
                     output_dir=output_dir,
+                    feature_extractor=feature_extractor,
                     perturbation_forwarder=perturbation_forwarder,
                 )
                 summary["teacher_train_inference_path"] = str(train_teacher_path)
@@ -148,6 +159,7 @@ def _train_random_forest_student(
     device: torch.device,
     config: ExperimentConfig,
     output_dir: Path,
+    feature_extractor: TeacherFeatureExtractor | None = None,
     perturbation_forwarder: ResNetFeatureForwarder | None = None,
 ) -> dict[str, float | int | str]:
     started_at = time.time()
@@ -192,6 +204,7 @@ def _train_random_forest_student(
         teacher,
         validation_loader,
         device,
+        feature_extractor=feature_extractor,
         perturbation_forwarder=perturbation_forwarder,
         config=config,
     )
@@ -207,6 +220,7 @@ def _train_random_forest_student(
         teacher,
         test_loader,
         device,
+        feature_extractor=feature_extractor,
         perturbation_forwarder=perturbation_forwarder,
         config=config,
     )
@@ -306,6 +320,7 @@ def _collect_tree_dataset(
     teacher: nn.Module,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
+    feature_extractor: TeacherFeatureExtractor | None = None,
     perturbation_forwarder: ResNetFeatureForwarder | None = None,
     config: ExperimentConfig | None = None,
 ) -> "_TreeDataset":
@@ -314,6 +329,8 @@ def _collect_tree_dataset(
     probability_batches: list[torch.Tensor] = []
     label_batches: list[torch.Tensor] = []
     teacher.eval()
+    if feature_extractor is not None:
+        feature_extractor.eval()
     if perturbation_forwarder is not None:
         perturbation_forwarder.eval()
     for images, labels in loader:
@@ -334,6 +351,11 @@ def _collect_tree_dataset(
             )
             logits = perturbation_forwarder.forward_from_features(
                 perturbation_batch.perturbed_features
+            )
+        elif feature_extractor is not None:
+            logits, features = feature_extractor(images)
+            feature_batches.append(
+                torch.flatten(features, start_dim=1).cpu().numpy().astype(np.float32)
             )
         else:
             feature_batches.append(

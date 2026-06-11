@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from distill_ood_detection.inference import collect_tree_model_outputs
+from distill_ood_detection.inference.outputs import collect_feature_tree_model_outputs
 
 
 class _FixedPredictionModel:
@@ -55,11 +56,45 @@ class TreeInferenceOutputTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             collect_tree_model_outputs(model, "cross_entropy", loader)
 
+    def test_feature_tree_outputs_use_extracted_features(self) -> None:
+        model = _FeatureShapeModel()
+        loader = _loader()
+        feature_extractor = _FeatureExtractor()
+
+        outputs = collect_feature_tree_model_outputs(
+            model,
+            "logits",
+            feature_extractor,
+            loader,
+            torch.device("cpu"),
+        )
+
+        self.assertEqual(model.feature_shape, (2, 4))
+        self.assertEqual(tuple(outputs.logits.shape), (2, 2))
+        self.assertEqual(outputs.labels.tolist(), [0, 1])
+
 
 def _loader() -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
     images = torch.zeros((2, 3, 32, 32), dtype=torch.float32)
     labels = torch.tensor([0, 1])
     return DataLoader(TensorDataset(images, labels), batch_size=1)
+
+
+class _FeatureShapeModel:
+    def __init__(self) -> None:
+        self.feature_shape: tuple[int, int] | None = None
+
+    def predict(self, features: np.ndarray) -> np.ndarray:
+        self.feature_shape = features.shape
+        return np.zeros((features.shape[0], 2), dtype=np.float32)
+
+
+class _FeatureExtractor(torch.nn.Module):
+    def forward(self, images: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        batch_size = images.shape[0]
+        logits = torch.zeros((batch_size, 2), dtype=torch.float32)
+        features = torch.ones((batch_size, 1, 2, 2), dtype=torch.float32)
+        return logits, features
 
 
 if __name__ == "__main__":

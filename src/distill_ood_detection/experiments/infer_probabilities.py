@@ -23,6 +23,7 @@ from distill_ood_detection.datasets.inference import (
 )
 from distill_ood_detection.inference import (
     collect_feature_model_outputs,
+    collect_feature_tree_model_outputs,
     collect_model_outputs,
     collect_perturbed_teacher_outputs,
     collect_perturbation_model_outputs,
@@ -128,6 +129,7 @@ def run_probability_inference(
                     checkpoint=checkpoint,
                     tree_mode=tree_mode,
                     device=device,
+                    feature_extractor=feature_extractor,
                     perturbation_forwarder=perturbation_forwarder,
                 )
             )
@@ -249,6 +251,7 @@ def _infer_tree_students(
     checkpoint: CheckpointSelection,
     tree_mode: TreeDistillationMode | None,
     device: torch.device,
+    feature_extractor: TeacherFeatureExtractor | None,
     perturbation_forwarder: ResNetFeatureForwarder | None,
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
@@ -276,6 +279,8 @@ def _infer_tree_students(
                 "dataset": dataset_name,
                 "split": split,
             }
+            if feature_extractor is not None:
+                metadata["feature_layer"] = config.student.feature_layer
             if perturbation_forwarder is not None:
                 metadata["strategy"] = config.strategy.name
                 metadata["feature_layer"] = config.student.feature_layer
@@ -293,6 +298,14 @@ def _infer_tree_students(
                         device,
                     )
                     if perturbation_forwarder is not None
+                    else collect_feature_tree_model_outputs(
+                        model,
+                        current_mode,
+                        feature_extractor,
+                        loader,
+                        device,
+                    )
+                    if feature_extractor is not None
                     else collect_tree_model_outputs(model, current_mode, loader)
                 ),
                 metadata=metadata,
@@ -307,6 +320,8 @@ def _infer_tree_students(
             }
             if perturbation_forwarder is not None:
                 artifact["strategy"] = config.strategy.name
+                artifact["feature_layer"] = config.student.feature_layer
+            elif feature_extractor is not None:
                 artifact["feature_layer"] = config.student.feature_layer
             artifacts.append(artifact)
     return artifacts
