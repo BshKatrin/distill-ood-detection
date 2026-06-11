@@ -7,7 +7,11 @@ import unittest
 import torch
 from torch import nn
 
-from distill_ood_detection.models.teacher import TeacherFeatureExtractor
+from distill_ood_detection.models.teacher import (
+    CifarResNet18,
+    ResNetFeatureForwarder,
+    TeacherFeatureExtractor,
+)
 
 
 class ToyTeacher(nn.Module):
@@ -45,6 +49,25 @@ class TeacherFeatureExtractorTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             TeacherFeatureExtractor(teacher, "missing")
+
+    def test_resnet_forwarder_resumes_from_feature_layer(self) -> None:
+        teacher = CifarResNet18(num_classes=3)
+        teacher.eval()
+        forwarder = ResNetFeatureForwarder(teacher, "layer3")
+        images = torch.randn(2, 3, 32, 32)
+
+        features = forwarder.forward_to_features(images)
+        resumed_logits = forwarder.forward_from_features(features)
+        full_logits = teacher(images)
+
+        self.assertEqual(tuple(features.shape), (2, 256, 8, 8))
+        torch.testing.assert_close(resumed_logits, full_logits)
+
+    def test_resnet_forwarder_rejects_non_residual_layer(self) -> None:
+        teacher = CifarResNet18(num_classes=3)
+
+        with self.assertRaises(ValueError):
+            ResNetFeatureForwarder(teacher, "avgpool")
 
 
 if __name__ == "__main__":

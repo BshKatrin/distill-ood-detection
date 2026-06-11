@@ -37,6 +37,21 @@ class DistillationLossTests(unittest.TestCase):
 
         torch.testing.assert_close(actual, expected)
 
+    def test_kl_divergence_matches_teacher_student_probability_kl(self) -> None:
+        student_logits = torch.tensor([[1.0, 0.0, -1.0], [0.5, 2.0, -0.5]])
+        teacher_logits = torch.tensor([[0.0, 2.0, 1.0], [1.5, -0.5, 0.0]])
+        teacher_probabilities = F.softmax(teacher_logits, dim=1)
+        student_log_probabilities = F.log_softmax(student_logits, dim=1)
+        expected = F.kl_div(
+            student_log_probabilities,
+            teacher_probabilities,
+            reduction="batchmean",
+        )
+
+        actual = distillation_loss("kl_divergence", student_logits, teacher_logits)
+
+        torch.testing.assert_close(actual, expected)
+
 
 if __name__ == "__main__":
     unittest.main()

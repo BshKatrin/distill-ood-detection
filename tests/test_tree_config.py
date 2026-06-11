@@ -12,7 +12,7 @@ class TreeConfigTests(unittest.TestCase):
     """Validate random-forest student configuration parsing."""
 
     def test_loads_random_forest_config(self) -> None:
-        config = load_config(Path("configs/distill_random_forest_cifar10.yaml"))
+        config = load_config(Path("configs/baseline/cifar_10/random_forest.yaml"))
 
         self.assertEqual(config.student.kind, "random_forest")
         self.assertEqual(config.training.enabled_methods(), ())
@@ -20,7 +20,7 @@ class TreeConfigTests(unittest.TestCase):
         self.assertEqual(config.tree.random_forest.n_estimators, 200)
 
     def test_loads_cifar100_random_forest_config(self) -> None:
-        config = load_config(Path("configs/distill_random_forest_cifar100.yaml"))
+        config = load_config(Path("configs/baseline/cifar_100/random_forest.yaml"))
 
         self.assertEqual(config.dataset.name, "cifar100")
         self.assertEqual(config.teacher.hf_model_id, "edadaltocg/resnet18_cifar100")
