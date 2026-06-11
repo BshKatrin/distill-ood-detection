@@ -32,8 +32,20 @@ uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-st
 uv run --project envs/tests --no-sync pytest
 ```
 
-Use `--no-sync` inside submitted jobs after the environment has already been
-synced. This keeps jobs from spending allocation time resolving dependencies.
+Use `--no-sync` only after the environment has already been synced. If the
+environment does not exist yet, `uv run --no-sync` can create an empty `.venv`
+and then skip dependency installation.
+
+For a GPU-cluster training run from the repository root:
+
+```bash
+uv sync --project envs/gpu --locked
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config configs/perturbation/cifar_10/linear_layer3_clip_constant.yaml
+```
+
+For submitted jobs, keep the sync step in a setup phase or at the start of the
+job, then use `--no-sync` for the actual training commands. This keeps repeated
+commands from spending allocation time resolving dependencies.
 
 ## Adding an environment
 

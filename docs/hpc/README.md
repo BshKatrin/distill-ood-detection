@@ -33,9 +33,15 @@ If present, treat it as the authoritative source for cluster-specific instructio
 Use the focused GPU environment for cluster jobs:
 
 ```bash
-uv sync --project envs/gpu
+uv sync --project envs/gpu --locked
 ```
 
 Submitted jobs should run with `PYTHONPATH` pointing at `src/` and use
 `uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli ...`
 after the GPU environment has been synced.
+
+Example from the repository root:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config configs/perturbation/cifar_10/linear_layer3_clip_constant.yaml
+```

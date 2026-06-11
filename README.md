@@ -32,6 +32,14 @@ Put `src/` on `PYTHONPATH` when running project modules:
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 ```
 
+Run `uv sync --project <env> --locked` once before using `uv run --no-sync`.
+For example:
+
+```bash
+uv sync --project envs/gpu --locked
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli ...
+```
+
 See [`docs/envs.md`](docs/envs.md) for the environment split. On macOS,
 PyTorch resolves from PyPI. On Linux x86_64, the focused environment files
 configure `uv` to resolve `torch` and `torchvision` from the official CUDA 12.8
