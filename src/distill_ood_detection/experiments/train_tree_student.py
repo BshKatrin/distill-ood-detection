@@ -18,6 +18,7 @@ from distill_ood_detection.config import (
     ExperimentConfig,
     TreeDistillationMode,
 )
+from distill_ood_detection.distillation.perturbation import sample_clipping_perturbation
 from distill_ood_detection.datasets.inference import (
     build_in_distribution_test_loader,
     build_in_distribution_train_loader,
@@ -28,7 +29,7 @@ from distill_ood_detection.inference import (
     predict_tree_model_outputs,
     save_model_outputs,
 )
-from distill_ood_detection.models.teacher import load_teacher
+from distill_ood_detection.models.teacher import ResNetFeatureForwarder, load_teacher
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
 
@@ -65,8 +66,19 @@ def run_tree_experiment(
     )
     test_loader = build_in_distribution_test_loader(config.dataset)
     teacher = load_teacher(config.teacher, device)
+    perturbation_forwarder = (
+        ResNetFeatureForwarder(teacher, config.student.feature_layer)
+        if config.strategy.name == "perturbation"
+        else None
+    )
 
-    train_data = _collect_tree_dataset(teacher, train_loader.loader, device)
+    train_data = _collect_tree_dataset(
+        teacher,
+        train_loader.loader,
+        device,
+        perturbation_forwarder=perturbation_forwarder,
+        config=config,
+    )
     train_teacher_path = (
         experiment_dir
         / "teacher_inference"
@@ -80,6 +92,7 @@ def run_tree_experiment(
             "model": "teacher",
             "dataset": train_loader.name,
             "split": train_loader.split,
+            "strategy": config.strategy.name,
         },
     )
 
@@ -106,6 +119,7 @@ def run_tree_experiment(
                     device=device,
                     config=config,
                     output_dir=output_dir,
+                    perturbation_forwarder=perturbation_forwarder,
                 )
                 summary["teacher_train_inference_path"] = str(train_teacher_path)
                 write_json(output_dir / "metrics.json", summary)
@@ -134,6 +148,7 @@ def _train_random_forest_student(
     device: torch.device,
     config: ExperimentConfig,
     output_dir: Path,
+    perturbation_forwarder: ResNetFeatureForwarder | None = None,
 ) -> dict[str, float | int | str]:
     started_at = time.time()
     targets = _target_matrix(
@@ -160,6 +175,7 @@ def _train_random_forest_student(
                 "mode": mode,
                 "student": asdict(config.student),
                 "random_forest": asdict(config.tree.random_forest),
+                "strategy": asdict(config.strategy),
             },
             handle,
         )
@@ -172,7 +188,13 @@ def _train_random_forest_student(
         labels=train_data.outputs.labels.numpy(),
         prefix="train",
     )
-    validation_data = _collect_tree_dataset(teacher, validation_loader, device)
+    validation_data = _collect_tree_dataset(
+        teacher,
+        validation_loader,
+        device,
+        perturbation_forwarder=perturbation_forwarder,
+        config=config,
+    )
     validation_metrics = _tree_metrics(
         model=model,
         mode=mode,
@@ -181,7 +203,13 @@ def _train_random_forest_student(
         labels=validation_data.outputs.labels.numpy(),
         prefix="validation",
     )
-    test_data = _collect_tree_dataset(teacher, test_loader, device)
+    test_data = _collect_tree_dataset(
+        teacher,
+        test_loader,
+        device,
+        perturbation_forwarder=perturbation_forwarder,
+        config=config,
+    )
     test_metrics = _tree_metrics(
         model=model,
         mode=mode,
@@ -278,16 +306,40 @@ def _collect_tree_dataset(
     teacher: nn.Module,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
+    perturbation_forwarder: ResNetFeatureForwarder | None = None,
+    config: ExperimentConfig | None = None,
 ) -> "_TreeDataset":
     feature_batches: list[np.ndarray] = []
     logits_batches: list[torch.Tensor] = []
     probability_batches: list[torch.Tensor] = []
     label_batches: list[torch.Tensor] = []
     teacher.eval()
+    if perturbation_forwarder is not None:
+        perturbation_forwarder.eval()
     for images, labels in loader:
-        feature_batches.append(torch.flatten(images, start_dim=1).numpy().astype(np.float32))
         images = images.to(device)
-        logits = teacher(images)
+        if perturbation_forwarder is not None:
+            if config is None:
+                raise ValueError("config is required for perturbation tree collection")
+            features = perturbation_forwarder.forward_to_features(images)
+            perturbation_batch = sample_clipping_perturbation(
+                features,
+                config.strategy.perturbation,
+            )
+            feature_batches.append(
+                torch.flatten(perturbation_batch.student_inputs, start_dim=1)
+                .cpu()
+                .numpy()
+                .astype(np.float32)
+            )
+            logits = perturbation_forwarder.forward_from_features(
+                perturbation_batch.perturbed_features
+            )
+        else:
+            feature_batches.append(
+                torch.flatten(images.cpu(), start_dim=1).numpy().astype(np.float32)
+            )
+            logits = teacher(images)
         probabilities = torch.softmax(logits, dim=1)
         logits_batches.append(logits.cpu())
         probability_batches.append(probabilities.cpu())

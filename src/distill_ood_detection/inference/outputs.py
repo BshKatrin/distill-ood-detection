@@ -12,7 +12,8 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
-from distill_ood_detection.config import TreeDistillationMode
+from distill_ood_detection.config import PerturbationConfig, TreeDistillationMode
+from distill_ood_detection.distillation.perturbation import sample_clipping_perturbation
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,90 @@ def collect_feature_model_outputs(
     )
 
 
+@torch.no_grad()
+def collect_perturbation_model_outputs(
+    model: nn.Module,
+    perturbation_forwarder: nn.Module,
+    perturbation_config: PerturbationConfig,
+    loader: DataLoader[tuple[torch.Tensor, int]],
+    device: torch.device,
+) -> ModelOutputs:
+    """Collect averaged outputs for a perturbation-aware student."""
+
+    logits_batches: list[torch.Tensor] = []
+    probabilities: list[torch.Tensor] = []
+    labels: list[torch.Tensor] = []
+    model.eval()
+    perturbation_forwarder.eval()
+    for images, batch_labels in loader:
+        images = images.to(device)
+        features = perturbation_forwarder.forward_to_features(images)
+        logits_sum = None
+        probability_sum = None
+        for _ in range(perturbation_config.evaluation_draws):
+            perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+            logits = model(perturbation_batch.student_inputs)
+            batch_probabilities = F.softmax(logits, dim=1)
+            logits_sum = logits if logits_sum is None else logits_sum + logits
+            probability_sum = (
+                batch_probabilities
+                if probability_sum is None
+                else probability_sum + batch_probabilities
+            )
+        assert logits_sum is not None
+        assert probability_sum is not None
+        logits_batches.append((logits_sum / perturbation_config.evaluation_draws).cpu())
+        probabilities.append((probability_sum / perturbation_config.evaluation_draws).cpu())
+        labels.append(batch_labels.cpu())
+    return ModelOutputs(
+        logits=torch.cat(logits_batches, dim=0),
+        probabilities=torch.cat(probabilities, dim=0),
+        labels=torch.cat(labels, dim=0),
+    )
+
+
+@torch.no_grad()
+def collect_perturbed_teacher_outputs(
+    perturbation_forwarder: nn.Module,
+    perturbation_config: PerturbationConfig,
+    loader: DataLoader[tuple[torch.Tensor, int]],
+    device: torch.device,
+) -> ModelOutputs:
+    """Collect averaged perturbed teacher logits and probabilities."""
+
+    logits_batches: list[torch.Tensor] = []
+    probabilities: list[torch.Tensor] = []
+    labels: list[torch.Tensor] = []
+    perturbation_forwarder.eval()
+    for images, batch_labels in loader:
+        images = images.to(device)
+        features = perturbation_forwarder.forward_to_features(images)
+        logits_sum = None
+        probability_sum = None
+        for _ in range(perturbation_config.evaluation_draws):
+            perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+            logits = perturbation_forwarder.forward_from_features(
+                perturbation_batch.perturbed_features
+            )
+            batch_probabilities = F.softmax(logits, dim=1)
+            logits_sum = logits if logits_sum is None else logits_sum + logits
+            probability_sum = (
+                batch_probabilities
+                if probability_sum is None
+                else probability_sum + batch_probabilities
+            )
+        assert logits_sum is not None
+        assert probability_sum is not None
+        logits_batches.append((logits_sum / perturbation_config.evaluation_draws).cpu())
+        probabilities.append((probability_sum / perturbation_config.evaluation_draws).cpu())
+        labels.append(batch_labels.cpu())
+    return ModelOutputs(
+        logits=torch.cat(logits_batches, dim=0),
+        probabilities=torch.cat(probabilities, dim=0),
+        labels=torch.cat(labels, dim=0),
+    )
+
+
 def save_model_outputs(
     path: Path,
     outputs: ModelOutputs,
@@ -114,6 +199,57 @@ def collect_tree_model_outputs(
     return ModelOutputs(
         logits=torch.from_numpy(logits),
         probabilities=torch.from_numpy(probabilities),
+        labels=torch.cat(label_batches, dim=0),
+    )
+
+
+@torch.no_grad()
+def collect_perturbation_tree_model_outputs(
+    model: Any,
+    mode: TreeDistillationMode,
+    perturbation_forwarder: nn.Module,
+    perturbation_config: PerturbationConfig,
+    loader: DataLoader[tuple[torch.Tensor, int]],
+    device: torch.device,
+) -> ModelOutputs:
+    """Collect averaged outputs from a perturbation-aware tree student."""
+
+    logits_batches: list[torch.Tensor] = []
+    probability_batches: list[torch.Tensor] = []
+    label_batches: list[torch.Tensor] = []
+    perturbation_forwarder.eval()
+    for images, batch_labels in loader:
+        images = images.to(device)
+        features = perturbation_forwarder.forward_to_features(images)
+        logits_sum: np.ndarray | None = None
+        probability_sum: np.ndarray | None = None
+        for _ in range(perturbation_config.evaluation_draws):
+            perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+            student_features = (
+                torch.flatten(perturbation_batch.student_inputs, start_dim=1)
+                .cpu()
+                .numpy()
+                .astype(np.float32)
+            )
+            logits, probabilities = predict_tree_model_outputs(model, mode, student_features)
+            logits_sum = logits if logits_sum is None else logits_sum + logits
+            probability_sum = (
+                probabilities
+                if probability_sum is None
+                else probability_sum + probabilities
+            )
+        if logits_sum is None or probability_sum is None:
+            raise RuntimeError("No perturbation draws were collected")
+        logits_batches.append(
+            torch.from_numpy(logits_sum / perturbation_config.evaluation_draws)
+        )
+        probability_batches.append(
+            torch.from_numpy(probability_sum / perturbation_config.evaluation_draws)
+        )
+        label_batches.append(batch_labels.cpu())
+    return ModelOutputs(
+        logits=torch.cat(logits_batches, dim=0),
+        probabilities=torch.cat(probability_batches, dim=0),
         labels=torch.cat(label_batches, dim=0),
     )
 

@@ -24,11 +24,18 @@ from distill_ood_detection.datasets.inference import (
 from distill_ood_detection.inference import (
     collect_feature_model_outputs,
     collect_model_outputs,
+    collect_perturbed_teacher_outputs,
+    collect_perturbation_model_outputs,
+    collect_perturbation_tree_model_outputs,
     collect_tree_model_outputs,
     save_model_outputs,
 )
 from distill_ood_detection.models.student import build_student
-from distill_ood_detection.models.teacher import TeacherFeatureExtractor, load_teacher
+from distill_ood_detection.models.teacher import (
+    ResNetFeatureForwarder,
+    TeacherFeatureExtractor,
+    load_teacher,
+)
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
 CheckpointSelection = Literal["best", "latest", "both"]
@@ -63,9 +70,14 @@ def run_probability_inference(
         ]
     )
     teacher = load_teacher(config.teacher, device)
+    perturbation_forwarder = (
+        ResNetFeatureForwarder(teacher, config.student.feature_layer)
+        if config.strategy.name == "perturbation"
+        else None
+    )
     feature_extractor = (
         TeacherFeatureExtractor(teacher, config.student.feature_layer)
-        if config.student.feature_layer is not None
+        if config.student.feature_layer is not None and perturbation_forwarder is None
         else None
     )
     if config.student.kind == "random_forest" and method is not None:
@@ -78,14 +90,29 @@ def run_probability_inference(
         dataset_dir = output_dir / named_loader.name
         dataset_dir.mkdir(parents=True, exist_ok=True)
         teacher_path = dataset_dir / "teacher.pt"
+        teacher_metadata = {
+            "model": "teacher",
+            "dataset": named_loader.name,
+            "split": named_loader.split,
+        }
+        if perturbation_forwarder is not None:
+            teacher_metadata["strategy"] = config.strategy.name
+            teacher_metadata["feature_layer"] = config.student.feature_layer
+            teacher_metadata["perturbation"] = asdict(config.strategy.perturbation)
+            set_seed(training_defaults.seed)
         save_model_outputs(
             path=teacher_path,
-            outputs=collect_model_outputs(teacher, named_loader.loader, device),
-            metadata={
-                "model": "teacher",
-                "dataset": named_loader.name,
-                "split": named_loader.split,
-            },
+            outputs=(
+                collect_perturbed_teacher_outputs(
+                    perturbation_forwarder,
+                    config.strategy.perturbation,
+                    named_loader.loader,
+                    device,
+                )
+                if perturbation_forwarder is not None
+                else collect_model_outputs(teacher, named_loader.loader, device)
+            ),
+            metadata=teacher_metadata,
         )
         artifacts.append({"dataset": named_loader.name, "model": "teacher", "path": str(teacher_path)})
 
@@ -100,6 +127,8 @@ def run_probability_inference(
                     loader=named_loader.loader,
                     checkpoint=checkpoint,
                     tree_mode=tree_mode,
+                    device=device,
+                    perturbation_forwarder=perturbation_forwarder,
                 )
             )
         else:
@@ -115,6 +144,7 @@ def run_probability_inference(
                     checkpoint=checkpoint,
                     method=method,
                     feature_extractor=feature_extractor,
+                    perturbation_forwarder=perturbation_forwarder,
                 )
             )
 
@@ -139,6 +169,7 @@ def _infer_torch_students(
     checkpoint: CheckpointSelection,
     method: DistillationMethod | None,
     feature_extractor: TeacherFeatureExtractor | None,
+    perturbation_forwarder: ResNetFeatureForwarder | None,
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
     methods = (method,) if method else config.training.enabled_methods()
@@ -166,10 +197,22 @@ def _infer_torch_students(
             }
             if config.student.feature_layer is not None:
                 metadata["feature_layer"] = config.student.feature_layer
+            if perturbation_forwarder is not None:
+                metadata["strategy"] = config.strategy.name
+                metadata["perturbation"] = asdict(config.strategy.perturbation)
+                set_seed(config.training.defaults.seed)
             save_model_outputs(
                 path=probability_path,
                 outputs=(
-                    collect_model_outputs(student, loader, device)
+                    collect_perturbation_model_outputs(
+                        student,
+                        perturbation_forwarder,
+                        config.strategy.perturbation,
+                        loader,
+                        device,
+                    )
+                    if perturbation_forwarder is not None
+                    else collect_model_outputs(student, loader, device)
                     if feature_extractor is None
                     else collect_feature_model_outputs(
                         student,
@@ -190,6 +233,8 @@ def _infer_torch_students(
             }
             if config.student.feature_layer is not None:
                 artifact["feature_layer"] = config.student.feature_layer
+            if perturbation_forwarder is not None:
+                artifact["strategy"] = config.strategy.name
             artifacts.append(artifact)
     return artifacts
 
@@ -203,6 +248,8 @@ def _infer_tree_students(
     loader: torch.utils.data.DataLoader[tuple[torch.Tensor, int]],
     checkpoint: CheckpointSelection,
     tree_mode: TreeDistillationMode | None,
+    device: torch.device,
+    perturbation_forwarder: ResNetFeatureForwarder | None,
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
     modes = (tree_mode,) if tree_mode else config.tree.enabled_modes()
@@ -220,29 +267,48 @@ def _infer_tree_students(
                     f"{checkpoint_mode!r}, expected {current_mode!r}"
                 )
             probability_path = dataset_dir / f"student_{current_mode}_{checkpoint_name}.pt"
+            metadata = {
+                "model": "student",
+                "student_kind": config.student.kind,
+                "mode": current_mode,
+                "checkpoint": checkpoint_name,
+                "checkpoint_path": str(checkpoint_path),
+                "dataset": dataset_name,
+                "split": split,
+            }
+            if perturbation_forwarder is not None:
+                metadata["strategy"] = config.strategy.name
+                metadata["feature_layer"] = config.student.feature_layer
+                metadata["perturbation"] = asdict(config.strategy.perturbation)
+                set_seed(config.training.defaults.seed)
             save_model_outputs(
                 path=probability_path,
-                outputs=collect_tree_model_outputs(model, current_mode, loader),
-                metadata={
-                    "model": "student",
-                    "student_kind": config.student.kind,
-                    "mode": current_mode,
-                    "checkpoint": checkpoint_name,
-                    "checkpoint_path": str(checkpoint_path),
-                    "dataset": dataset_name,
-                    "split": split,
-                },
+                outputs=(
+                    collect_perturbation_tree_model_outputs(
+                        model,
+                        current_mode,
+                        perturbation_forwarder,
+                        config.strategy.perturbation,
+                        loader,
+                        device,
+                    )
+                    if perturbation_forwarder is not None
+                    else collect_tree_model_outputs(model, current_mode, loader)
+                ),
+                metadata=metadata,
             )
-            artifacts.append(
-                {
-                    "dataset": dataset_name,
-                    "model": "student",
-                    "student_kind": config.student.kind,
-                    "mode": current_mode,
-                    "checkpoint": checkpoint_name,
-                    "path": str(probability_path),
-                }
-            )
+            artifact = {
+                "dataset": dataset_name,
+                "model": "student",
+                "student_kind": config.student.kind,
+                "mode": current_mode,
+                "checkpoint": checkpoint_name,
+                "path": str(probability_path),
+            }
+            if perturbation_forwarder is not None:
+                artifact["strategy"] = config.strategy.name
+                artifact["feature_layer"] = config.student.feature_layer
+            artifacts.append(artifact)
     return artifacts
 
 

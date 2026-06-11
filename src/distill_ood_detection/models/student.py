@@ -15,7 +15,7 @@ from distill_ood_detection.config import StudentConfig
 class LinearStudent(nn.Module):
     """A single linear classifier over flattened image pixels."""
 
-    def __init__(self, input_shape: tuple[int, int, int], num_classes: int) -> None:
+    def __init__(self, input_shape: tuple[int, ...], num_classes: int) -> None:
         super().__init__()
         input_dim = reduce(mul, input_shape, 1)
         self.classifier = nn.Linear(input_dim, num_classes)
@@ -31,7 +31,7 @@ class MLPStudent(nn.Module):
 
     def __init__(
         self,
-        input_shape: tuple[int, int, int],
+        input_shape: tuple[int, ...],
         num_classes: int,
         hidden_channels: tuple[int, ...],
     ) -> None:

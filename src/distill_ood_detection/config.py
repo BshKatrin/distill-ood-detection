@@ -9,12 +9,20 @@ from typing import Any, Literal
 import yaml
 
 
+DISTILLATION_METHODS: tuple[str, ...] = (
+    "cross_entropy",
+    "mse_logits",
+    "kl_divergence",
+)
 DistillationMethod = Literal[
     "cross_entropy",
     "mse_logits",
+    "kl_divergence",
 ]
 TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
+StrategyName = Literal["baseline", "perturbation"]
+ClippingMode = Literal["constant", "spatial_dependent", "channel_dependent"]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
     "cross_entropy_softmax": "cross_entropy",
 }
@@ -54,7 +62,7 @@ class StudentConfig:
     """Student model settings."""
 
     kind: str = "linear"
-    input_shape: tuple[int, int, int] = (3, 32, 32)
+    input_shape: tuple[int, ...] = (3, 32, 32)
     num_classes: int = 10
     hidden_channels: tuple[int, ...] = field(default_factory=tuple)
     feature_layer: str | None = None
@@ -71,6 +79,24 @@ class RandomForestConfig:
     max_features: str | int | float | None = "sqrt"
     bootstrap: bool = True
     n_jobs: int | None = -1
+
+
+@dataclass(frozen=True)
+class PerturbationConfig:
+    """Clipping perturbation settings for stochastic distillation."""
+
+    u_min: float = 0.0
+    u_max: float = 1.0
+    clipping_mode: ClippingMode = "constant"
+    evaluation_draws: int = 1
+
+
+@dataclass(frozen=True)
+class StrategyConfig:
+    """Distillation strategy settings."""
+
+    name: StrategyName = "baseline"
+    perturbation: PerturbationConfig = field(default_factory=PerturbationConfig)
 
 
 @dataclass(frozen=True)
@@ -142,6 +168,7 @@ class OptimizerByMethodConfig:
 
     cross_entropy: OptimizerConfig = field(default_factory=OptimizerConfig)
     mse_logits: OptimizerConfig = field(default_factory=OptimizerConfig)
+    kl_divergence: OptimizerConfig = field(default_factory=OptimizerConfig)
 
     def for_method(self, method: DistillationMethod) -> OptimizerConfig:
         """Return the optimizer settings for one distillation method."""
@@ -173,15 +200,16 @@ class TrainingByMethodConfig:
 
     cross_entropy: MethodTrainingConfig | None = field(default_factory=MethodTrainingConfig)
     mse_logits: MethodTrainingConfig | None = field(default_factory=MethodTrainingConfig)
+    kl_divergence: MethodTrainingConfig | None = None
 
     def enabled_methods(self) -> tuple[DistillationMethod, ...]:
         """Return enabled methods in a deterministic order."""
 
         return tuple(
             method
-            for method in ("cross_entropy", "mse_logits")
+            for method in DISTILLATION_METHODS
             if getattr(self, method) is not None
-        )
+        )  # type: ignore[return-value]
 
 
 @dataclass(frozen=True)
@@ -239,6 +267,7 @@ class ExperimentConfig:
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     teacher: TeacherConfig = field(default_factory=TeacherConfig)
     student: StudentConfig = field(default_factory=StudentConfig)
+    strategy: StrategyConfig = field(default_factory=StrategyConfig)
     optimizer: OptimizerByMethodConfig = field(default_factory=OptimizerByMethodConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
     tree: TreeConfig = field(default_factory=TreeConfig)
@@ -265,12 +294,15 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     teacher = TeacherConfig(**raw.get("teacher", {}))
     if teacher.num_classes <= 0:
         raise ValueError("teacher.num_classes must be positive")
+    strategy = _parse_strategy_config(raw.get("strategy", {}))
     student_raw = raw.get("student", {}).copy()
     if "input_shape" in student_raw:
         student_raw["input_shape"] = tuple(student_raw["input_shape"])
     if "hidden_channels" in student_raw:
         student_raw["hidden_channels"] = tuple(student_raw["hidden_channels"])
-    student = _parse_student_config(student_raw)
+    student = _parse_student_config(student_raw, strategy=strategy)
+    if strategy.name == "perturbation" and student.feature_layer is None:
+        raise ValueError("student.feature_layer is required for perturbation strategy")
     optimizer = _parse_optimizer_config(raw.get("optimizer", {}))
     training = _parse_training_config(
         raw.get("training", {}),
@@ -285,6 +317,7 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
         dataset=dataset,
         teacher=teacher,
         student=student,
+        strategy=strategy,
         optimizer=optimizer,
         training=training,
         tree=tree,
@@ -292,14 +325,18 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     )
 
 
-def _parse_student_config(raw: dict[str, Any]) -> StudentConfig:
+def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> StudentConfig:
     """Parse neural-network student settings."""
 
     student = StudentConfig(**raw)
     if student.kind not in {"linear", "mlp", "random_forest"}:
         raise ValueError(f"Unsupported student kind: {student.kind}")
-    if len(student.input_shape) != 3:
-        raise ValueError("student.input_shape must contain channel, height, and width")
+    if not student.input_shape:
+        raise ValueError("student.input_shape must contain at least one dimension")
+    if strategy.name == "baseline" and len(student.input_shape) != 3:
+        raise ValueError(
+            "baseline student.input_shape must contain channel, height, and width"
+        )
     if any(dimension <= 0 for dimension in student.input_shape):
         raise ValueError("student.input_shape dimensions must be positive")
     if student.num_classes <= 0:
@@ -309,11 +346,42 @@ def _parse_student_config(raw: dict[str, Any]) -> StudentConfig:
             "student.hidden_channels must define at least one hidden layer "
             "for MLP students"
         )
-    if student.kind == "random_forest" and student.feature_layer is not None:
+    if (
+        student.kind == "random_forest"
+        and student.feature_layer is not None
+        and strategy.name != "perturbation"
+    ):
         raise ValueError("student.feature_layer is only supported for PyTorch students")
     if any(hidden_channel <= 0 for hidden_channel in student.hidden_channels):
         raise ValueError("student.hidden_channels values must be positive")
     return student
+
+
+def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
+    """Parse distillation strategy settings."""
+
+    strategy_raw = raw.copy()
+    perturbation = PerturbationConfig(**strategy_raw.pop("perturbation", {}))
+    strategy = StrategyConfig(
+        name=strategy_raw.pop("name", "baseline"),
+        perturbation=perturbation,
+    )
+    if strategy_raw:
+        unknown = ", ".join(sorted(strategy_raw))
+        raise ValueError(f"Unsupported strategy config fields: {unknown}")
+    if strategy.name not in {"baseline", "perturbation"}:
+        raise ValueError(f"Unsupported strategy: {strategy.name}")
+    if perturbation.clipping_mode not in {
+        "constant",
+        "spatial_dependent",
+        "channel_dependent",
+    }:
+        raise ValueError(f"Unsupported clipping mode: {perturbation.clipping_mode}")
+    if not 0.0 <= perturbation.u_min < perturbation.u_max <= 1.0:
+        raise ValueError("strategy.perturbation requires 0 <= u_min < u_max <= 1")
+    if perturbation.evaluation_draws <= 0:
+        raise ValueError("strategy.perturbation.evaluation_draws must be positive")
+    return strategy
 
 
 def _parse_tree_config(raw: dict[str, Any]) -> TreeConfig:
@@ -381,25 +449,24 @@ def _parse_tree_method_config(
 def _parse_optimizer_config(raw: dict[str, Any]) -> OptimizerByMethodConfig:
     """Parse optimizer settings from a shared or per-method config block."""
 
-    method_names: tuple[DistillationMethod, ...] = (
-        "cross_entropy",
-        "mse_logits",
-    )
+    method_names = DISTILLATION_METHODS
     optimizer_raw = {
         _normalize_method_name(name) if name in LEGACY_METHOD_ALIASES else name: value
         for name, value in raw.copy().items()
     }
     if any(name in optimizer_raw for name in method_names):
-        missing_methods = [name for name in method_names if name not in optimizer_raw]
-        if missing_methods:
-            missing = ", ".join(missing_methods)
-            raise ValueError(
-                "optimizer must define settings for every distillation method when "
-                f"using per-method configuration; missing: {missing}"
-            )
+        unknown_methods = [name for name in optimizer_raw if name not in method_names]
+        if unknown_methods:
+            unknown = ", ".join(sorted(unknown_methods))
+            raise ValueError(f"Unsupported optimizer methods: {unknown}")
+        default_optimizer = OptimizerConfig()
         return OptimizerByMethodConfig(
             **{
-                name: OptimizerConfig(**optimizer_raw[name])
+                name: (
+                    OptimizerConfig(**optimizer_raw[name])
+                    if name in optimizer_raw
+                    else default_optimizer
+                )
                 for name in method_names
             }
         )
@@ -445,12 +512,12 @@ def _parse_training_methods(
 ) -> TrainingByMethodConfig:
     """Parse per-method training settings."""
 
-    method_names: tuple[DistillationMethod, ...] = (
-        "cross_entropy",
-        "mse_logits",
-    )
+    method_names = DISTILLATION_METHODS
     if raw_methods is None:
-        methods_raw: dict[str, Any] = {name: {} for name in method_names}
+        methods_raw: dict[str, Any] = {
+            "cross_entropy": {},
+            "mse_logits": {},
+        }
     elif isinstance(raw_methods, list):
         methods_raw = {
             _normalize_method_name(method): {}
@@ -522,6 +589,17 @@ def _resolve_method_training_config(
             log_every_steps=defaults.log_every_steps,
             temperature=temperature,
             alpha=alpha,
+        )
+    if method == "kl_divergence":
+        if method_config.alpha is not None:
+            raise ValueError("training.methods.kl_divergence.alpha is not supported")
+        if method_config.temperature is not None:
+            raise ValueError("training.methods.kl_divergence.temperature is not supported")
+        return ResolvedTrainingMethodConfig(
+            epochs=defaults.epochs,
+            seed=defaults.seed,
+            device=defaults.device,
+            log_every_steps=defaults.log_every_steps,
         )
     if method_config.temperature is not None:
         raise ValueError(f"training.methods.{method}.temperature is not supported")

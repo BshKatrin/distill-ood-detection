@@ -20,12 +20,12 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/distill_linear_cifar10.yaml"),
+        default=Path("configs/baseline/cifar_10/linear.yaml"),
         help="Path to a YAML experiment config.",
     )
     train_parser.add_argument(
         "--method",
-        choices=("cross_entropy", "mse_logits"),
+        choices=("cross_entropy", "mse_logits", "kl_divergence"),
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )
@@ -33,7 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     tree_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/distill_random_forest_cifar10.yaml"),
+        default=Path("configs/baseline/cifar_10/random_forest.yaml"),
         help="Path to a YAML tree experiment config.",
     )
     tree_parser.add_argument(
@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     infer_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/distill_linear_cifar10.yaml"),
+        default=Path("configs/baseline/cifar_10/linear.yaml"),
         help="Path to a YAML experiment config.",
     )
     infer_parser.add_argument(
@@ -57,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     infer_parser.add_argument(
         "--method",
-        choices=("cross_entropy", "mse_logits"),
+        choices=("cross_entropy", "mse_logits", "kl_divergence"),
         default=None,
         help="Run only one distillation method. Defaults to all methods in config.",
     )

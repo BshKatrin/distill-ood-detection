@@ -39,4 +39,12 @@ def distillation_loss(
         )
         loss_hard = F.cross_entropy(student_logits, labels)
         return alpha * (temperature**2) * loss_soft + (1.0 - alpha) * loss_hard
+    if method == "kl_divergence":
+        teacher_probabilities = F.softmax(teacher_logits, dim=1)
+        student_log_probabilities = F.log_softmax(student_logits, dim=1)
+        return F.kl_div(
+            student_log_probabilities,
+            teacher_probabilities,
+            reduction="batchmean",
+        )
     raise ValueError(f"Unsupported distillation method: {method}")

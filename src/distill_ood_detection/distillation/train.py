@@ -16,9 +16,11 @@ import mlflow
 from distill_ood_detection.config import (
     DistillationMethod,
     OptimizerConfig,
+    PerturbationConfig,
     ResolvedTrainingMethodConfig,
 )
 from distill_ood_detection.distillation.losses import distillation_loss
+from distill_ood_detection.distillation.perturbation import sample_clipping_perturbation
 from distill_ood_detection.evaluation.metrics import distillation_validation_metrics
 from distill_ood_detection.utils import write_json
 
@@ -35,12 +37,17 @@ def train_student(
     output_dir: Path,
     mlflow_enabled: bool = True,
     feature_extractor: nn.Module | None = None,
+    perturbation_forwarder: nn.Module | None = None,
+    perturbation_config: PerturbationConfig | None = None,
 ) -> dict[str, float | int | str]:
     """Train a student against teacher predictions and save trace artifacts."""
     student.to(device)
     if feature_extractor is not None:
         feature_extractor.to(device)
         feature_extractor.eval()
+    if perturbation_forwarder is not None:
+        perturbation_forwarder.to(device)
+        perturbation_forwarder.eval()
     optimizer = build_optimizer(student, optimizer_config)
     history: list[dict[str, float | int]] = []
     best_validation_accuracy = 0.0
@@ -60,7 +67,19 @@ def train_student(
             labels = labels.to(device)
             optimizer.zero_grad(set_to_none=True)
             with torch.no_grad():
-                if feature_extractor is None:
+                if perturbation_forwarder is not None:
+                    if perturbation_config is None:
+                        raise ValueError("perturbation_config is required for perturbation training")
+                    features = perturbation_forwarder.forward_to_features(images)
+                    perturbation_batch = sample_clipping_perturbation(
+                        features,
+                        perturbation_config,
+                    )
+                    teacher_logits = perturbation_forwarder.forward_from_features(
+                        perturbation_batch.perturbed_features
+                    )
+                    student_inputs = perturbation_batch.student_inputs
+                elif feature_extractor is None:
                     teacher_logits = teacher(images)
                     student_inputs = images
                 else:
@@ -93,6 +112,8 @@ def train_student(
             temperature=training_config.temperature,
             alpha=training_config.alpha,
             feature_extractor=feature_extractor,
+            perturbation_forwarder=perturbation_forwarder,
+            perturbation_config=perturbation_config,
         )
         validation_accuracy = validation_metrics["validation_accuracy"]
         validation_distillation_loss = validation_metrics["validation_distillation_loss"]

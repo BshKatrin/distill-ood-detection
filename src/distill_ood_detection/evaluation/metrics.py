@@ -7,8 +7,9 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
-from distill_ood_detection.config import DistillationMethod
+from distill_ood_detection.config import DistillationMethod, PerturbationConfig
 from distill_ood_detection.distillation.losses import distillation_loss
+from distill_ood_detection.distillation.perturbation import sample_clipping_perturbation
 
 
 @torch.no_grad()
@@ -17,21 +18,37 @@ def accuracy(
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
     feature_extractor: nn.Module | None = None,
+    perturbation_forwarder: nn.Module | None = None,
+    perturbation_config: PerturbationConfig | None = None,
 ) -> float:
     """Compute top-1 classification accuracy."""
 
     model.eval()
     if feature_extractor is not None:
         feature_extractor.eval()
+    if perturbation_forwarder is not None:
+        perturbation_forwarder.eval()
     correct = 0
     total = 0
     for images, labels in loader:
         images = images.to(device)
         labels = labels.to(device)
-        inputs = images
-        if feature_extractor is not None:
-            _, inputs = feature_extractor(images)
-        predictions = model(inputs).argmax(dim=1)
+        if perturbation_forwarder is not None:
+            if perturbation_config is None:
+                raise ValueError("perturbation_config is required for perturbation accuracy")
+            features = perturbation_forwarder.forward_to_features(images)
+            logits_sum = None
+            for _ in range(perturbation_config.evaluation_draws):
+                perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+                logits = model(perturbation_batch.student_inputs)
+                logits_sum = logits if logits_sum is None else logits_sum + logits
+            assert logits_sum is not None
+            predictions = (logits_sum / perturbation_config.evaluation_draws).argmax(dim=1)
+        else:
+            inputs = images
+            if feature_extractor is not None:
+                _, inputs = feature_extractor(images)
+            predictions = model(inputs).argmax(dim=1)
         correct += (predictions == labels).sum().item()
         total += labels.numel()
     return correct / total
@@ -47,6 +64,8 @@ def distillation_validation_metrics(
     temperature: float = 1.0,
     alpha: float = 0.5,
     feature_extractor: nn.Module | None = None,
+    perturbation_forwarder: nn.Module | None = None,
+    perturbation_config: PerturbationConfig | None = None,
 ) -> dict[str, float]:
     """Compute validation metrics for student distillation."""
 
@@ -54,6 +73,8 @@ def distillation_validation_metrics(
     student.eval()
     if feature_extractor is not None:
         feature_extractor.eval()
+    if perturbation_forwarder is not None:
+        perturbation_forwarder.eval()
     correct = 0
     total = 0
     total_kl = 0.0
@@ -61,7 +82,16 @@ def distillation_validation_metrics(
     for images, labels in loader:
         images = images.to(device)
         labels = labels.to(device)
-        if feature_extractor is None:
+        if perturbation_forwarder is not None:
+            if perturbation_config is None:
+                raise ValueError("perturbation_config is required for perturbation validation")
+            features = perturbation_forwarder.forward_to_features(images)
+            perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+            teacher_logits = perturbation_forwarder.forward_from_features(
+                perturbation_batch.perturbed_features
+            )
+            student_inputs = perturbation_batch.student_inputs
+        elif feature_extractor is None:
             teacher_logits = teacher(images)
             student_inputs = images
         else:

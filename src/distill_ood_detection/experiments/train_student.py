@@ -12,7 +12,11 @@ from distill_ood_detection.datasets.cifar10 import build_cifar_loaders
 from distill_ood_detection.distillation.train import train_student
 from distill_ood_detection.evaluation.metrics import accuracy
 from distill_ood_detection.models.student import build_student
-from distill_ood_detection.models.teacher import TeacherFeatureExtractor, load_teacher
+from distill_ood_detection.models.teacher import (
+    ResNetFeatureForwarder,
+    TeacherFeatureExtractor,
+    load_teacher,
+)
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
 
@@ -35,9 +39,14 @@ def run_experiment(
 
     loaders = build_cifar_loaders(config.dataset, seed=training_defaults.seed)
     teacher = load_teacher(config.teacher, device)
+    perturbation_forwarder = (
+        ResNetFeatureForwarder(teacher, config.student.feature_layer)
+        if config.strategy.name == "perturbation"
+        else None
+    )
     feature_extractor = (
         TeacherFeatureExtractor(teacher, config.student.feature_layer)
-        if config.student.feature_layer is not None
+        if config.student.feature_layer is not None and perturbation_forwarder is None
         else None
     )
     teacher_metrics = {
@@ -65,6 +74,7 @@ def run_experiment(
             with _mlflow_method_run(config, current_method):
                 if config.mlflow.enabled:
                     mlflow.log_param("distillation_method", current_method)
+                    mlflow.log_param("distillation_strategy", config.strategy.name)
                 summary = train_student(
                     method=current_method,
                     teacher=teacher,
@@ -77,12 +87,24 @@ def run_experiment(
                     output_dir=output_dir,
                     mlflow_enabled=config.mlflow.enabled,
                     feature_extractor=feature_extractor,
+                    perturbation_forwarder=perturbation_forwarder,
+                    perturbation_config=(
+                        config.strategy.perturbation
+                        if config.strategy.name == "perturbation"
+                        else None
+                    ),
                 )
                 summary["test_accuracy"] = accuracy(
                     student,
                     loaders.test,
                     device,
                     feature_extractor=feature_extractor,
+                    perturbation_forwarder=perturbation_forwarder,
+                    perturbation_config=(
+                        config.strategy.perturbation
+                        if config.strategy.name == "perturbation"
+                        else None
+                    ),
                 )
                 write_json(output_dir / "metrics.json", summary)
                 if config.mlflow.enabled:
