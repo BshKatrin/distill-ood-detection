@@ -27,3 +27,15 @@ If present, treat it as the authoritative source for cluster-specific instructio
 - Do not commit `docs/hpc/hpc.local.md`.
 - If `docs/hpc/hpc.local.md` is missing, ask the user for the non-sensitive cluster details needed for the task, or ask them to create it from `docs/hpc/hpc.template.md`.
 - Prefer documented cluster commands from `docs/hpc/hpc.local.md` over guessing.
+
+## Environment
+
+Use the focused GPU environment for cluster jobs:
+
+```bash
+uv sync --project envs/gpu
+```
+
+Submitted jobs should run with `PYTHONPATH` pointing at `src/` and use
+`uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli ...`
+after the GPU environment has been synced.

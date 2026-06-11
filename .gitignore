@@ -3,7 +3,7 @@ TODO.md
 scratch/
 
 # uv
-uv.lock
+**/uv.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -167,6 +167,7 @@ activemq-data/
 .env
 .envrc
 .venv
+envs/*/.venv
 env/
 venv/
 ENV/

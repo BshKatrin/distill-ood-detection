@@ -23,34 +23,37 @@ mkdir -p slurm
 
 echo "[$(date --iso-8601=seconds)] Syncing uv environment"
 uv --version
-uv sync --locked --no-install-project
+uv sync --project envs/gpu --locked
 
 torch_configs=(
-  "configs/distill_linear_cifar100.yaml"
-  "configs/distill_mlp_cifar100.yaml"
-  "configs/distill_feature_linear_layer3_cifar100.yaml"
+  "configs/baseline/cifar_100/linear.yaml"
+  "configs/baseline/cifar_100/mlp.yaml"
+  "configs/baseline/cifar_100/feature_linear_layer3.yaml"
 )
 
 tree_configs=(
-  "configs/distill_random_forest_cifar100.yaml"
+  "configs/baseline/cifar_100/random_forest.yaml"
 )
 
 for config in "${torch_configs[@]}"; do
   echo "[$(date --iso-8601=seconds)] Training PyTorch student: ${config}"
-  uv run distill-ood train-student --config "${config}"
+  uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student \
+    --config "${config}"
 
   echo "[$(date --iso-8601=seconds)] Inferring best PyTorch student probabilities: ${config}"
-  uv run distill-ood infer-probabilities --config "${config}" --checkpoint best 
+  uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli infer-probabilities \
+    --config "${config}" --checkpoint best
 
 done
 
 for config in "${tree_configs[@]}"; do
   echo "[$(date --iso-8601=seconds)] Training tree student: ${config}"
-  uv run --no-sync python -m distill_ood_detection.cli train-tree-student \
+  uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-tree-student \
     --config "${config}"
 
   echo "[$(date --iso-8601=seconds)] Inferring best tree student probabilities: ${config}"
-  uv run distill-ood infer-probabilities --config "${config}" --checkpoint best 
+  uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli infer-probabilities \
+    --config "${config}" --checkpoint best
   
 done
 

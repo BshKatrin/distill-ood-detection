@@ -1,0 +1,32 @@
+[project]
+name = "distill-ood-detection-gpu-env"
+version = "0.1.0"
+description = "Minimal GPU-cluster runtime environment for distill-ood-detection."
+requires-python = ">=3.13"
+dependencies = [
+    "huggingface-hub>=1.17.0",
+    "mlflow>=3.13.0",
+    "numpy>=2.4.6",
+    "pyyaml>=6.0.3",
+    "safetensors>=0.7.0",
+    "scikit-learn>=1.9.0",
+    "torch>=2.11.0,<2.12.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torchvision>=0.26.0,<0.27.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "tqdm>=4.67.3",
+]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+torchvision = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]

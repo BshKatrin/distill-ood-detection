@@ -7,6 +7,7 @@ student models for OOD-detection experiments.
 
 - `src/distill_ood_detection/`: importable Python package.
 - `configs/`: reproducible YAML experiment definitions.
+- `envs/`: focused `uv` environments for GPU jobs, notebooks, and tests.
 - `runs/`: generated metrics, checkpoints, and resolved configs.
 - `docs/`: project documentation, strategy notes, objectives, and OOD Score definitions.
 - `AGENTS.md`: instructions for AI agents working in this repository.
@@ -19,26 +20,29 @@ and OOD Score conventions, start with [`docs/index.md`](docs/index.md).
 Dependencies are managed with `uv`.
 
 ```bash
-uv sync
+uv sync --project envs/notebooks
+uv sync --project envs/tests
+uv sync --project envs/gpu
 ```
 
-The project uses a `src` layout with setuptools metadata, so notebooks can
-import package modules directly:
+The focused environments do not install the repository package during sync.
+Put `src/` on `PYTHONPATH` when running project modules:
 
-```python
-from distill_ood_detection.config import load_config
+```bash
+export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 ```
 
-On macOS, PyTorch resolves from PyPI. On Linux x86_64, `pyproject.toml`
-configures `uv` to resolve `torch` and `torchvision` from the official
-CUDA 12.8 PyTorch wheel index.
+See [`docs/envs.md`](docs/envs.md) for the environment split. On macOS,
+PyTorch resolves from PyPI. On Linux x86_64, the focused environment files
+configure `uv` to resolve `torch` and `torchvision` from the official CUDA 12.8
+PyTorch wheel index.
 
 ## Training
 
 ### PyTorch-based students
 
 ```bash
-uv run distill-ood train-student --config <CONFIG_PATH> [--method <METHOD>]
+uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config <CONFIG_PATH> [--method <METHOD>]
 ```
 
 See [`docs/objectives/README.md`](docs/objectives/README.md) for objective definitions.
@@ -46,7 +50,7 @@ See [`docs/objectives/README.md`](docs/objectives/README.md) for objective defin
 MLflow logging is enabled in the YAML config. View logged runs with:
 
 ```bash
-uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
+uv run --project envs/notebooks --no-sync mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```
 
 ### Tree Students
@@ -54,7 +58,7 @@ uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 Train sklearn random-forest students from teacher outputs:
 
 ```text
-uv run distill-ood train-tree-student --config <CONFIG_PATH>
+uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-tree-student --config <CONFIG_PATH>
 ```
 
 The tree config supports one mode:
@@ -66,7 +70,7 @@ The tree config supports one mode:
 After training, save teacher and student logits/probabilities for the ID and OOD datasets test splits :
 
 ```text
-uv run distill-ood infer-probabilities --config <CONFIG_PATH> [--checkpoint {latest,checkpoint}] [--include-train] [--include-validation]
+uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli infer-probabilities --config <CONFIG_PATH> [--checkpoint {latest,checkpoint}] [--include-train] [--include-validation]
 ```
 
 Artifacts are written under
