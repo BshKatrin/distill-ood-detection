@@ -67,7 +67,7 @@ class OODScoreTests(unittest.TestCase):
 
         np.testing.assert_allclose(
             max_probability_difference(teacher, student, signed=True),
-            np.array([-0.1, -0.1]),
+            np.array([0.1, 0.1]),
         )
         np.testing.assert_allclose(
             absolute_max_probability_difference(teacher, student, signed=True),
@@ -109,6 +109,56 @@ class OODScoreTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             student_teacher_kl_divergence(teacher, student)
+
+    def test_averages_per_draw_scores_for_perturbation_outputs(self) -> None:
+        teacher = np.array(
+            [
+                [[0.7, 0.3], [0.6, 0.4]],
+                [[0.1, 0.9], [0.3, 0.7]],
+            ]
+        )
+        student = np.array(
+            [
+                [[0.4, 0.6], [0.5, 0.5]],
+                [[0.2, 0.8], [0.4, 0.6]],
+            ]
+        )
+
+        np.testing.assert_allclose(
+            max_probability_difference(teacher, student),
+            np.array([0.1, 0.1]),
+        )
+        np.testing.assert_allclose(
+            max_probability_difference(teacher, student, average_draws=False),
+            np.array([[0.1, 0.1], [0.1, 0.1]]),
+        )
+
+        per_draw_kl = np.sum(teacher * np.log(teacher / student), axis=-1)
+        np.testing.assert_allclose(
+            student_teacher_kl_divergence(teacher, student),
+            per_draw_kl.mean(axis=1),
+        )
+
+    def test_averages_per_draw_logit_scores_for_perturbation_outputs(self) -> None:
+        teacher = np.array(
+            [
+                [[1.0, 3.0], [2.0, 4.0]],
+                [[0.0, 4.0], [1.0, 5.0]],
+            ]
+        )
+        student = np.array(
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[1.0, 3.0], [1.0, 4.0]],
+            ]
+        )
+
+        per_draw = logit_l2_distance(teacher, student, average_draws=False)
+
+        np.testing.assert_allclose(
+            logit_l2_distance(teacher, student),
+            per_draw.mean(axis=1),
+        )
 
 
 if __name__ == "__main__":

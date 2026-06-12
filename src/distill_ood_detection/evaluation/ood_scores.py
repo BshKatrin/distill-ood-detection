@@ -37,6 +37,20 @@ def _maybe_signed(
     return sign * scores
 
 
+def _maybe_average_draws(
+    scores: NDArray[np.float64],
+    average_draws: bool,
+) -> NDArray[np.float64]:
+    if scores.ndim == 1:
+        return scores
+    if scores.ndim == 2 and average_draws:
+        return scores.mean(axis=1)
+    if scores.ndim == 2:
+        return scores
+    msg = f"scores must be one- or two-dimensional, got {scores.ndim} dimensions."
+    raise ValueError(msg)
+
+
 def _max_probabilities(
     teacher_probabilities: ArrayLike,
     student_probabilities: ArrayLike,
@@ -45,7 +59,7 @@ def _max_probabilities(
         teacher_probabilities,
         student_probabilities,
     )
-    return teacher.max(axis=1), student.max(axis=1)
+    return teacher.max(axis=-1), student.max(axis=-1)
 
 
 def _probability_matrices(
@@ -79,7 +93,7 @@ def _logit_matrices(
 
 
 def _center_outputs(outputs: NDArray[np.float64]) -> NDArray[np.float64]:
-    return outputs - outputs.mean(axis=1, keepdims=True)
+    return outputs - outputs.mean(axis=-1, keepdims=True)
 
 
 def _as_probability_matrix(
@@ -94,10 +108,10 @@ def _as_output_matrix(
     name: str,
 ) -> NDArray[np.float64]:
     array = np.asarray(outputs, dtype=float)
-    if array.ndim != 2:
-        msg = f"{name} must be a two-dimensional array."
+    if array.ndim not in (2, 3):
+        msg = f"{name} must be a two- or three-dimensional array."
         raise ValueError(msg)
-    if array.shape[1] == 0:
+    if array.shape[-1] == 0:
         msg = f"{name} must contain at least one class output."
         raise ValueError(msg)
     if not np.all(np.isfinite(array)):
@@ -126,13 +140,14 @@ def _kl(p: ArrayLike, q: ArrayLike) -> NDArray[np.float64]:
     terms[positive_support] = (
         p[positive_support] * np.log(p[positive_support] / q[positive_support])
     )
-    return np.sum(terms, axis=1)
+    return np.sum(terms, axis=-1)
 
 
 def max_probability_difference(
     teacher_probabilities: ArrayLike,
     student_probabilities: ArrayLike,
     signed: bool = False,
+    average_draws: bool = True,
 ) -> NDArray[np.float64]:
     """Compute max_proba_teacher - max_proba_student for each sample.
 
@@ -143,6 +158,9 @@ def max_probability_difference(
             ``(n_samples, n_classes)``.
         signed: If True, apply this score's sign so higher values are more
             ID-like.
+        average_draws: If True and inputs have shape
+            ``(n_samples, n_draws, n_classes)``, average per-draw scores for
+            each sample.
 
     Returns:
         One raw or signed score per sample.
@@ -152,7 +170,7 @@ def max_probability_difference(
         teacher_probabilities,
         student_probabilities,
     )
-    scores = teacher_max - student_max
+    scores = _maybe_average_draws(teacher_max - student_max, average_draws)
     return _maybe_signed(scores, MAX_PROBABILITY_DIFFERENCE, signed)
 
 
@@ -160,6 +178,7 @@ def absolute_max_probability_difference(
     teacher_probabilities: ArrayLike,
     student_probabilities: ArrayLike,
     signed: bool = False,
+    average_draws: bool = True,
 ) -> NDArray[np.float64]:
     """Compute abs(max_proba_teacher - max_proba_student) for each sample.
 
@@ -170,6 +189,9 @@ def absolute_max_probability_difference(
             ``(n_samples, n_classes)``.
         signed: If True, apply this score's sign so higher values are more
             ID-like.
+        average_draws: If True and inputs have shape
+            ``(n_samples, n_draws, n_classes)``, average per-draw scores for
+            each sample.
 
     Returns:
         One raw or signed score per sample.
@@ -179,8 +201,10 @@ def absolute_max_probability_difference(
         max_probability_difference(
             teacher_probabilities,
             student_probabilities,
+            average_draws=False,
         )
     )
+    scores = _maybe_average_draws(scores, average_draws)
     return _maybe_signed(scores, ABSOLUTE_MAX_PROBABILITY_DIFFERENCE, signed)
 
 
@@ -188,6 +212,7 @@ def student_teacher_kl_divergence(
     teacher_probabilities: ArrayLike,
     student_probabilities: ArrayLike,
     signed: bool = False,
+    average_draws: bool = True,
 ) -> NDArray[np.float64]:
     """Compute KL(teacher || student) for each sample.
 
@@ -198,6 +223,9 @@ def student_teacher_kl_divergence(
             ``(n_samples, n_classes)``.
         signed: If True, apply this score's sign so higher values are more
             ID-like.
+        average_draws: If True and inputs have shape
+            ``(n_samples, n_draws, n_classes)``, average per-draw scores for
+            each sample.
 
     Returns:
         One raw or signed divergence value per sample.
@@ -212,7 +240,7 @@ def student_teacher_kl_divergence(
         teacher_probabilities,
         student_probabilities,
     )
-    scores = _kl(teacher, student)
+    scores = _maybe_average_draws(_kl(teacher, student), average_draws)
     return _maybe_signed(scores, STUDENT_TEACHER_KL_DIVERGENCE, signed)
 
 
@@ -220,6 +248,7 @@ def logit_l2_distance(
     teacher_logits: ArrayLike,
     student_logits: ArrayLike,
     signed: bool = False,
+    average_draws: bool = True,
 ) -> NDArray[np.float64]:
     """Compute L2 distance between centered teacher and student logits.
 
@@ -228,6 +257,9 @@ def logit_l2_distance(
         student_logits: Student logits with shape ``(n_samples, n_classes)``.
         signed: If True, apply this score's sign so higher values are more
             ID-like.
+        average_draws: If True and inputs have shape
+            ``(n_samples, n_draws, n_classes)``, average per-draw scores for
+            each sample.
 
     Returns:
         One raw or signed L2 distance per sample.
@@ -239,5 +271,6 @@ def logit_l2_distance(
     teacher, student = _logit_matrices(teacher_logits, student_logits)
     centered_teacher = _center_outputs(teacher)
     centered_student = _center_outputs(student)
-    scores = np.linalg.norm(centered_teacher - centered_student, ord=2, axis=1)
+    scores = np.linalg.norm(centered_teacher - centered_student, ord=2, axis=-1)
+    scores = _maybe_average_draws(scores, average_draws)
     return _maybe_signed(scores, LOGIT_L2_DISTANCE, signed)

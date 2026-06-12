@@ -8,8 +8,14 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
+from distill_ood_detection.config import PerturbationConfig
 from distill_ood_detection.inference import collect_tree_model_outputs
-from distill_ood_detection.inference.outputs import collect_feature_tree_model_outputs
+from distill_ood_detection.inference.outputs import (
+    collect_feature_tree_model_outputs,
+    collect_perturbed_teacher_outputs,
+    collect_perturbation_model_outputs,
+    collect_perturbation_tree_model_outputs,
+)
 
 
 class _FixedPredictionModel:
@@ -73,6 +79,51 @@ class TreeInferenceOutputTests(unittest.TestCase):
         self.assertEqual(tuple(outputs.logits.shape), (2, 2))
         self.assertEqual(outputs.labels.tolist(), [0, 1])
 
+    def test_perturbation_outputs_keep_draw_dimension(self) -> None:
+        loader = _loader()
+        forwarder = _PerturbationForwarder()
+        config = PerturbationConfig(evaluation_draws=3)
+        student = _PerturbationStudent()
+
+        outputs = collect_perturbation_model_outputs(
+            student,
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+        )
+        teacher_outputs = collect_perturbed_teacher_outputs(
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+        )
+
+        self.assertEqual(tuple(outputs.logits.shape), (2, 3, 2))
+        self.assertEqual(tuple(outputs.probabilities.shape), (2, 3, 2))
+        self.assertEqual(tuple(teacher_outputs.logits.shape), (2, 3, 2))
+        self.assertEqual(tuple(teacher_outputs.probabilities.shape), (2, 3, 2))
+        self.assertEqual(outputs.labels.tolist(), [0, 1])
+
+    def test_perturbation_tree_outputs_keep_draw_dimension(self) -> None:
+        loader = _loader()
+        forwarder = _PerturbationForwarder()
+        config = PerturbationConfig(evaluation_draws=3)
+        model = _FeatureShapeModel()
+
+        outputs = collect_perturbation_tree_model_outputs(
+            model,
+            "logits",
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+        )
+
+        self.assertEqual(tuple(outputs.logits.shape), (2, 3, 2))
+        self.assertEqual(tuple(outputs.probabilities.shape), (2, 3, 2))
+        self.assertEqual(outputs.labels.tolist(), [0, 1])
+
 
 def _loader() -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
     images = torch.zeros((2, 3, 32, 32), dtype=torch.float32)
@@ -95,6 +146,19 @@ class _FeatureExtractor(torch.nn.Module):
         logits = torch.zeros((batch_size, 2), dtype=torch.float32)
         features = torch.ones((batch_size, 1, 2, 2), dtype=torch.float32)
         return logits, features
+
+
+class _PerturbationForwarder(torch.nn.Module):
+    def forward_to_features(self, images: torch.Tensor) -> torch.Tensor:
+        return torch.ones((images.shape[0], 1, 2, 2), dtype=torch.float32)
+
+    def forward_from_features(self, features: torch.Tensor) -> torch.Tensor:
+        return torch.zeros((features.shape[0], 2), dtype=torch.float32)
+
+
+class _PerturbationStudent(torch.nn.Module):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        return torch.zeros((inputs.shape[0], 2), dtype=torch.float32)
 
 
 if __name__ == "__main__":
