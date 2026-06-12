@@ -13,3 +13,4 @@ Sections marked "Not implemented" describe planned work. All other sections corr
 - [Syncing run artifacts from the GPU cluster](hpc/sync-runs.md): Copy selected remote `runs/` folders into local `runs/`.
 - [Objectives](objectives/README.md): Distillation objective functions for deep-learning students.
 - [OOD Scores](ood_scores/README.md): Per-sample scores that quantify whether a sample is more ID-like or OOD-like.
+- [Reports](reports.md): Generate report tables and render report outputs.

@@ -20,7 +20,7 @@ def main() -> None:
         raise FileNotFoundError(msg)
 
     if shutil.which("latexmk") is not None:
-        command = ["latexmk", "-pdf", "-interaction=nonstopmode", TEX_FILE.name]
+        command = ["latexmk", "-g", "-pdf", "-interaction=nonstopmode", TEX_FILE.name]
     elif shutil.which("pdflatex") is not None:
         command = ["pdflatex", "-interaction=nonstopmode", TEX_FILE.name]
     else:
