@@ -98,13 +98,19 @@ def collect_perturbation_model_outputs(
         features = perturbation_forwarder.forward_to_features(images)
         draw_logits: list[torch.Tensor] = []
         draw_probabilities: list[torch.Tensor] = []
-        for _ in range(perturbation_config.evaluation_draws):
-            perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+        batch_size = features.shape[0]
+        for draw_count in _draw_chunks(perturbation_config.evaluation_draws, batch_size):
+            expanded_features = features.repeat_interleave(draw_count, dim=0)
+            perturbation_batch = sample_clipping_perturbation(
+                expanded_features,
+                perturbation_config,
+            )
             logits = model(perturbation_batch.student_inputs)
+            logits = logits.reshape(batch_size, draw_count, -1)
             draw_logits.append(logits)
-            draw_probabilities.append(F.softmax(logits, dim=1))
-        logits_batches.append(torch.stack(draw_logits, dim=1).cpu())
-        probabilities.append(torch.stack(draw_probabilities, dim=1).cpu())
+            draw_probabilities.append(F.softmax(logits, dim=-1))
+        logits_batches.append(torch.cat(draw_logits, dim=1).cpu())
+        probabilities.append(torch.cat(draw_probabilities, dim=1).cpu())
         labels.append(batch_labels.cpu())
     return ModelOutputs(
         logits=torch.cat(logits_batches, dim=0),
@@ -131,15 +137,21 @@ def collect_perturbed_teacher_outputs(
         features = perturbation_forwarder.forward_to_features(images)
         draw_logits: list[torch.Tensor] = []
         draw_probabilities: list[torch.Tensor] = []
-        for _ in range(perturbation_config.evaluation_draws):
-            perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+        batch_size = features.shape[0]
+        for draw_count in _draw_chunks(perturbation_config.evaluation_draws, batch_size):
+            expanded_features = features.repeat_interleave(draw_count, dim=0)
+            perturbation_batch = sample_clipping_perturbation(
+                expanded_features,
+                perturbation_config,
+            )
             logits = perturbation_forwarder.forward_from_features(
                 perturbation_batch.perturbed_features
             )
+            logits = logits.reshape(batch_size, draw_count, -1)
             draw_logits.append(logits)
-            draw_probabilities.append(F.softmax(logits, dim=1))
-        logits_batches.append(torch.stack(draw_logits, dim=1).cpu())
-        probabilities.append(torch.stack(draw_probabilities, dim=1).cpu())
+            draw_probabilities.append(F.softmax(logits, dim=-1))
+        logits_batches.append(torch.cat(draw_logits, dim=1).cpu())
+        probabilities.append(torch.cat(draw_probabilities, dim=1).cpu())
         labels.append(batch_labels.cpu())
     return ModelOutputs(
         logits=torch.cat(logits_batches, dim=0),
@@ -239,8 +251,13 @@ def collect_perturbation_tree_model_outputs(
         features = perturbation_forwarder.forward_to_features(images)
         draw_logits: list[np.ndarray] = []
         draw_probabilities: list[np.ndarray] = []
-        for _ in range(perturbation_config.evaluation_draws):
-            perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+        batch_size = features.shape[0]
+        for draw_count in _draw_chunks(perturbation_config.evaluation_draws, batch_size):
+            expanded_features = features.repeat_interleave(draw_count, dim=0)
+            perturbation_batch = sample_clipping_perturbation(
+                expanded_features,
+                perturbation_config,
+            )
             student_features = (
                 torch.flatten(perturbation_batch.student_inputs, start_dim=1)
                 .cpu()
@@ -248,10 +265,10 @@ def collect_perturbation_tree_model_outputs(
                 .astype(np.float32)
             )
             logits, probabilities = predict_tree_model_outputs(model, mode, student_features)
-            draw_logits.append(logits)
-            draw_probabilities.append(probabilities)
-        logits_batches.append(torch.from_numpy(np.stack(draw_logits, axis=1)))
-        probability_batches.append(torch.from_numpy(np.stack(draw_probabilities, axis=1)))
+            draw_logits.append(logits.reshape(batch_size, draw_count, -1))
+            draw_probabilities.append(probabilities.reshape(batch_size, draw_count, -1))
+        logits_batches.append(torch.from_numpy(np.concatenate(draw_logits, axis=1)))
+        probability_batches.append(torch.from_numpy(np.concatenate(draw_probabilities, axis=1)))
         label_batches.append(batch_labels.cpu())
     return ModelOutputs(
         logits=torch.cat(logits_batches, dim=0),
@@ -277,3 +294,16 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     shifted = logits - logits.max(axis=1, keepdims=True)
     exp = np.exp(shifted)
     return (exp / exp.sum(axis=1, keepdims=True)).astype(np.float32)
+
+
+def _draw_chunks(total_draws: int, batch_size: int, max_examples: int = 2048) -> tuple[int, ...]:
+    """Split stochastic draws into bounded expanded-batch chunks."""
+
+    chunk_size = max(1, min(total_draws, max_examples // batch_size))
+    chunks = []
+    remaining = total_draws
+    while remaining > 0:
+        current = min(chunk_size, remaining)
+        chunks.append(current)
+        remaining -= current
+    return tuple(chunks)

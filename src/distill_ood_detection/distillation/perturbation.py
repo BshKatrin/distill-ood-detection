@@ -35,15 +35,9 @@ def sample_clipping_perturbation(
         raise ValueError(
             "clipping perturbation expects convolutional features with shape "
             "(batch, channels, height, width)"
-        )
-    percentiles = _sample_percentiles(features, config)
-    perturbed = torch.stack(
-        [
-            _clip_single_feature_map(features[index], percentiles[index], config)
-            for index in range(features.shape[0])
-        ],
-        dim=0,
     )
+    percentiles = _sample_percentiles(features, config)
+    perturbed = _clip_feature_batch(features, percentiles, config)
     perturbations = torch.flatten(percentiles, start_dim=1)
     student_inputs = torch.cat(
         [
@@ -81,40 +75,59 @@ def _sample_percentiles(
     ).uniform_(config.u_min, config.u_max)
 
 
+def _clip_feature_batch(
+    features: torch.Tensor,
+    percentiles: torch.Tensor,
+    config: PerturbationConfig,
+) -> torch.Tensor:
+    batch_size, channels, height, width = features.shape
+    if config.clipping_mode == "constant":
+        thresholds = _rowwise_quantile(features.reshape(batch_size, -1), percentiles.squeeze(1))
+        return torch.minimum(features, thresholds[:, None, None, None])
+    if config.clipping_mode == "spatial_dependent":
+        spatial_values = features.permute(0, 2, 3, 1).reshape(
+            batch_size * height * width,
+            channels,
+        )
+        thresholds = _rowwise_quantile(
+            spatial_values,
+            percentiles.reshape(batch_size * height * width),
+        ).reshape(batch_size, height, width)
+        return torch.minimum(features, thresholds[:, None, :, :])
+    if config.clipping_mode == "channel_dependent":
+        channel_values = features.reshape(batch_size * channels, height * width)
+        thresholds = _rowwise_quantile(
+            channel_values,
+            percentiles.reshape(batch_size * channels),
+        ).reshape(batch_size, channels)
+        return torch.minimum(features, thresholds[:, :, None, None])
+    raise ValueError(f"Unsupported clipping mode: {config.clipping_mode}")
+
+
 def _clip_single_feature_map(
     feature_map: torch.Tensor,
     percentiles: torch.Tensor,
     config: PerturbationConfig,
 ) -> torch.Tensor:
     if config.clipping_mode == "constant":
-        threshold = torch.quantile(feature_map.flatten(), percentiles.squeeze())
-        return torch.minimum(feature_map, threshold)
-    if config.clipping_mode == "spatial_dependent":
-        _, height, width = feature_map.shape
-        thresholds = torch.empty(
-            (height, width),
-            device=feature_map.device,
-            dtype=feature_map.dtype,
-        )
-        for row in range(height):
-            for column in range(width):
-                thresholds[row, column] = torch.quantile(
-                    feature_map[:, row, column],
-                    percentiles[row, column],
-                )
-        return torch.minimum(feature_map, thresholds.unsqueeze(0))
-    if config.clipping_mode == "channel_dependent":
-        channels = feature_map.shape[0]
-        flattened_channels = feature_map.reshape(channels, -1)
-        thresholds = torch.empty(
-            channels,
-            device=feature_map.device,
-            dtype=feature_map.dtype,
-        )
-        for channel in range(channels):
-            thresholds[channel] = torch.quantile(
-                flattened_channels[channel],
-                percentiles[channel],
-            )
-        return torch.minimum(feature_map, thresholds[:, None, None])
-    raise ValueError(f"Unsupported clipping mode: {config.clipping_mode}")
+        batched_percentiles = percentiles.reshape(1, 1)
+    else:
+        batched_percentiles = percentiles.unsqueeze(0)
+    return _clip_feature_batch(feature_map.unsqueeze(0), batched_percentiles, config).squeeze(0)
+
+
+def _rowwise_quantile(values: torch.Tensor, percentiles: torch.Tensor) -> torch.Tensor:
+    """Compute one linear-interpolated quantile per row."""
+
+    if values.ndim != 2:
+        raise ValueError("values must have shape (rows, columns)")
+    if percentiles.ndim != 1 or percentiles.shape[0] != values.shape[0]:
+        raise ValueError("percentiles must have one value per row")
+    sorted_values = values.sort(dim=1).values
+    positions = percentiles * (values.shape[1] - 1)
+    lower_indices = positions.floor().long()
+    upper_indices = positions.ceil().long()
+    weights = positions - lower_indices.to(dtype=positions.dtype)
+    lower_values = sorted_values.gather(1, lower_indices[:, None]).squeeze(1)
+    upper_values = sorted_values.gather(1, upper_indices[:, None]).squeeze(1)
+    return lower_values + weights * (upper_values - lower_values)
