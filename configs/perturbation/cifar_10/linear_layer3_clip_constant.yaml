@@ -1,4 +1,4 @@
-experiment_name: perturbation_linear_layer3_student_resnet18_cifar10
+experiment_name: perturbation_linear_layer3_student_resnet18_cifar10_clip_constant
 output_dir: runs
 
 dataset:
