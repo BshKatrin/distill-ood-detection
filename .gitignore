@@ -111,7 +111,11 @@ ipython_config.py
 # Experiment artifacts
 data/
 runs/
-reports/
+reports/output/*.aux
+reports/output/*.fdb_latexmk
+reports/output/*.fls
+reports/output/*.log
+reports/output/*.synctex.gz
 mlflow.db
 mlflow.db-*
 mlruns/

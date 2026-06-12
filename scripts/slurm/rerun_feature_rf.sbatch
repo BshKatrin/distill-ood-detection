@@ -25,31 +25,44 @@ echo "[$(date --iso-8601=seconds)] Syncing uv GPU environment"
 uv --version
 uv sync --project envs/gpu --locked
 
+echo "[$(date --iso-8601=seconds)] Slurm GPU environment"
+echo "SLURM_JOB_ID=${SLURM_JOB_ID:-}"
+echo "SLURM_JOB_GPUS=${SLURM_JOB_GPUS:-}"
+echo "SLURM_GPUS=${SLURM_GPUS:-}"
+echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}"
+nvidia-smi
+
 run_distill_ood() {
-  uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli "$@"
+  srun --ntasks=1 --gres=gpu:1 uv run --project envs/gpu --no-sync \
+    python -m distill_ood_detection.cli "$@"
 }
 
-feature_random_forest_configs=(
-  "configs/baseline/cifar_10/feature_random_forest_layer3.yaml"
-)
+echo "[$(date --iso-8601=seconds)] Probing PyTorch CUDA inside the Slurm job step"
+srun --ntasks=1 --gres=gpu:1 uv run --project envs/gpu --no-sync python - <<'PY'
+import torch
 
-train_and_infer_feature_random_forests() {
-  export CUDA_VISIBLE_DEVICES="${FEATURE_RANDOM_FOREST_GPU:-1}"
-  for config in "${feature_random_forest_configs[@]}"; do
-    echo "[$(date --iso-8601=seconds)] Training layer3 random forest: ${config}"
-    run_distill_ood train-tree-student \
-      --config "${config}"
+print(f"torch={torch.__version__}")
+print(f"torch.version.cuda={torch.version.cuda}")
+print(f"cuda_available={torch.cuda.is_available()}")
+print(f"device_count={torch.cuda.device_count()}")
+if torch.cuda.is_available():
+    print(f"device_name={torch.cuda.get_device_name(0)}")
+    images = torch.zeros((1, 3, 8, 8), device="cuda")
+    weights = torch.zeros((4, 3, 3, 3), device="cuda")
+    torch.nn.functional.conv2d(images, weights)
+    torch.cuda.synchronize()
+    print("cuda_conv2d_probe=ok")
+PY
 
-    echo "[$(date --iso-8601=seconds)] Inferring layer3 random-forest probabilities: ${config}"
-    run_distill_ood infer-probabilities \
-      --config "${config}" \
-      --checkpoint best
-  done
-}
+config="configs/baseline/cifar_10/feature_random_forest_layer3.yaml"
 
-train_and_infer_feature_random_forests &
-feature_rf_pid=$!
+echo "[$(date --iso-8601=seconds)] Training layer3 random forest: ${config}"
+run_distill_ood train-tree-student \
+  --config "${config}"
 
-wait "${feature_rf_pid}"
+echo "[$(date --iso-8601=seconds)] Inferring layer3 random-forest probabilities: ${config}"
+run_distill_ood infer-probabilities \
+  --config "${config}" \
+  --checkpoint best
 
 echo "[$(date --iso-8601=seconds)] Layer3 random-forest chores complete"

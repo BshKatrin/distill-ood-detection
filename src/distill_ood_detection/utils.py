@@ -33,10 +33,12 @@ def resolve_device(requested: str) -> torch.device:
         return device
     if torch.cuda.is_available():
         cuda_device = torch.device("cuda")
-        if _can_execute_on_device(cuda_device):
+        can_execute, error = _can_execute_on_device(cuda_device)
+        if can_execute:
             return cuda_device
         warnings.warn(
-            "CUDA is visible but unusable for this run; falling back to CPU.",
+            "CUDA is visible but unusable for this run; falling back to CPU. "
+            f"PyTorch error: {error}",
             RuntimeWarning,
             stacklevel=2,
         )
@@ -45,25 +47,29 @@ def resolve_device(requested: str) -> torch.device:
     return torch.device("cpu")
 
 
-def _can_execute_on_device(device: torch.device) -> bool:
+def _can_execute_on_device(device: torch.device) -> tuple[bool, str | None]:
     if device.type != "cuda":
-        return True
+        return True, None
     try:
         images = torch.zeros((1, 3, 8, 8), device=device)
         weights = torch.zeros((4, 3, 3, 3), device=device)
         torch.nn.functional.conv2d(images, weights)
         torch.cuda.synchronize(device)
-    except RuntimeError:
-        return False
-    return True
+    except RuntimeError as error:
+        return False, str(error)
+    return True, None
 
 
 def _validate_device(device: torch.device) -> None:
-    if device.type == "cuda" and not _can_execute_on_device(device):
+    if device.type != "cuda":
+        return
+    can_execute, error = _can_execute_on_device(device)
+    if not can_execute:
         raise RuntimeError(
             "CUDA was requested, but PyTorch could not execute a small CUDA "
             "convolution. Try running inside a GPU allocation, for example with "
-            "srun/sbatch, or set training.device to 'cpu'."
+            "srun/sbatch, or set training.device to 'cpu'. "
+            f"PyTorch error: {error}"
         )
 
 
