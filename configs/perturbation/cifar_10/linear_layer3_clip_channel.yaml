@@ -22,7 +22,7 @@ teacher:
 student:
   kind: linear
   feature_layer: layer3
-  input_shape: [16385]
+  input_shape: [16640] # 256 * 8 * 8 + 256
   num_classes: 10
 
 strategy:
