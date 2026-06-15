@@ -2,6 +2,10 @@
 
 This directory contains HPC cluster-related documentation.
 
+- [SLURM jobs](slurm-jobs.md): Submit reusable config-driven sbatch jobs.
+- [Syncing run artifacts](sync-runs.md): Copy selected remote `runs/` folders
+  into local `runs/`.
+
 ## Local configuration
 
 Cluster access instructions are intentionally not stored in version control.

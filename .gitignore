@@ -1,6 +1,7 @@
 TODO.md
 slurm/
 !scripts/slurm
+scripts/slurm/legacy
 
 # uv
 **/uv.lock
