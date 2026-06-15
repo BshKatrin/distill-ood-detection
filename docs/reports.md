@@ -14,15 +14,32 @@ Generated report files are split by artifact type:
 ## Metrics table
 
 The OOD metrics table is generated from saved probability artifacts under
-`runs/*/probabilities/`. The export script computes ROC-AUC and FPR@95 from the
+`runs/*/probabilities/` and experiment metadata in `configs/`. The export script
+accepts config files or config directories, computes ROC-AUC and FPR@95 from the
 saved teacher and student artifacts, applies report-specific pretty names for
-OOD Scores, and writes `reports/outputs/latex/metrics.tex`.
+OOD Scores, and writes one LaTeX file per OOD strategy under
+`reports/outputs/latex/`.
 
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_metrics_table.py
 ```
 
-Render the generated LaTeX source to `reports/outputs/pdf/metrics.pdf` with:
+By default, the exporter reads `configs/baseline/` and `configs/perturbation/`
+and writes `metrics_baseline.tex` and `metrics_perturbation.tex` when matching
+run artifacts are available. Pass config paths to restrict the output, for
+example:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_metrics_table.py configs/baseline/cifar_10 configs/perturbation/cifar_10
+```
+
+Baseline tables include a `Features` column from `student.feature_layer` (`Raw
+pixels` when absent). Perturbation tables also include a `Perturbation` column
+from `strategy.perturbation.clipping_mode`. In every strategy table, the Teacher
+MSP row uses raw-image teacher probability artifacts from baseline runs.
+
+Render the generated LaTeX sources to one PDF per strategy under
+`reports/outputs/pdf/` with:
 
 ```bash
 uv run --project envs/notebooks --no-sync python reports/scripts/render_metrics.py

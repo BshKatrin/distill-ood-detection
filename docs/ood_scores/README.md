@@ -16,7 +16,11 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
 
 ## Scores
 
-- MSP (Maximum Softmax Probability): Maximum softmax probability of the **teacher** model. MSP is the baseline OOD Score.
+- MSP (Maximum Softmax Probability): Maximum softmax probability of the
+  **teacher** model from standard raw-image inference. MSP is the baseline OOD
+  Score and does not depend on the student model or OOD distillation strategy.
+  In different OOD strategy reports, the Teacher MSP row must still use the raw-pixel
+  teacher probability artifacts from the matching baseline run.
   - `sign: +1`
   - **Status**: Not implemented in `ood_scores.py`.
 
