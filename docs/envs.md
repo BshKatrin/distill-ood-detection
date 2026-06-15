@@ -36,6 +36,14 @@ Use `--no-sync` only after the environment has already been synced. If the
 environment does not exist yet, `uv run --no-sync` can create an empty `.venv`
 and then skip dependency installation.
 
+## Environment variables
+
+When the project downloads teacher checkpoints from Hugging Face Hub, it
+automatically loads a repository-root `.env` file if one exists.
+
+Use `HF_TOKEN` for private or gated Hub access, and keep the real token only in
+the local `.env` file. Commit examples such as `.env.example`, not the secret.
+
 For a GPU-cluster training run from the repository root:
 
 ```bash

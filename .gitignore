@@ -21,6 +21,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+!reports/lib/
+!reports/lib/**
 lib64/
 parts/
 sdist/
@@ -110,11 +112,9 @@ ipython_config.py
 # Experiment artifacts
 data/
 runs/
-reports/output/*.aux
-reports/output/*.fdb_latexmk
-reports/output/*.fls
-reports/output/*.log
-reports/output/*.synctex.gz
+reports/build/
+reports/outputs/pdf/
+reports/outputs/notebooks/
 mlflow.db
 mlflow.db-*
 mlruns/

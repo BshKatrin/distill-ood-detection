@@ -26,7 +26,7 @@ from distill_ood_detection.evaluation.ood_scores import (
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "reports"
-OUTPUT_DIR = REPORTS_DIR / "output"
+OUTPUT_DIR = REPORTS_DIR / "outputs" / "latex"
 DEFAULT_OUTPUT = OUTPUT_DIR / "metrics.tex"
 
 RUN_ORDER = [
