@@ -11,6 +11,7 @@ from huggingface_hub.errors import EntryNotFoundError
 from safetensors.torch import load_file
 
 from distill_ood_detection.config import TeacherConfig
+from distill_ood_detection.utils import get_hf_token
 
 
 class CifarResNet18(ResNet):
@@ -140,11 +141,13 @@ def load_teacher(config: TeacherConfig, device: torch.device) -> nn.Module:
 
 
 def _download_state_dict(config: TeacherConfig) -> dict[str, torch.Tensor]:
+    token = get_hf_token()
     try:
         path = hf_hub_download(
             repo_id=config.hf_model_id,
             filename="model.safetensors",
             revision=config.revision,
+            token=token,
         )
         return load_file(path)
     except EntryNotFoundError:
@@ -152,5 +155,6 @@ def _download_state_dict(config: TeacherConfig) -> dict[str, torch.Tensor]:
             repo_id=config.hf_model_id,
             filename="pytorch_model.bin",
             revision=config.revision,
+            token=token,
         )
         return torch.load(path, map_location="cpu", weights_only=True)

@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import warnings
 from dataclasses import asdict, is_dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
+from dotenv import load_dotenv
 
 
 def set_seed(seed: int) -> None:
@@ -92,3 +95,22 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     return value
+
+
+@lru_cache(maxsize=1)
+def load_project_dotenv() -> None:
+    """Load the repository ``.env`` file once when present."""
+
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        dotenv_path = parent / ".env"
+        if dotenv_path.is_file():
+            load_dotenv(dotenv_path=dotenv_path, override=False)
+            return
+
+
+def get_hf_token() -> str | None:
+    """Return the Hugging Face access token from the environment."""
+
+    load_project_dotenv()
+    return os.getenv("HF_TOKEN") or os.getenv("HF_token")
