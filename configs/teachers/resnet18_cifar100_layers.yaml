@@ -14,7 +14,7 @@ dataset:
       split: test
     - name: svhn
       split: test
-    - name: cifar100
+    - name: cifar10
       split: test
 
 teacher:
