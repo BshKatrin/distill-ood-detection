@@ -10,7 +10,7 @@ The script accepts config paths as positional arguments:
 sbatch \
   --job-name=cifar10_perturb \
   --gres=gpu:2 \
-  scripts/slurm/run_configs.sbatch \
+  scripts/run_configs.sbatch \
   configs/perturbation/cifar_10/linear_layer3_clip_constant.yaml \
   configs/perturbation/cifar_10/linear_layer3_clip_channel.yaml \
   configs/perturbation/cifar_10/linear_layer3_clip_spatial.yaml

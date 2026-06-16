@@ -6,6 +6,7 @@ Report scripts live in `reports/scripts/`. Shared report-only helpers live in
 Generated report files are split by artifact type:
 
 - `reports/outputs/latex/`: generated LaTeX source files. These are tracked.
+- `reports/outputs/cache/`: generated metric cache files. These are not tracked.
 - `reports/outputs/pdf/`: rendered PDFs. These are not tracked.
 - `reports/outputs/notebooks/`: generated analysis notebooks. These are not tracked.
 - `reports/build/`: compiler scratch files such as `.aux`, `.log`, `.fls`, and
@@ -37,6 +38,14 @@ Baseline tables include a `Features` column from `student.feature_layer` (`Raw
 Pixels` when absent). Perturbation tables also include a `Perturbation` column
 from `strategy.perturbation.clipping_mode`. In every strategy table, the Teacher
 MSP row uses raw-image teacher probability artifacts from baseline runs.
+Rows with the same displayed metadata are merged across ID datasets, so matching
+CIFAR-10 and CIFAR-100 runs fill the same row block instead of repeating the
+metadata with blank cells.
+
+Computed OOD metrics are cached in
+`reports/outputs/cache/ood_metrics.json` by default. The cache is reused when
+the source artifact paths, sizes, and modification times match. Use `--cache` to
+choose a different cache file.
 
 ## Validation metrics table
 

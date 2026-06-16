@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import sys
 from collections.abc import Callable, Iterable
@@ -30,6 +31,7 @@ from distill_ood_detection.evaluation.ood_scores import (
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "reports"
 OUTPUT_DIR = REPORTS_DIR / "outputs" / "latex"
+DEFAULT_CACHE_PATH = REPORTS_DIR / "outputs" / "cache" / "ood_metrics.json"
 DEFAULT_OUTPUT_PATTERN = "metrics_{strategy}.tex"
 
 DEFAULT_CONFIG_PATHS = [
@@ -121,6 +123,7 @@ class ExperimentConfig:
     strategy: str
     experiment_name: str
     dataset_name: str
+    ood_dataset_keys: tuple[str, ...]
     student_kind: str
     feature_source: str
     perturbation: str | None
@@ -128,10 +131,30 @@ class ExperimentConfig:
     run_dir: Path
 
 
+@dataclass(frozen=True)
+class ReportRowGroup:
+    """Configs that share the same rendered report metadata columns."""
+
+    student_kind: str
+    feature_source: str
+    perturbation: str | None
+    configs: tuple[ExperimentConfig, ...]
+
+
 def load_artifact(path: Path) -> dict[str, Any]:
     """Load one saved probability artifact on CPU."""
 
     return torch.load(path, map_location="cpu")
+
+
+def load_artifact_array(path: Path, key: str) -> np.ndarray:
+    """Load one array from a saved probability artifact on CPU."""
+
+    artifact = load_artifact(path)
+    try:
+        return to_numpy(artifact[key])
+    finally:
+        del artifact
 
 
 def to_numpy(value: Any) -> np.ndarray:
@@ -237,6 +260,10 @@ def experiment_config(path: Path) -> ExperimentConfig:
         strategy=strategy,
         experiment_name=experiment_name,
         dataset_name=dataset["name"],
+        ood_dataset_keys=tuple(
+            f"{ood_dataset['name']}_{ood_dataset['split']}"
+            for ood_dataset in dataset.get("ood_datasets", [])
+        ),
         student_kind=student_kind_label(student["kind"]),
         feature_source=feature_source_label(feature_layer),
         perturbation=(
@@ -362,6 +389,109 @@ def format_metric(metrics: dict[str, float]) -> str:
     return f"{metrics['roc_auc']:.2f}/{metrics['fpr_at_95_tpr']:.2f}"
 
 
+def progress(message: str) -> None:
+    """Print one report export progress message."""
+
+    print(f"[metrics] {message}", file=sys.stderr, flush=True)
+
+
+def artifact_fingerprint(path: Path) -> dict[str, int | str]:
+    """Return a compact fingerprint for cache invalidation."""
+
+    stat = path.stat()
+    return {
+        "path": str(path.relative_to(ROOT)),
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
+
+
+def cache_key(parts: dict[str, str]) -> str:
+    """Return a stable string key for one cached metric."""
+
+    return json.dumps(parts, sort_keys=True, separators=(",", ":"))
+
+
+class MetricCache:
+    """Persistent cache for computed report metrics."""
+
+    def __init__(self, path: Path, *, save_interval: int = 10) -> None:
+        self.path = path
+        self.save_interval = save_interval
+        self.entries = self._load()
+        self.dirty = False
+        self.pending_writes = 0
+
+    def _load(self) -> dict[str, Any]:
+        if not self.path.exists():
+            return {}
+        with self.path.open() as file:
+            payload = json.load(file)
+        if not isinstance(payload, dict) or payload.get("version") != 1:
+            return {}
+        entries = payload.get("entries", {})
+        return entries if isinstance(entries, dict) else {}
+
+    def get(
+        self,
+        key: dict[str, str],
+        fingerprints: list[dict[str, int | str]],
+    ) -> dict[str, float] | None:
+        """Return a cached metric when all artifact fingerprints still match."""
+
+        entry = self.entries.get(cache_key(key))
+        if not isinstance(entry, dict):
+            return None
+        if entry.get("artifacts") != fingerprints:
+            return None
+        metrics = entry.get("metrics")
+        if not isinstance(metrics, dict):
+            return None
+        roc_auc = metrics.get("roc_auc")
+        fpr_at_95_tpr = metrics.get("fpr_at_95_tpr")
+        if not isinstance(roc_auc, int | float) or not isinstance(
+            fpr_at_95_tpr,
+            int | float,
+        ):
+            return None
+        return {
+            "roc_auc": float(roc_auc),
+            "fpr_at_95_tpr": float(fpr_at_95_tpr),
+        }
+
+    def set(
+        self,
+        key: dict[str, str],
+        fingerprints: list[dict[str, int | str]],
+        metrics: dict[str, float],
+    ) -> None:
+        """Store one computed metric."""
+
+        self.entries[cache_key(key)] = {
+            "artifacts": fingerprints,
+            "metrics": {
+                "roc_auc": float(metrics["roc_auc"]),
+                "fpr_at_95_tpr": float(metrics["fpr_at_95_tpr"]),
+            },
+        }
+        self.dirty = True
+        self.pending_writes += 1
+        if self.pending_writes >= self.save_interval:
+            self.save()
+
+    def save(self) -> None:
+        """Write cache entries to disk if they changed."""
+
+        if not self.dirty:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"version": 1, "entries": self.entries}
+        with self.path.open("w") as file:
+            json.dump(payload, file, indent=2, sort_keys=True)
+        self.dirty = False
+        self.pending_writes = 0
+
+
 class RunArtifacts:
     """Loaded artifacts and metadata for one run directory."""
 
@@ -374,30 +504,43 @@ class RunArtifacts:
             f"{dataset['name']}_{dataset['split']}"
             for dataset in self.manifest["dataset"]["ood_datasets"]
         ]
-        self.teacher_artifacts = self._load_teacher_artifacts()
-        self.student_artifacts = self._load_student_artifacts()
+        self._teacher_artifact_paths = self._teacher_paths()
+        self._student_artifact_paths = self._student_paths()
 
     def _load_manifest(self) -> dict[str, Any]:
         manifest_path = self.run_dir / "probabilities" / "manifest.json"
         with manifest_path.open() as file:
             return json.load(file)
 
-    def _load_teacher_artifacts(self) -> dict[str, dict[str, Any]]:
-        artifacts = {}
+    def _teacher_paths(self) -> dict[str, Path]:
+        paths = {}
         for entry in self.manifest["artifacts"]:
             if entry["model"] == "teacher":
-                artifacts[entry["dataset"]] = load_artifact(ROOT / entry["path"])
-        return artifacts
+                paths[entry["dataset"]] = ROOT / entry["path"]
+        return paths
 
-    def _load_student_artifacts(self) -> dict[tuple[str, str], dict[str, Any]]:
-        artifacts = {}
+    def _student_paths(self) -> dict[tuple[str, str], Path]:
+        paths = {}
         for entry in self.manifest["artifacts"]:
             if entry["model"] == "student":
                 method_key = entry.get("method") or entry.get("mode")
-                artifacts[(entry["dataset"], method_key)] = load_artifact(
-                    ROOT / entry["path"],
-                )
-        return artifacts
+                paths[(entry["dataset"], method_key)] = ROOT / entry["path"]
+        return paths
+
+    def teacher_artifact_path(self, dataset_key: str) -> Path:
+        """Return the path to one teacher probability artifact."""
+
+        return self._teacher_artifact_paths[dataset_key]
+
+    def student_artifact_path(self, dataset_key: str, method_key: str) -> Path:
+        """Return the path to one student probability artifact."""
+
+        return self._student_artifact_paths[(dataset_key, method_key)]
+
+    def has_student_artifact(self, dataset_key: str, method_key: str) -> bool:
+        """Return whether one student probability artifact exists in the manifest."""
+
+        return (dataset_key, method_key) in self._student_artifact_paths
 
 
 def metric_for_scores(
@@ -419,11 +562,19 @@ def metric_for_scores(
 def teacher_metrics_by_column(
     teacher_runs_by_id_dataset: dict[str, RunArtifacts],
     columns: list[tuple[str, str]],
+    metric_cache: MetricCache,
 ) -> dict[tuple[str, str], str]:
     """Compute teacher MSP metrics for each report column."""
 
     values = {}
-    for id_dataset_key, ood_dataset_key in columns:
+    total_columns = len(columns)
+    for column_index, (id_dataset_key, ood_dataset_key) in enumerate(columns, start=1):
+        progress(
+            "teacher MSP "
+            f"{column_index}/{total_columns}: "
+            f"{DATASET_LABELS.get(id_dataset_key, id_dataset_key)} (ID) vs "
+            f"{DATASET_LABELS.get(ood_dataset_key, ood_dataset_key)}",
+        )
         if id_dataset_key not in teacher_runs_by_id_dataset:
             msg = (
                 "Missing baseline raw-image teacher artifacts for "
@@ -431,12 +582,97 @@ def teacher_metrics_by_column(
             )
             raise FileNotFoundError(msg)
         run = teacher_runs_by_id_dataset[id_dataset_key]
-        id_scores = teacher_msp_scores(run.teacher_artifacts[id_dataset_key])
-        ood_scores = teacher_msp_scores(run.teacher_artifacts[ood_dataset_key])
-        values[(id_dataset_key, ood_dataset_key)] = format_metric(
-            metric_for_scores(id_scores, ood_scores),
+        values[(id_dataset_key, ood_dataset_key)] = teacher_metric(
+            run,
+            id_dataset_key,
+            ood_dataset_key,
+            metric_cache,
         )
     return values
+
+
+def teacher_metric(
+    run: RunArtifacts,
+    id_dataset_key: str,
+    ood_dataset_key: str,
+    metric_cache: MetricCache,
+) -> str:
+    """Compute or load one cached Teacher MSP metric table cell."""
+
+    id_teacher_path = run.teacher_artifact_path(id_dataset_key)
+    ood_teacher_path = run.teacher_artifact_path(ood_dataset_key)
+    fingerprints = [
+        artifact_fingerprint(id_teacher_path),
+        artifact_fingerprint(ood_teacher_path),
+    ]
+    key = {
+        "kind": "teacher_msp",
+        "run": run.run_name,
+        "id_dataset": id_dataset_key,
+        "ood_dataset": ood_dataset_key,
+    }
+    cached = metric_cache.get(key, fingerprints)
+    if cached is not None:
+        progress("cache hit Teacher MSP")
+        return format_metric(cached)
+
+    id_scores = teacher_msp_scores_for_dataset(run, id_dataset_key)
+    ood_scores = teacher_msp_scores_for_dataset(run, ood_dataset_key)
+    try:
+        metrics = metric_for_scores(id_scores, ood_scores)
+    finally:
+        del id_scores, ood_scores
+        gc.collect()
+    metric_cache.set(key, fingerprints, metrics)
+    return format_metric(metrics)
+
+
+def teacher_msp_scores_for_dataset(
+    run: RunArtifacts,
+    dataset_key: str,
+) -> np.ndarray:
+    """Compute teacher MSP scores for one dataset artifact."""
+
+    probabilities = load_artifact_array(
+        run.teacher_artifact_path(dataset_key),
+        "probabilities",
+    )
+    if probabilities.ndim != 2:
+        msg = (
+            "Teacher MSP must use raw-image teacher probabilities with shape "
+            f"(n_samples, n_classes), got {probabilities.shape}."
+        )
+        raise ValueError(msg)
+    try:
+        return probabilities.max(axis=1)
+    finally:
+        del probabilities
+
+
+def student_scores_for_dataset(
+    run: RunArtifacts,
+    dataset_key: str,
+    method_key: str,
+    score_key: str,
+) -> np.ndarray:
+    """Compute student-teacher OOD scores for one dataset artifact pair."""
+
+    artifact_key = "logits" if score_key == LOGIT_L2_DISTANCE else "probabilities"
+    teacher_values = load_artifact_array(
+        run.teacher_artifact_path(dataset_key),
+        artifact_key,
+    )
+    student_values = load_artifact_array(
+        run.student_artifact_path(dataset_key, method_key),
+        artifact_key,
+    )
+    try:
+        if score_key == LOGIT_L2_DISTANCE:
+            return logit_l2_distance(teacher_values, student_values, signed=True)
+        score_function = PROBABILITY_SCORE_FUNCTIONS[score_key]
+        return score_function(teacher_values, student_values)
+    finally:
+        del teacher_values, student_values
 
 
 def student_metric(
@@ -444,50 +680,88 @@ def student_metric(
     method_key: str,
     score_key: str,
     ood_dataset_key: str,
+    metric_cache: MetricCache,
 ) -> str:
     """Compute one student metric table cell."""
 
     id_dataset_key = run.id_dataset_key
-    id_teacher = run.teacher_artifacts[id_dataset_key]
-    ood_teacher = run.teacher_artifacts[ood_dataset_key]
-    id_student = run.student_artifacts[(id_dataset_key, method_key)]
-    ood_student = run.student_artifacts[(ood_dataset_key, method_key)]
+    artifact_key = "logits" if score_key == LOGIT_L2_DISTANCE else "probabilities"
+    id_teacher_path = run.teacher_artifact_path(id_dataset_key)
+    id_student_path = run.student_artifact_path(id_dataset_key, method_key)
+    ood_teacher_path = run.teacher_artifact_path(ood_dataset_key)
+    ood_student_path = run.student_artifact_path(ood_dataset_key, method_key)
+    fingerprints = [
+        artifact_fingerprint(id_teacher_path),
+        artifact_fingerprint(id_student_path),
+        artifact_fingerprint(ood_teacher_path),
+        artifact_fingerprint(ood_student_path),
+    ]
+    key = {
+        "kind": "student",
+        "run": run.run_name,
+        "method": method_key,
+        "score": score_key,
+        "artifact_key": artifact_key,
+        "id_dataset": id_dataset_key,
+        "ood_dataset": ood_dataset_key,
+    }
+    cached = metric_cache.get(key, fingerprints)
+    if cached is not None:
+        progress("cache hit student metric")
+        return format_metric(cached)
 
-    if score_key == LOGIT_L2_DISTANCE:
-        id_scores = logit_l2_distance(
-            to_numpy(id_teacher["logits"]),
-            to_numpy(id_student["logits"]),
-            signed=True,
-        )
-        ood_scores = logit_l2_distance(
-            to_numpy(ood_teacher["logits"]),
-            to_numpy(ood_student["logits"]),
-            signed=True,
-        )
-    else:
-        score_function = PROBABILITY_SCORE_FUNCTIONS[score_key]
-        id_scores = score_function(
-            to_numpy(id_teacher["probabilities"]),
-            to_numpy(id_student["probabilities"]),
-        )
-        ood_scores = score_function(
-            to_numpy(ood_teacher["probabilities"]),
-            to_numpy(ood_student["probabilities"]),
-        )
-
-    return format_metric(metric_for_scores(id_scores, ood_scores))
+    id_scores = student_scores_for_dataset(
+        run,
+        id_dataset_key,
+        method_key,
+        score_key,
+    )
+    ood_scores = student_scores_for_dataset(
+        run,
+        ood_dataset_key,
+        method_key,
+        score_key,
+    )
+    try:
+        metrics = metric_for_scores(id_scores, ood_scores)
+    finally:
+        del id_scores, ood_scores
+        gc.collect()
+    metric_cache.set(key, fingerprints, metrics)
+    return format_metric(metrics)
 
 
-def available_columns(runs: list[RunArtifacts]) -> list[tuple[str, str]]:
-    """Return report metric columns available for a set of runs."""
+def id_dataset_key_from_config(config: ExperimentConfig) -> str:
+    """Return the report dataset key for one config's ID dataset."""
+
+    return f"{config.dataset_name}_test"
+
+
+def available_columns(
+    configs: list[ExperimentConfig],
+    runs: list[RunArtifacts],
+) -> list[tuple[str, str]]:
+    """Return report metric columns for selected configs and available runs."""
 
     id_dataset_keys = ["cifar10_test", "cifar100_test"]
     columns = []
     for id_dataset_key in id_dataset_keys:
-        run = next((run for run in runs if run.id_dataset_key == id_dataset_key), None)
-        if run is None:
+        available_ood_datasets = {
+            ood_dataset_key
+            for config in configs
+            if id_dataset_key_from_config(config) == id_dataset_key
+            for ood_dataset_key in config.ood_dataset_keys
+        }
+        available_ood_datasets.update(
+            {
+                ood_dataset_key
+                for run in runs
+                if run.id_dataset_key == id_dataset_key
+                for ood_dataset_key in run.ood_dataset_keys
+            },
+        )
+        if not available_ood_datasets:
             continue
-        available_ood_datasets = set(run.ood_dataset_keys)
         columns.extend(
             (id_dataset_key, ood_dataset_key)
             for ood_dataset_key in OOD_DATASET_ORDER_BY_ID[id_dataset_key]
@@ -496,16 +770,60 @@ def available_columns(runs: list[RunArtifacts]) -> list[tuple[str, str]]:
     return columns
 
 
+def report_row_groups(configs: list[ExperimentConfig]) -> list[ReportRowGroup]:
+    """Group configs that share the same rendered report metadata."""
+
+    groups: dict[tuple[str, str, str | None], list[ExperimentConfig]] = {}
+    for config in configs:
+        key = (config.student_kind, config.feature_source, config.perturbation)
+        groups.setdefault(key, []).append(config)
+    return [
+        ReportRowGroup(
+            student_kind=key[0],
+            feature_source=key[1],
+            perturbation=key[2],
+            configs=tuple(sorted(group_configs, key=report_sort_key)),
+        )
+        for key, group_configs in sorted(
+            groups.items(),
+            key=lambda item: report_sort_key(item[1][0]),
+        )
+    ]
+
+
+def group_method_keys(group: ReportRowGroup) -> tuple[str, ...]:
+    """Return all methods used by a row group in stable report order."""
+
+    methods = {
+        method_key
+        for config in group.configs
+        for method_key in config.method_keys
+    }
+    return tuple(method_key for method_key in METHOD_ORDER if method_key in methods)
+
+
 def build_table_rows(
     configs: list[ExperimentConfig],
     runs: list[RunArtifacts],
     teacher_runs_by_id_dataset: dict[str, RunArtifacts],
     columns: list[tuple[str, str]],
+    metric_cache: MetricCache,
 ) -> list[str]:
     """Build LaTeX table body rows."""
 
     rows = []
-    teacher_values = teacher_metrics_by_column(teacher_runs_by_id_dataset, columns)
+    row_groups = report_row_groups(configs)
+    total_metric_cells = sum(
+        len(group_method_keys(group)) * len(SCORE_ORDER) * len(columns)
+        for group in row_groups
+    )
+    metric_cell_index = 0
+    progress(f"computing Teacher MSP row across {len(columns)} columns")
+    teacher_values = teacher_metrics_by_column(
+        teacher_runs_by_id_dataset,
+        columns,
+        metric_cache,
+    )
     strategy = configs[0].strategy
     teacher_prefix = "Teacher & - & - & " + TEACHER_SCORE_LABEL
     if strategy == "perturbation":
@@ -517,24 +835,43 @@ def build_table_rows(
         + r" \\",
     )
 
-    for config in configs:
-        run_by_id_dataset = {
-            run.id_dataset_key: run for run in runs if run.run_name == config.experiment_name
+    runs_by_name = {run.run_name: run for run in runs}
+    for group in row_groups:
+        config_by_id_dataset = {
+            id_dataset_key_from_config(config): config for config in group.configs
         }
-        if not run_by_id_dataset:
-            continue
-        method_keys = config.method_keys
+        run_by_id_dataset = {
+            id_dataset_key: runs_by_name[config.experiment_name]
+            for id_dataset_key, config in config_by_id_dataset.items()
+            if config.experiment_name in runs_by_name
+        }
+        method_keys = group_method_keys(group)
         if not method_keys:
+            progress(
+                "skipping "
+                f"{group.student_kind}/{group.feature_source}/"
+                f"{group.perturbation or '-'}: no configured methods",
+            )
             continue
+        progress(
+            "row group "
+            f"{group.student_kind}/{group.feature_source}/{group.perturbation or '-'}: "
+            f"{len(method_keys)} methods, {len(columns)} columns",
+        )
         rows.append(r"\midrule")
         for method_index, method_key in enumerate(method_keys):
+            progress(
+                f"method {METHOD_LABELS.get(method_key, method_key)} "
+                f"for {group.student_kind}/{group.feature_source}/"
+                f"{group.perturbation or '-'}",
+            )
             if method_index > 0:
                 rows.append(r"\addlinespace")
             for score_index, score_key in enumerate(SCORE_ORDER):
                 show_config_labels = method_index == 0 and score_index == 0
-                student_label = config.student_kind if show_config_labels else ""
-                feature_label = config.feature_source if show_config_labels else ""
-                perturbation = config.perturbation or ""
+                student_label = group.student_kind if show_config_labels else ""
+                feature_label = group.feature_source if show_config_labels else ""
+                perturbation = group.perturbation or ""
                 perturbation_label_text = (
                     perturbation if method_index == 0 and score_index == 0 else ""
                 )
@@ -542,12 +879,56 @@ def build_table_rows(
                 score_label = OOD_SCORE_LABELS[score_key]
                 cells = []
                 for id_dataset_key, ood_dataset_key in columns:
+                    metric_cell_index += 1
+                    config = config_by_id_dataset.get(id_dataset_key)
                     run = run_by_id_dataset.get(id_dataset_key)
-                    if run is None or (id_dataset_key, method_key) not in run.student_artifacts:
+                    if config is None or method_key not in config.method_keys:
+                        progress(
+                            "blank "
+                            f"{metric_cell_index}/{total_metric_cells}: "
+                            f"{group.student_kind}/{group.feature_source}/"
+                            f"{group.perturbation or '-'}, "
+                            f"{METHOD_LABELS.get(method_key, method_key)}, "
+                            f"{score_label}, "
+                            f"{DATASET_LABELS.get(id_dataset_key, id_dataset_key)} "
+                            f"vs {DATASET_LABELS.get(ood_dataset_key, ood_dataset_key)}",
+                        )
+                        cells.append("")
+                    elif run is None or not run.has_student_artifact(
+                        id_dataset_key,
+                        method_key,
+                    ) or not run.has_student_artifact(
+                        ood_dataset_key,
+                        method_key,
+                    ):
+                        progress(
+                            "blank "
+                            f"{metric_cell_index}/{total_metric_cells}: "
+                            f"{config.experiment_name}, "
+                            f"{METHOD_LABELS.get(method_key, method_key)}, "
+                            f"{score_label}, "
+                            f"{DATASET_LABELS.get(id_dataset_key, id_dataset_key)} "
+                            f"vs {DATASET_LABELS.get(ood_dataset_key, ood_dataset_key)}",
+                        )
                         cells.append("")
                     else:
+                        progress(
+                            "cell "
+                            f"{metric_cell_index}/{total_metric_cells}: "
+                            f"{config.experiment_name}, "
+                            f"{METHOD_LABELS.get(method_key, method_key)}, "
+                            f"{score_label}, "
+                            f"{DATASET_LABELS.get(id_dataset_key, id_dataset_key)} "
+                            f"vs {DATASET_LABELS.get(ood_dataset_key, ood_dataset_key)}",
+                        )
                         cells.append(
-                            student_metric(run, method_key, score_key, ood_dataset_key),
+                            student_metric(
+                                run,
+                                method_key,
+                                score_key,
+                                ood_dataset_key,
+                                metric_cache,
+                            ),
                         )
                 if strategy == "perturbation":
                     row_prefix = (
@@ -567,10 +948,11 @@ def build_strategy_table(
     configs: list[ExperimentConfig],
     runs: list[RunArtifacts],
     teacher_runs_by_id_dataset: dict[str, RunArtifacts],
+    metric_cache: MetricCache,
 ) -> str:
     """Render one LaTeX metrics table for one OOD strategy."""
 
-    columns = available_columns(runs)
+    columns = available_columns(configs, runs)
     if not columns:
         return ""
     metadata_headers = ["Student", "Features"]
@@ -592,7 +974,13 @@ def build_strategy_table(
     cifar100_start = cifar10_end + 1
     cifar100_end = cifar100_start + cifar100_span - 1
 
-    rows = build_table_rows(configs, runs, teacher_runs_by_id_dataset, columns)
+    rows = build_table_rows(
+        configs,
+        runs,
+        teacher_runs_by_id_dataset,
+        columns,
+        metric_cache,
+    )
     body = "\n".join(rows)
     header_prefix = " & ".join(metadata_headers)
     id_headers = []
@@ -623,10 +1011,27 @@ def build_strategy_table(
 def grouped_available_configs(
     configs: list[ExperimentConfig],
 ) -> dict[str, list[ExperimentConfig]]:
-    """Group configs with local artifacts by OOD strategy."""
+    """Group configs by OOD strategy when the strategy has local artifacts."""
 
+    configs = deduplicate_configs(configs)
+    available_experiment_names = {
+        config.experiment_name for config in available_configs(configs, warn=False)
+    }
     by_strategy: dict[str, list[ExperimentConfig]] = {}
-    for config in available_configs(configs):
+    strategies_with_artifacts = {
+        config.strategy
+        for config in configs
+        if config.experiment_name in available_experiment_names
+    }
+    for config in configs:
+        if config.strategy not in strategies_with_artifacts:
+            continue
+        if config.experiment_name not in available_experiment_names:
+            print(
+                "Skipping "
+                f"{config.path}: missing probability artifacts in {config.run_dir}",
+                file=sys.stderr,
+            )
         by_strategy.setdefault(config.strategy, []).append(config)
     for strategy, strategy_configs in by_strategy.items():
         by_strategy[strategy] = sorted(strategy_configs, key=report_sort_key)
@@ -650,11 +1055,22 @@ def build_latex_document(
     strategy: str,
     configs: list[ExperimentConfig],
     teacher_runs_by_id_dataset: dict[str, RunArtifacts],
+    metric_cache: MetricCache,
 ) -> str:
     """Render one standalone LaTeX metrics table."""
 
-    runs = [RunArtifacts(config.run_dir) for config in configs]
-    body = build_strategy_table(strategy, configs, runs, teacher_runs_by_id_dataset)
+    runs = [
+        RunArtifacts(config.run_dir)
+        for config in configs
+        if run_artifacts_available(config)
+    ]
+    body = build_strategy_table(
+        strategy,
+        configs,
+        runs,
+        teacher_runs_by_id_dataset,
+        metric_cache,
+    )
     return rf"""\documentclass[border=2pt]{{standalone}}
 \usepackage{{booktabs}}
 
@@ -707,6 +1123,15 @@ def parse_args() -> argparse.Namespace:
         default=OUTPUT_DIR,
         help="Directory for generated strategy-specific LaTeX documents.",
     )
+    parser.add_argument(
+        "--cache",
+        type=Path,
+        default=DEFAULT_CACHE_PATH,
+        help=(
+            "Path to the persistent OOD metric cache. Cached cells are reused "
+            "when source artifact paths, sizes, and mtimes match."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -720,6 +1145,7 @@ def main() -> None:
     configs = [experiment_config(path) for path in expand_config_paths(args.configs)]
     configs_by_strategy = grouped_available_configs(configs)
     teacher_runs_by_id_dataset = teacher_reference_runs()
+    metric_cache = MetricCache(args.cache)
 
     if args.output is not None and len(configs_by_strategy) != 1:
         msg = "--output can only be used when one OOD strategy is selected."
@@ -731,9 +1157,11 @@ def main() -> None:
             strategy,
             strategy_configs,
             teacher_runs_by_id_dataset,
+            metric_cache,
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(latex)
+        metric_cache.save()
         print(f"Wrote {output_path}")
 
 
