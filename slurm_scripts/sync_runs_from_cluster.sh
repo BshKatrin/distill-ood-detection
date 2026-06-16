@@ -6,15 +6,15 @@ usage() {
 Sync selected run folders from a remote GPU cluster into local runs/.
 
 Usage:
-  scripts/sync_runs_from_cluster.sh --host SSH_ALIAS --remote-repo REMOTE_REPO_PATH RUN_DIR [RUN_DIR ...]
+  slurm_scripts/sync_runs_from_cluster.sh --host SSH_ALIAS --remote-repo REMOTE_REPO_PATH RUN_DIR [RUN_DIR ...]
 
 Example:
-  scripts/sync_runs_from_cluster.sh \
+  slurm_scripts/sync_runs_from_cluster.sh \
     --host my-cluster \
     --remote-repo /scratch/user/distill-ood-detection \
     linear_student_resnet18_cifar10 mlp_student_resnet18_cifar10
 
-  scripts/sync_runs_from_cluster.sh \
+  slurm_scripts/sync_runs_from_cluster.sh \
     --host my-cluster \
     --remote-repo '~/distill-ood-detection' \
     perturbation_linear_layer3_student_resnet18_cifar10

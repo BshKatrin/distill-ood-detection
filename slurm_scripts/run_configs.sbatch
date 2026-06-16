@@ -47,7 +47,7 @@ fi
 
 if [ "${#configs[@]}" -eq 0 ]; then
   echo "[$(date --iso-8601=seconds)] No configs provided"
-  echo "Usage: sbatch scripts/slurm/run_configs.sbatch configs/...yaml [configs/...yaml ...]"
+  echo "Usage: sbatch slurm_scripts/run_configs.sbatch configs/...yaml [configs/...yaml ...]"
   echo "Or set CONFIG_LIST to a newline-delimited file of config paths."
   exit 1
 fi

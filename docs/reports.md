@@ -47,6 +47,15 @@ Computed OOD metrics are cached in
 the source artifact paths, sizes, and modification times match. Use `--cache` to
 choose a different cache file.
 
+On the GPU cluster, run the same exporter through SLURM with
+`slurm_scripts/export_metrics_table.sbatch`. This job should not allocate a GPU;
+it loads saved probability artifacts on CPU and writes the generated LaTeX files
+under `reports/outputs/latex/`.
+
+```bash
+sbatch --mem=32G slurm_scripts/export_metrics_table.sbatch
+```
+
 ## Validation metrics table
 
 The validation metrics table is generated from saved method metrics under

@@ -1,6 +1,6 @@
 # SLURM jobs
 
-Use [scripts/slurm/run_configs.sbatch](../../scripts/slurm/run_configs.sbatch)
+Use [slurm_scripts/run_configs.sbatch](../../slurm_scripts/run_configs.sbatch)
 for ordinary config-driven GPU jobs instead of creating one sbatch file per
 experiment group.
 
@@ -10,7 +10,7 @@ The script accepts config paths as positional arguments:
 sbatch \
   --job-name=cifar10_perturb \
   --gres=gpu:2 \
-  scripts/run_configs.sbatch \
+  slurm_scripts/run_configs.sbatch \
   configs/perturbation/cifar_10/linear_layer3_clip_constant.yaml \
   configs/perturbation/cifar_10/linear_layer3_clip_channel.yaml \
   configs/perturbation/cifar_10/linear_layer3_clip_spatial.yaml
@@ -33,13 +33,13 @@ Examples:
 
 ```bash
 sbatch --gres=gpu:1 --export=ALL,MODE=infer \
-  scripts/slurm/run_configs.sbatch \
+  slurm_scripts/run_configs.sbatch \
   configs/baseline/cifar_100/linear.yaml
 ```
 
 ```bash
 sbatch --gres=gpu:1 --export=ALL,MODE=train \
-  scripts/slurm/run_configs.sbatch \
+  slurm_scripts/run_configs.sbatch \
   configs/baseline/cifar_10/feature_random_forest_layer3.yaml
 ```
 
@@ -51,7 +51,7 @@ GPU or set `PARALLEL=1`:
 
 ```bash
 sbatch --gres=gpu:1 --export=ALL,MODE=infer,PARALLEL=1 \
-  scripts/slurm/run_configs.sbatch \
+  slurm_scripts/run_configs.sbatch \
   configs/perturbation/cifar_10/linear_layer3_clip_constant.yaml
 ```
 
@@ -62,7 +62,7 @@ with `CONFIG_LIST`:
 
 ```bash
 sbatch --gres=gpu:2 --export=ALL,CONFIG_LIST=configs_to_run.txt \
-  scripts/slurm/run_configs.sbatch
+  slurm_scripts/run_configs.sbatch
 ```
 
 Blank lines and lines beginning with `#` are ignored.
@@ -78,3 +78,35 @@ The script maps these environment variables to CLI flags:
   `infer-probabilities --tree-mode` for tree configs.
 - `INCLUDE_TRAIN=1`: add `infer-probabilities --include-train`.
 - `INCLUDE_VALIDATION=1`: add `infer-probabilities --include-validation`.
+
+## Report metrics tables
+
+Use [slurm_scripts/export_metrics_table.sbatch](../../slurm_scripts/export_metrics_table.sbatch)
+to compute OOD metrics tables on the cluster from existing
+`runs/*/probabilities/` artifacts.
+
+This is a CPU and disk-I/O job. Do not request `--gres=gpu:*` for this script.
+Increase `--mem` if the job is killed while loading probability artifacts.
+
+```bash
+sbatch \
+  --cpus-per-task=4 \
+  --mem=32G \
+  --time=01:00:00 \
+  slurm_scripts/export_metrics_table.sbatch
+```
+
+Pass config files or directories after the script to restrict the export:
+
+```bash
+sbatch \
+  --mem=32G \
+  slurm_scripts/export_metrics_table.sbatch \
+  configs/baseline/cifar_10 configs/perturbation/cifar_10
+```
+
+The script maps these environment variables to exporter flags:
+
+- `CACHE_PATH`: `export_metrics_table.py --cache`.
+- `OUTPUT_PATH`: `export_metrics_table.py --output`.
+- `OUTPUT_DIR`: `export_metrics_table.py --output-dir`.
