@@ -81,7 +81,17 @@ PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks
 Baseline validation tables include `Student`, `Features`, and `Training`
 columns. Perturbation validation tables also include a `Perturbation` column.
 Both strategy tables keep `CIFAR-10 (ID)` and `CIFAR-100 (ID)` columns, leaving
-cells blank when a run belongs to the other ID dataset.
+cells blank when local metrics are missing. Rows with the same displayed
+metadata are merged across ID datasets, matching the OOD metrics table layout.
+
+On the GPU cluster, run the validation metrics exporter through SLURM with
+`slurm_scripts/export_validation_metrics_table.sbatch`. This job should not
+allocate a GPU; it reads saved method metrics JSON files and writes generated
+LaTeX files under `reports/outputs/latex/`.
+
+```bash
+sbatch slurm_scripts/export_validation_metrics_table.sbatch
+```
 
 Render the generated LaTeX sources to one PDF per strategy under
 `reports/outputs/pdf/` with:

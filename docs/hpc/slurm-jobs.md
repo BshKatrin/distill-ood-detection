@@ -79,7 +79,7 @@ The script maps these environment variables to CLI flags:
 - `INCLUDE_TRAIN=1`: add `infer-probabilities --include-train`.
 - `INCLUDE_VALIDATION=1`: add `infer-probabilities --include-validation`.
 
-## Report metrics tables
+## Report tables
 
 Use [slurm_scripts/export_metrics_table.sbatch](../../slurm_scripts/export_metrics_table.sbatch)
 to compute OOD metrics tables on the cluster from existing
@@ -110,3 +110,26 @@ The script maps these environment variables to exporter flags:
 - `CACHE_PATH`: `export_metrics_table.py --cache`.
 - `OUTPUT_PATH`: `export_metrics_table.py --output`.
 - `OUTPUT_DIR`: `export_metrics_table.py --output-dir`.
+
+Use [slurm_scripts/export_validation_metrics_table.sbatch](../../slurm_scripts/export_validation_metrics_table.sbatch)
+to compute validation metrics tables on the cluster from existing
+`runs/<experiment_name>/<method>/metrics.json` artifacts.
+
+This is also a CPU job and should not request a GPU.
+
+```bash
+sbatch slurm_scripts/export_validation_metrics_table.sbatch
+```
+
+Pass config files or directories after the script to restrict the export:
+
+```bash
+sbatch \
+  slurm_scripts/export_validation_metrics_table.sbatch \
+  configs/baseline/cifar_10 configs/perturbation/cifar_10
+```
+
+The script maps these environment variables to exporter flags:
+
+- `OUTPUT_PATH`: `export_validation_metrics_table.py --output`.
+- `OUTPUT_DIR`: `export_validation_metrics_table.py --output-dir`.

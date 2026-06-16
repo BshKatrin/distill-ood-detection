@@ -69,6 +69,16 @@ class ExperimentConfig:
     run_dir: Path
 
 
+@dataclass(frozen=True)
+class ReportRowGroup:
+    """Configs that share the same rendered report metadata columns."""
+
+    student_kind: str
+    feature_source: str
+    perturbation: str | None
+    configs: tuple[ExperimentConfig, ...]
+
+
 def load_yaml(path: Path) -> dict[str, Any]:
     """Load one YAML experiment config."""
 
@@ -203,27 +213,48 @@ def config_has_metrics(config: ExperimentConfig) -> bool:
     return any(metrics_path(config, method_key).exists() for method_key in config.method_keys)
 
 
-def available_configs(configs: Iterable[ExperimentConfig]) -> list[ExperimentConfig]:
+def available_configs(
+    configs: Iterable[ExperimentConfig],
+    *,
+    warn: bool = True,
+) -> list[ExperimentConfig]:
     """Return configs with local metrics artifacts, warning for missing runs."""
 
     configs = deduplicate_configs(configs)
     existing_configs = [config for config in configs if config_has_metrics(config)]
-    for config in configs:
-        if config not in existing_configs:
-            print(
-                f"Skipping {config.path}: missing method metrics in {config.run_dir}",
-                file=sys.stderr,
-            )
+    if warn:
+        for config in configs:
+            if config not in existing_configs:
+                print(
+                    f"Skipping {config.path}: missing method metrics in {config.run_dir}",
+                    file=sys.stderr,
+                )
     return existing_configs
 
 
 def grouped_available_configs(
     configs: list[ExperimentConfig],
 ) -> dict[str, list[ExperimentConfig]]:
-    """Group configs with local metrics by OOD strategy."""
+    """Group configs by OOD strategy when the strategy has local metrics."""
 
+    configs = deduplicate_configs(configs)
+    available_experiment_names = {
+        config.experiment_name for config in available_configs(configs, warn=False)
+    }
     by_strategy: dict[str, list[ExperimentConfig]] = {}
-    for config in available_configs(configs):
+    strategies_with_metrics = {
+        config.strategy
+        for config in configs
+        if config.experiment_name in available_experiment_names
+    }
+    for config in configs:
+        if config.strategy not in strategies_with_metrics:
+            continue
+        if config.experiment_name not in available_experiment_names:
+            print(
+                f"Skipping {config.path}: missing method metrics in {config.run_dir}",
+                file=sys.stderr,
+            )
         by_strategy.setdefault(config.strategy, []).append(config)
     for strategy, strategy_configs in by_strategy.items():
         by_strategy[strategy] = sorted(strategy_configs, key=report_sort_key)
@@ -279,38 +310,105 @@ def format_validation_metric(metrics: dict[str, Any]) -> str:
     return f"{accuracy:.4f}/{loss:.4f}"
 
 
+def report_row_groups(configs: list[ExperimentConfig]) -> list[ReportRowGroup]:
+    """Group configs that share the same rendered report metadata."""
+
+    groups: dict[tuple[str, str, str | None], list[ExperimentConfig]] = {}
+    for config in configs:
+        key = (config.student_kind, config.feature_source, config.perturbation)
+        groups.setdefault(key, []).append(config)
+    return [
+        ReportRowGroup(
+            student_kind=key[0],
+            feature_source=key[1],
+            perturbation=key[2],
+            configs=tuple(sorted(group_configs, key=report_sort_key)),
+        )
+        for key, group_configs in sorted(
+            groups.items(),
+            key=lambda item: report_sort_key(item[1][0]),
+        )
+    ]
+
+
+def group_method_keys(group: ReportRowGroup) -> tuple[str, ...]:
+    """Return all methods used by a row group in stable report order."""
+
+    methods = {
+        method_key
+        for config in group.configs
+        for method_key in config.method_keys
+    }
+    return tuple(method_key for method_key in METHOD_ORDER if method_key in methods)
+
+
+def group_configs_by_dataset(
+    group: ReportRowGroup,
+    method_key: str,
+) -> dict[str, ExperimentConfig]:
+    """Return one config per ID dataset for a rendered row group and method."""
+
+    selected: dict[str, ExperimentConfig] = {}
+    for config in sorted(group.configs, key=report_sort_key):
+        if method_key not in config.method_keys:
+            continue
+        existing = selected.get(config.dataset_name)
+        if existing is not None:
+            print(
+                "Skipping duplicate rendered row source "
+                f"{config.path}: already using {existing.path} for "
+                f"{DATASET_LABELS.get(config.dataset_name, config.dataset_name)}, "
+                f"{group.student_kind}/{group.feature_source}/"
+                f"{group.perturbation or '-'}, "
+                f"{METHOD_LABELS.get(method_key, method_key)}",
+                file=sys.stderr,
+            )
+            continue
+        selected[config.dataset_name] = config
+    return selected
+
+
 def build_table_rows(configs: list[ExperimentConfig], strategy: str) -> list[str]:
     """Build LaTeX table body rows."""
 
     rows = []
-    for config in configs:
-        if not config.method_keys:
+    for group in report_row_groups(configs):
+        method_keys = group_method_keys(group)
+        if not method_keys:
             continue
-        first_config_row = True
-        for method_key in config.method_keys:
-            metrics = load_method_metrics(config, method_key)
-            if metrics is None:
-                continue
+        first_group_row = True
+        rows_for_group = []
+        for method_key in method_keys:
+            config_by_dataset = group_configs_by_dataset(group, method_key)
             values = []
             for dataset_name in ID_DATASET_ORDER:
+                config = config_by_dataset.get(dataset_name)
+                metrics = (
+                    load_method_metrics(config, method_key)
+                    if config is not None
+                    else None
+                )
                 values.append(
                     format_validation_metric(metrics)
-                    if config.dataset_name == dataset_name
+                    if metrics is not None
                     else ""
                 )
-            student_label = config.student_kind if first_config_row else ""
-            feature_label = config.feature_source if first_config_row else ""
+            if not any(values):
+                continue
+            student_label = group.student_kind if first_group_row else ""
+            feature_label = group.feature_source if first_group_row else ""
             method_label = METHOD_LABELS[method_key]
             if strategy == "perturbation":
-                perturbation = config.perturbation if first_config_row else ""
+                perturbation = group.perturbation if first_group_row else ""
                 prefix = (
                     f"{student_label} & {feature_label} & {perturbation} & {method_label}"
                 )
             else:
                 prefix = f"{student_label} & {feature_label} & {method_label}"
-            rows.append(prefix + " & " + " & ".join(values) + r" \\")
-            first_config_row = False
-        if rows and rows[-1] != r"\midrule":
+            rows_for_group.append(prefix + " & " + " & ".join(values) + r" \\")
+            first_group_row = False
+        if rows_for_group:
+            rows.extend(rows_for_group)
             rows.append(r"\midrule")
     if rows and rows[-1] == r"\midrule":
         rows.pop()
