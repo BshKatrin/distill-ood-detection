@@ -9,41 +9,23 @@
 \toprule
 Student & Features & Perturbation & Training & CIFAR-10 (ID) & CIFAR-100 (ID) \\
 \midrule
-Linear & Layer3 & Constant & KL & 0.3118/0.1281 &  \\
- &  &  & Logit MSE & 0.2786/0.6687 &  \\
+Linear & Layer3 & Constant & KL & 0.3118/0.1281 & 0.1212/0.6283 \\
+ &  &  & Logit MSE & 0.2786/0.6687 & 0.0648/0.3273 \\
 \midrule
-Linear & Layer3 & Constant & KL &  & 0.1212/0.6283 \\
- &  &  & Logit MSE &  & 0.0648/0.3273 \\
+Linear & Layer3 & Channel & KL & 0.8628/0.1961 & 0.2690/1.1812 \\
+ &  &  & Logit MSE & 0.8096/1.1447 & 0.1274/0.7000 \\
 \midrule
-Linear & Layer3 & Channel & KL & 0.8628/0.1961 &  \\
- &  &  & Logit MSE & 0.8096/1.1447 &  \\
+Linear & Layer3 & Spatial & KL & 0.3436/0.2415 & 0.0380/0.1870 \\
+ &  &  & Logit MSE & 0.2948/0.6361 & 0.0226/0.1082 \\
 \midrule
-Linear & Layer3 & Channel & KL &  & 0.2690/1.1812 \\
- &  &  & Logit MSE &  & 0.1274/0.7000 \\
+Linear & Layer4 & Constant & KL & 0.9942/0.0001 & 0.9562/0.0006 \\
+ &  &  & Logit MSE & 0.9940/0.0001 & 0.9526/0.0010 \\
 \midrule
-Linear & Layer3 & Spatial & KL & 0.3436/0.2415 &  \\
- &  &  & Logit MSE & 0.2948/0.6361 &  \\
+Linear & Layer4 & Channel & KL & 1.0000/0.0000 & 0.9998/0.0002 \\
+ &  &  & Logit MSE & 1.0000/0.0002 & 1.0000/0.0013 \\
 \midrule
-Linear & Layer3 & Spatial & KL &  & 0.0380/0.1870 \\
- &  &  & Logit MSE &  & 0.0226/0.1082 \\
-\midrule
-Linear & Layer4 & Constant & KL & 0.9942/0.0001 &  \\
- &  &  & Logit MSE & 0.9940/0.0001 &  \\
-\midrule
-Linear & Layer4 & Constant & KL &  & 0.9562/0.0006 \\
- &  &  & Logit MSE &  & 0.9526/0.0010 \\
-\midrule
-Linear & Layer4 & Channel & KL & 1.0000/0.0000 &  \\
- &  &  & Logit MSE & 1.0000/0.0002 &  \\
-\midrule
-Linear & Layer4 & Channel & KL &  & 0.9998/0.0002 \\
- &  &  & Logit MSE &  & 1.0000/0.0013 \\
-\midrule
-Linear & Layer4 & Spatial & KL & 1.0000/0.0001 &  \\
- &  &  & Logit MSE & 1.0000/0.0002 &  \\
-\midrule
-Linear & Layer4 & Spatial & KL &  & 0.9998/0.0015 \\
- &  &  & Logit MSE &  & 1.0000/0.0022 \\
+Linear & Layer4 & Spatial & KL & 1.0000/0.0001 & 0.9998/0.0015 \\
+ &  &  & Logit MSE & 1.0000/0.0002 & 1.0000/0.0022 \\
 \bottomrule
 \end{tabular}
 

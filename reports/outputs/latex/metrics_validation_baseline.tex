@@ -9,26 +9,23 @@
 \toprule
 Student & Features & Training & CIFAR-10 (ID) & CIFAR-100 (ID) \\
 \midrule
-Linear & Raw Pixels & CE & 0.3752/27.2902 &  \\
- &  & Logit MSE & 0.2514/20.0568 &  \\
+Linear & Raw Pixels & CE & 0.3752/27.2902 & 0.1752/59.2081 \\
+ &  & Logit MSE & 0.2514/20.0568 & 0.1334/2.1358 \\
 \midrule
-Linear & Raw Pixels & CE &  & 0.1752/59.2081 \\
- &  & Logit MSE &  & 0.1334/2.1358 \\
+Linear & Layer3 & CE & 0.9990/17.5381 & 0.7132/56.9313 \\
+ &  & Logit MSE & 0.9994/1.1334 & 0.6966/1.4226 \\
 \midrule
-Linear & Layer4 & CE &  & 1.0000/54.2631 \\
- &  & Logit MSE &  & 0.9998/0.0012 \\
+Linear & Layer4 & CE & 1.0000/16.7793 & 1.0000/54.2631 \\
+ &  & Logit MSE & 1.0000/0.0001 & 0.9998/0.0012 \\
 \midrule
-MLP & Raw Pixels & CE & 0.5686/24.1425 &  \\
- &  & Logit MSE & 0.5810/8.5772 &  \\
+MLP & Raw Pixels & CE & 0.5686/24.1425 & 0.2962/58.4024 \\
+ &  & Logit MSE & 0.5810/8.5772 & 0.2130/1.8997 \\
 \midrule
-MLP & Raw Pixels & CE &  & 0.2962/58.4024 \\
- &  & Logit MSE &  & 0.2130/1.8997 \\
+MLP & Layer3 & CE & 0.9998/16.8321 & 0.6076/56.7758 \\
+ &  & Logit MSE & 0.9998/0.0884 & 0.2336/1.7260 \\
 \midrule
-MLP & Layer3 & CE & 0.9990/17.5381 &  \\
- &  & Logit MSE & 0.9994/1.1340 &  \\
-\midrule
-MLP & Layer3 & CE &  & 0.7132/56.9313 \\
- &  & Logit MSE &  & 0.6966/1.4226 \\
+MLP & Layer4 & CE & 1.0000/16.7794 & 1.0000/54.2671 \\
+ &  & Logit MSE & 1.0000/0.0003 & 1.0000/0.0072 \\
 \bottomrule
 \end{tabular}
 
