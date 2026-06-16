@@ -11,6 +11,8 @@ configs/
   <ood_distillation_strategy>/
     <id_dataset>/
       <experiment_config>.yaml
+  teachers/
+    <teacher_export_config>.yaml
 ```
 
 ## First-level directory: OOD distillation strategy
@@ -59,3 +61,23 @@ that distinguishes the experiment. For example:
 - `linear_layer3.yaml`
 
 Prefer short, descriptive names that make related configs easy to scan.
+
+## Teacher artifact configs
+
+The [configs/teachers](../configs/teachers/) directory contains teacher-only
+artifact export configs. These are not student training experiments; they define
+which teacher checkpoint, datasets, and teacher layers should be used for
+inference artifacts such as raw activations.
+
+Teacher activation configs use a top-level `layers` list. Each requested layer
+is saved to its own `.pt` file under:
+
+```text
+runs/<experiment_name>/teacher_activations/<dataset_name>/<layer>.pt
+```
+
+The matching manifest is saved at:
+
+```text
+runs/<experiment_name>/teacher_activations/manifest.json
+```

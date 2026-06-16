@@ -274,12 +274,62 @@ class ExperimentConfig:
     mlflow: MlflowConfig = field(default_factory=MlflowConfig)
 
 
+@dataclass(frozen=True)
+class TeacherActivationConfig:
+    """Configuration for exporting raw teacher activations."""
+
+    experiment_name: str
+    output_dir: str = "runs"
+    dataset: DatasetConfig = field(default_factory=DatasetConfig)
+    teacher: TeacherConfig = field(default_factory=TeacherConfig)
+    layers: tuple[str, ...] = ("layer3",)
+    device: str = "auto"
+    seed: int = 123
+
+
 def load_config(path: Path) -> ExperimentConfig:
     """Load an experiment configuration from a YAML file."""
 
     with path.open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle) or {}
     return parse_config(raw)
+
+
+def load_teacher_activation_config(path: Path) -> TeacherActivationConfig:
+    """Load a teacher activation export configuration from a YAML file."""
+
+    with path.open("r", encoding="utf-8") as handle:
+        raw = yaml.safe_load(handle) or {}
+    return parse_teacher_activation_config(raw)
+
+
+def parse_teacher_activation_config(raw: dict[str, Any]) -> TeacherActivationConfig:
+    """Parse a raw dictionary into a teacher activation export config."""
+
+    dataset_raw = raw.get("dataset", {}).copy()
+    if "ood_datasets" in dataset_raw:
+        dataset_raw["ood_datasets"] = tuple(
+            OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
+        )
+    dataset = DatasetConfig(**dataset_raw)
+    teacher = TeacherConfig(**raw.get("teacher", {}))
+    layers = tuple(raw.get("layers", ("layer3",)))
+    config = TeacherActivationConfig(
+        experiment_name=raw["experiment_name"],
+        output_dir=raw.get("output_dir", "runs"),
+        dataset=dataset,
+        teacher=teacher,
+        layers=layers,
+        device=raw.get("device", "auto"),
+        seed=raw.get("seed", 123),
+    )
+    if teacher.num_classes <= 0:
+        raise ValueError("teacher.num_classes must be positive")
+    if not config.layers:
+        raise ValueError("layers must contain at least one teacher layer")
+    if any(not isinstance(layer, str) or not layer for layer in config.layers):
+        raise ValueError("layers must contain non-empty layer names")
+    return config
 
 
 def parse_config(raw: dict[str, Any]) -> ExperimentConfig:

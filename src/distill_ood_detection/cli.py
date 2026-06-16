@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from distill_ood_detection.config import load_config
+from distill_ood_detection.config import load_config, load_teacher_activation_config
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,6 +74,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also infer the deterministic ID validation split.",
     )
+    activations_parser = subparsers.add_parser("export-teacher-activations")
+    activations_parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/teachers/resnet18_cifar10_layers.yaml"),
+        help="Path to a YAML teacher activation export config.",
+    )
     return parser
 
 
@@ -106,6 +113,13 @@ def main() -> None:
             include_train=args.include_train,
             include_validation=args.include_validation,
         )
+    if args.command == "export-teacher-activations":
+        from distill_ood_detection.experiments.export_teacher_activations import (
+            run_teacher_activation_export,
+        )
+
+        config = load_teacher_activation_config(args.config)
+        run_teacher_activation_export(config)
 
 
 if __name__ == "__main__":
