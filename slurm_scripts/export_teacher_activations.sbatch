@@ -21,15 +21,15 @@ cd "${PROJECT_DIR}"
 
 mkdir -p slurm
 
-CONFIG="${CONFIG:-configs/teachers/resnet18_cifar10_layers.yaml}"
+CONFIG_PATH="${1:-configs/teachers/resnet18_cifar10_layers.yaml}"
 
 echo "[$(date --iso-8601=seconds)] Syncing uv GPU environment"
 uv --version
 uv sync --project envs/gpu --locked
 
-echo "[$(date --iso-8601=seconds)] Exporting teacher activations: ${CONFIG}"
+echo "[$(date --iso-8601=seconds)] Exporting teacher activations: ${CONFIG_PATH}"
 uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli \
   export-teacher-activations \
-  --config "${CONFIG}"
+  --config "${CONFIG_PATH}"
 
 echo "[$(date --iso-8601=seconds)] Teacher activation export complete"
