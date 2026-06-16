@@ -23,7 +23,6 @@ student:
   kind: linear
   feature_layer: layer3
   input_shape: [256, 8, 8]
-  # hidden_channels: [1024, 512, 256]
   num_classes: 10
 
 optimizer:
