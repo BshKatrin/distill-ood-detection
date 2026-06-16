@@ -1,4 +1,4 @@
-experiment_name: feature_mlp_layer4_student_resnet18_cifar10
+experiment_name: feature_linear_layer4_student_resnet18_cifar10
 output_dir: runs
 
 dataset:
