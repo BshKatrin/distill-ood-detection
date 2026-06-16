@@ -802,6 +802,32 @@ def group_method_keys(group: ReportRowGroup) -> tuple[str, ...]:
     return tuple(method_key for method_key in METHOD_ORDER if method_key in methods)
 
 
+def group_configs_by_id_dataset(
+    group: ReportRowGroup,
+    method_key: str,
+) -> dict[str, ExperimentConfig]:
+    """Return one config per ID dataset for a rendered row group and method."""
+
+    selected: dict[str, ExperimentConfig] = {}
+    for config in sorted(group.configs, key=report_sort_key):
+        if method_key not in config.method_keys:
+            continue
+        id_dataset_key = id_dataset_key_from_config(config)
+        existing = selected.get(id_dataset_key)
+        if existing is not None:
+            progress(
+                "skipping duplicate rendered row source "
+                f"{config.path}: already using {existing.path} for "
+                f"{DATASET_LABELS.get(id_dataset_key, id_dataset_key)}, "
+                f"{group.student_kind}/{group.feature_source}/"
+                f"{group.perturbation or '-'}, "
+                f"{METHOD_LABELS.get(method_key, method_key)}",
+            )
+            continue
+        selected[id_dataset_key] = config
+    return selected
+
+
 def build_table_rows(
     configs: list[ExperimentConfig],
     runs: list[RunArtifacts],
@@ -837,14 +863,6 @@ def build_table_rows(
 
     runs_by_name = {run.run_name: run for run in runs}
     for group in row_groups:
-        config_by_id_dataset = {
-            id_dataset_key_from_config(config): config for config in group.configs
-        }
-        run_by_id_dataset = {
-            id_dataset_key: runs_by_name[config.experiment_name]
-            for id_dataset_key, config in config_by_id_dataset.items()
-            if config.experiment_name in runs_by_name
-        }
         method_keys = group_method_keys(group)
         if not method_keys:
             progress(
@@ -867,6 +885,12 @@ def build_table_rows(
             )
             if method_index > 0:
                 rows.append(r"\addlinespace")
+            config_by_id_dataset = group_configs_by_id_dataset(group, method_key)
+            run_by_id_dataset = {
+                id_dataset_key: runs_by_name[config.experiment_name]
+                for id_dataset_key, config in config_by_id_dataset.items()
+                if config.experiment_name in runs_by_name
+            }
             for score_index, score_key in enumerate(SCORE_ORDER):
                 show_config_labels = method_index == 0 and score_index == 0
                 student_label = group.student_kind if show_config_labels else ""
