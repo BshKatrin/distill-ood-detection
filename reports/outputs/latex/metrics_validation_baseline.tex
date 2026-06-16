@@ -1,0 +1,32 @@
+\documentclass[border=2pt]{standalone}
+\usepackage{booktabs}
+
+\begin{document}
+
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lllcc}
+\multicolumn{5}{c}{\textbf{Baseline Validation Accuracy/Distillation Loss}}\\[4pt]
+\toprule
+Student & Features & Training & CIFAR-10 (ID) & CIFAR-100 (ID) \\
+\midrule
+Linear & Raw Pixels & CE & 0.3752/27.2902 &  \\
+ &  & Logit MSE & 0.2514/20.0568 &  \\
+\midrule
+Linear & Raw Pixels & CE &  & 0.1752/59.2081 \\
+ &  & Logit MSE &  & 0.1334/2.1358 \\
+\midrule
+MLP & Raw Pixels & CE & 0.5686/24.1425 &  \\
+ &  & Logit MSE & 0.5810/8.5772 &  \\
+\midrule
+MLP & Raw Pixels & CE &  & 0.2962/58.4024 \\
+ &  & Logit MSE &  & 0.2130/1.8997 \\
+\midrule
+MLP & Layer3 & CE & 0.9990/17.5381 &  \\
+ &  & Logit MSE & 0.9994/1.1340 &  \\
+\midrule
+MLP & Layer3 & CE &  & 0.7132/56.9313 \\
+ &  & Logit MSE &  & 0.6966/1.4226 \\
+\bottomrule
+\end{tabular}
+
+\end{document}

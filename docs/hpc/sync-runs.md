@@ -26,7 +26,7 @@ scripts/sync_runs_from_cluster.sh \
 Preview a transfer before downloading files:
 
 ```bash
-r \
+scripts/sync_runs_from_cluster.sh \
   --host <ssh-alias> \
   --remote-repo <cluster-path-to-distill-ood-detection> \
   --dry-run \

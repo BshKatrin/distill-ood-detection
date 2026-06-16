@@ -11,7 +11,7 @@ Generated report files are split by artifact type:
 - `reports/build/`: compiler scratch files such as `.aux`, `.log`, `.fls`, and
   `.fdb_latexmk`. These are not tracked.
 
-## Metrics table
+## OOD metrics table
 
 The OOD metrics table is generated from saved probability artifacts under
 `runs/*/probabilities/` and experiment metadata in `configs/`. The export script
@@ -34,9 +34,36 @@ PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks
 ```
 
 Baseline tables include a `Features` column from `student.feature_layer` (`Raw
-pixels` when absent). Perturbation tables also include a `Perturbation` column
+Pixels` when absent). Perturbation tables also include a `Perturbation` column
 from `strategy.perturbation.clipping_mode`. In every strategy table, the Teacher
 MSP row uses raw-image teacher probability artifacts from baseline runs.
+
+## Validation metrics table
+
+The validation metrics table is generated from saved method metrics under
+`runs/<experiment_name>/<method>/metrics.json` and experiment metadata in
+`configs/`. Each ID-dataset cell is formatted as
+`best_validation_accuracy/best_validation_distillation_loss`, using the same
+best-validation-loss checkpoint selection that is used for student probability
+inference.
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_validation_metrics_table.py
+```
+
+By default, the exporter reads `configs/baseline/` and `configs/perturbation/`
+and writes `metrics_validation_baseline.tex` and
+`metrics_validation_perturbation.tex` when matching method metrics are
+available. Pass config paths to restrict the output, for example:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_validation_metrics_table.py configs/baseline/cifar_10 configs/perturbation/cifar_10
+```
+
+Baseline validation tables include `Student`, `Features`, and `Training`
+columns. Perturbation validation tables also include a `Perturbation` column.
+Both strategy tables keep `CIFAR-10 (ID)` and `CIFAR-100 (ID)` columns, leaving
+cells blank when a run belongs to the other ID dataset.
 
 Render the generated LaTeX sources to one PDF per strategy under
 `reports/outputs/pdf/` with:

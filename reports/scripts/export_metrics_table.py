@@ -51,7 +51,22 @@ METHOD_LABELS = {
     "logits": "Logits",
 }
 
-METHOD_ORDER = ["cross_entropy", "mse_logits", "kl_divergence", "logits"]
+METHOD_ORDER = ["cross_entropy", "kl_divergence", "mse_logits", "logits"]
+STUDENT_ORDER = {
+    "Linear": 0,
+    "MLP": 1,
+    "Random Forest": 2,
+}
+FEATURE_ORDER = {
+    "Raw Pixels": 0,
+    "Layer3": 1,
+    "Layer4": 2,
+}
+PERTURBATION_ORDER = {
+    "Constant": 0,
+    "Channel": 1,
+    "Spatial": 2,
+}
 
 OOD_DATASET_ORDER_BY_ID = {
     "cifar10_test": ["mnist_test", "svhn_test", "cifar100_test"],
@@ -105,6 +120,7 @@ class ExperimentConfig:
     path: Path
     strategy: str
     experiment_name: str
+    dataset_name: str
     student_kind: str
     feature_source: str
     perturbation: str | None
@@ -150,7 +166,7 @@ def feature_source_label(feature_layer: str | None) -> str:
     """Return the report label for a student input feature source."""
 
     if feature_layer is None:
-        return "Raw pixels"
+        return "Raw Pixels"
     return feature_layer.capitalize()
 
 
@@ -174,6 +190,7 @@ def perturbation_label(perturbation: str | None) -> str:
         "channel_dependent": "Channel",
         "constant": "Constant",
         "spatial": "Spatial",
+        "spatial_dependent": "Spatial",
     }
     return labels.get(perturbation, perturbation.replace("_", " ").title())
 
@@ -205,6 +222,7 @@ def experiment_config(path: Path) -> ExperimentConfig:
 
     config = load_yaml(path)
     student = config["student"]
+    dataset = config["dataset"]
     strategy = config_strategy(path, config)
     experiment_name = config["experiment_name"]
     output_dir = ROOT / config.get("output_dir", "runs")
@@ -218,6 +236,7 @@ def experiment_config(path: Path) -> ExperimentConfig:
         path=path,
         strategy=strategy,
         experiment_name=experiment_name,
+        dataset_name=dataset["name"],
         student_kind=student_kind_label(student["kind"]),
         feature_source=feature_source_label(feature_layer),
         perturbation=(
@@ -314,7 +333,7 @@ def teacher_reference_runs() -> dict[str, RunArtifacts]:
     ]
     references: dict[str, RunArtifacts] = {}
     for config in available_configs(configs, warn=False):
-        if config.feature_source != "Raw pixels":
+        if config.feature_source != "Raw Pixels":
             continue
         run = RunArtifacts(config.run_dir)
         references.setdefault(run.id_dataset_key, run)
@@ -609,7 +628,22 @@ def grouped_available_configs(
     by_strategy: dict[str, list[ExperimentConfig]] = {}
     for config in available_configs(configs):
         by_strategy.setdefault(config.strategy, []).append(config)
+    for strategy, strategy_configs in by_strategy.items():
+        by_strategy[strategy] = sorted(strategy_configs, key=report_sort_key)
     return by_strategy
+
+
+def report_sort_key(config: ExperimentConfig) -> tuple[int, int, int, str, str, str]:
+    """Return report ordering for experiment rows."""
+
+    return (
+        STUDENT_ORDER.get(config.student_kind, len(STUDENT_ORDER)),
+        FEATURE_ORDER.get(config.feature_source, len(FEATURE_ORDER)),
+        PERTURBATION_ORDER.get(config.perturbation or "", len(PERTURBATION_ORDER)),
+        config.dataset_name,
+        config.experiment_name,
+        config.path.name,
+    )
 
 
 def build_latex_document(
