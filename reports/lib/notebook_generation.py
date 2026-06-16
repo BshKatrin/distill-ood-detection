@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -19,6 +20,9 @@ PERTURBATION_NOTEBOOK_TEMPLATE = (
     / "templates"
     / "notebooks"
     / "perturbation_probability_artifact_analysis.ipynb"
+)
+TEACHER_ACTIVATION_NOTEBOOK_TEMPLATE = (
+    REPORTS_DIR / "templates" / "notebooks" / "teacher_activation_bars.ipynb"
 )
 NOTEBOOK_OUTPUT_DIR = REPORTS_DIR / "outputs" / "notebooks"
 
@@ -87,6 +91,22 @@ def filename_slug(experiment_name: str) -> str:
     return f"{backbone}_{dataset}_{descriptor}_probabilities"
 
 
+def teacher_activation_title(config: TeacherActivationConfig) -> str:
+    """Return a readable notebook title for a teacher activation export."""
+
+    dataset = _pretty_dataset_name(config.dataset.name)
+    teacher = "ResNet-18" if "resnet18" in config.teacher.hf_model_id else "Teacher"
+    return f"{teacher} {dataset} Teacher Activation Bars"
+
+
+def teacher_activation_filename_slug(config: TeacherActivationConfig) -> str:
+    """Return the report notebook filename slug for teacher activations."""
+
+    teacher = "resnet18" if "resnet18" in config.teacher.hf_model_id else "teacher"
+    dataset = config.dataset.name.replace("_", "")
+    return f"{teacher}_{dataset}_teacher_activation_bars"
+
+
 def next_notebook_number(output_dir: Path = NOTEBOOK_OUTPUT_DIR) -> int:
     """Return the next numeric report notebook prefix."""
 
@@ -135,9 +155,93 @@ def render_notebook_template(
     nbformat.write(notebook, output_path)
 
 
+def render_teacher_activation_notebook_template(
+    *,
+    config: TeacherActivationConfig,
+    output_path: Path,
+    notebook_title: str | None = None,
+    template_path: Path = TEACHER_ACTIVATION_NOTEBOOK_TEMPLATE,
+) -> None:
+    """Render a teacher activation analysis notebook from the notebook template."""
+
+    manifest_path = (
+        RUNS_DIR / config.experiment_name / "teacher_activations" / "manifest.json"
+    )
+    if not manifest_path.exists():
+        msg = f"Missing teacher activation manifest: {manifest_path}"
+        raise FileNotFoundError(msg)
+
+    title = notebook_title or teacher_activation_title(config)
+    id_dataset = f"{config.dataset.name}_test"
+    dataset_labels, dataset_order = _teacher_activation_dataset_metadata(config)
+
+    notebook = nbformat.read(template_path, as_version=4)
+    replacements = {
+        "{{ experiment_name }}": config.experiment_name,
+        "{{ notebook_title }}": title,
+        "{{ id_dataset }}": id_dataset,
+        "{{ dataset_labels }}": json.dumps(dataset_labels, indent=4),
+        "{{ dataset_order }}": json.dumps(dataset_order),
+    }
+    for cell in notebook.cells:
+        if isinstance(cell.source, str):
+            for placeholder, value in replacements.items():
+                cell.source = cell.source.replace(placeholder, value)
+        if cell.cell_type == "code":
+            cell.outputs = []
+            cell.execution_count = None
+
+    notebook.metadata.setdefault("distill_ood_detection", {})
+    notebook.metadata["distill_ood_detection"].update(
+        {
+            "generated_from": str(template_path.relative_to(ROOT)),
+            "experiment_name": config.experiment_name,
+            "config_kind": "teacher_activation",
+        },
+    )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    nbformat.write(notebook, output_path)
+
+
 def template_for_experiment(experiment_name: str) -> Path:
     """Return the notebook template path for an experiment name."""
 
     if experiment_name.startswith("perturbation_"):
         return PERTURBATION_NOTEBOOK_TEMPLATE
     return NOTEBOOK_TEMPLATE
+
+
+def _teacher_activation_dataset_metadata(
+    config: TeacherActivationConfig,
+) -> tuple[dict[str, str], list[str]]:
+    labels: dict[str, str] = {}
+    order: list[str] = []
+    id_name = config.dataset.name
+    id_key = f"{id_name}_test"
+    labels[id_key] = f"ID: {_pretty_dataset_name(id_name)}"
+    order.append(id_key)
+
+    for ood in config.dataset.ood_datasets:
+        key = f"{ood.name}_{ood.split}"
+        if key not in order:
+            order.append(key)
+        labels.setdefault(key, _ood_dataset_label(id_name, ood.name))
+    return labels, order
+
+
+def _ood_dataset_label(id_name: str, dataset_name: str) -> str:
+    if dataset_name == id_name:
+        return f"ID: {_pretty_dataset_name(dataset_name)}"
+    prefix = "Near-OOD" if dataset_name in {"cifar10", "cifar100"} else "Far-OOD"
+    return f"{prefix}: {_pretty_dataset_name(dataset_name)}"
+
+
+def _pretty_dataset_name(name: str) -> str:
+    labels = {
+        "cifar10": "CIFAR-10",
+        "cifar100": "CIFAR-100",
+        "mnist": "MNIST",
+        "svhn": "SVHN",
+    }
+    return labels.get(name, name.upper())

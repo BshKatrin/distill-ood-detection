@@ -118,3 +118,20 @@ uv run --project envs/notebooks --no-sync python reports/scripts/create_probabil
 
 Use `--number` to choose a stable notebook prefix and `--overwrite` to replace an
 existing generated notebook.
+
+## Teacher activation notebooks
+
+Teacher activation notebooks are generated from
+`reports/templates/notebooks/teacher_activation_bars.ipynb` and populated from a
+teacher activation config under `configs/teachers/`. The generator requires the
+matching activation manifest under
+`runs/<experiment_name>/teacher_activations/manifest.json`.
+
+```bash
+uv run --project envs/notebooks --no-sync python reports/scripts/create_teacher_activation_notebook.py configs/teachers/resnet18_cifar10_layers.yaml
+```
+
+Use `--number` to choose a stable notebook prefix and `--overwrite` to replace an
+existing generated notebook. The same command works for any teacher activation
+config, for example `configs/teachers/resnet18_cifar100_layers.yaml`, once its
+matching activation artifacts have been exported.
