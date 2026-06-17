@@ -364,18 +364,13 @@ def available_configs(
     return existing_configs
 
 
-def teacher_reference_runs(
-    configs: Iterable[ExperimentConfig],
-) -> dict[tuple[str, str], TeacherProbabilityRunArtifacts]:
-    """Load teacher-only probability artifacts keyed by ID dataset and teacher label."""
+def teacher_reference_runs() -> dict[tuple[str, str], TeacherProbabilityRunArtifacts]:
+    """Load all teacher-only probability artifacts keyed by ID dataset and teacher label."""
 
-    required_teacher_labels = {config.teacher_label for config in configs}
     references: dict[tuple[str, str], TeacherProbabilityRunArtifacts] = {}
     for manifest_path in sorted((ROOT / "runs").glob("*/teacher_probabilities/manifest.json")):
         run_dir = manifest_path.parents[1]
         run = TeacherProbabilityRunArtifacts(run_dir)
-        if run.teacher_label not in required_teacher_labels:
-            continue
         references.setdefault((run.id_dataset_key, run.teacher_label), run)
     return references
 
@@ -901,7 +896,7 @@ def build_table_rows(
     )
     metric_cell_index = 0
     strategy = configs[0].strategy
-    teacher_labels = list(dict.fromkeys(config.teacher_label for config in configs))
+    teacher_labels = sorted({teacher_label for _dataset_key, teacher_label in teacher_runs})
     for teacher_label in teacher_labels:
         progress(f"computing {teacher_label} MSP row across {len(columns)} columns")
         teacher_values = teacher_metrics_by_column(
@@ -1228,7 +1223,7 @@ def main() -> None:
         raise ValueError(msg)
     configs = [experiment_config(path) for path in expand_config_paths(args.configs)]
     configs_by_strategy = grouped_available_configs(configs)
-    teacher_runs = teacher_reference_runs(configs)
+    teacher_runs = teacher_reference_runs()
     metric_cache = MetricCache(args.cache)
 
     if args.output is not None and len(configs_by_strategy) != 1:
