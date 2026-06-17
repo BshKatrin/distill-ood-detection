@@ -1017,10 +1017,11 @@ def build_strategy_table(
         cmidrules.append(rf"\cmidrule(lr){{{cifar100_start}-{cifar100_end}}}")
     blank_metadata_headers = " & " * len(metadata_headers)
     strategy_title = strategy.replace("_", " ").title()
+    title_suffix = r" ROCAUC $\uparrow$ / FPR@95 $\downarrow$"
     total_columns = len(metadata_headers) + len(columns)
 
     return rf"""\begin{{tabular}}{{{column_spec}}}
-\multicolumn{{{total_columns}}}{{c}}{{\textbf{{{latex_escape(strategy_title)}}}}}\\[4pt]
+\multicolumn{{{total_columns}}}{{c}}{{\textbf{{{latex_escape(strategy_title)}{title_suffix}}}}}\\[4pt]
 \toprule
 {blank_metadata_headers}{' & '.join(id_headers)} \\
 {' '.join(cmidrules)}

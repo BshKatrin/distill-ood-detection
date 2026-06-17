@@ -24,6 +24,8 @@ eggs/
 lib/
 !reports/lib/
 !reports/lib/**
+reports/lib/__pycache__
+reports/lib/__pycache__/
 lib64/
 parts/
 sdist/
