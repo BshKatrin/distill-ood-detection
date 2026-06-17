@@ -2,8 +2,8 @@
 .DS_Store
 
 TODO.md
+tmp/
 slurm/
-slurm_scripts/legacy
 
 # uv
 **/uv.lock

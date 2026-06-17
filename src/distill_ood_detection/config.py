@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 import yaml
 
+from distill_ood_detection.utils import get_data_dir_override
+
 
 DISTILLATION_METHODS: tuple[str, ...] = (
     "cross_entropy",
@@ -326,12 +328,7 @@ def load_teacher_probability_config(path: Path) -> TeacherProbabilityConfig:
 def parse_teacher_activation_config(raw: dict[str, Any]) -> TeacherActivationConfig:
     """Parse a raw dictionary into a teacher activation export config."""
 
-    dataset_raw = raw.get("dataset", {}).copy()
-    if "ood_datasets" in dataset_raw:
-        dataset_raw["ood_datasets"] = tuple(
-            OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
-        )
-    dataset = DatasetConfig(**dataset_raw)
+    dataset = _parse_dataset_config(raw.get("dataset", {}))
     teacher = TeacherConfig(**raw.get("teacher", {}))
     layers = tuple(raw.get("layers", ("layer3",)))
     config = TeacherActivationConfig(
@@ -355,12 +352,7 @@ def parse_teacher_activation_config(raw: dict[str, Any]) -> TeacherActivationCon
 def parse_teacher_probability_config(raw: dict[str, Any]) -> TeacherProbabilityConfig:
     """Parse a raw dictionary into a teacher probability export config."""
 
-    dataset_raw = raw.get("dataset", {}).copy()
-    if "ood_datasets" in dataset_raw:
-        dataset_raw["ood_datasets"] = tuple(
-            OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
-        )
-    dataset = DatasetConfig(**dataset_raw)
+    dataset = _parse_dataset_config(raw.get("dataset", {}))
     teacher = TeacherConfig(**raw.get("teacher", {}))
     config = TeacherProbabilityConfig(
         experiment_name=raw["experiment_name"],
@@ -378,12 +370,7 @@ def parse_teacher_probability_config(raw: dict[str, Any]) -> TeacherProbabilityC
 def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     """Parse a raw dictionary into typed configuration objects."""
 
-    dataset_raw = raw.get("dataset", {}).copy()
-    if "ood_datasets" in dataset_raw:
-        dataset_raw["ood_datasets"] = tuple(
-            OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
-        )
-    dataset = DatasetConfig(**dataset_raw)
+    dataset = _parse_dataset_config(raw.get("dataset", {}))
     teacher = TeacherConfig(**raw.get("teacher", {}))
     if teacher.num_classes <= 0:
         raise ValueError("teacher.num_classes must be positive")
@@ -416,6 +403,20 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
         tree=tree,
         mlflow=mlflow,
     )
+
+
+def _parse_dataset_config(raw: dict[str, Any]) -> DatasetConfig:
+    """Parse dataset settings and apply local environment overrides."""
+
+    dataset_raw = raw.copy()
+    if "ood_datasets" in dataset_raw:
+        dataset_raw["ood_datasets"] = tuple(
+            OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
+        )
+    data_dir_override = get_data_dir_override()
+    if data_dir_override:
+        dataset_raw["data_dir"] = data_dir_override
+    return DatasetConfig(**dataset_raw)
 
 
 def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> StudentConfig:

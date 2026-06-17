@@ -44,6 +44,16 @@ automatically loads a repository-root `.env` file if one exists.
 Use `HF_TOKEN` for private or gated Hub access, and keep the real token only in
 the local `.env` file. Commit examples such as `.env.example`, not the secret.
 
+Set `DISTILL_OOD_DATA_DIR` to override every config's `dataset.data_dir`.
+This is intended for shared dataset roots on clusters, for example:
+
+```bash
+DISTILL_OOD_DATA_DIR=/path/to/shared/datasets
+```
+
+When this variable is set, resolved run configs record the expanded dataset
+directory for traceability.
+
 For a GPU-cluster training run from the repository root:
 
 ```bash

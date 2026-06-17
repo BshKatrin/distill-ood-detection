@@ -1,4 +1,4 @@
-"""Train PyTorch students from a pretrained CIFAR ResNet-18 teacher."""
+"""Train PyTorch students from a pretrained teacher."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import mlflow
 
 from distill_ood_detection.config import DistillationMethod, ExperimentConfig
-from distill_ood_detection.datasets.cifar10 import build_cifar_loaders
+from distill_ood_detection.datasets.inference import build_id_loaders
 from distill_ood_detection.distillation.train import train_student
 from distill_ood_detection.evaluation.metrics import accuracy
 from distill_ood_detection.models.student import build_student
@@ -37,7 +37,7 @@ def run_experiment(
         mlflow.set_tracking_uri(config.mlflow.tracking_uri)
         mlflow.set_experiment(config.mlflow.experiment_name)
 
-    loaders = build_cifar_loaders(config.dataset, seed=training_defaults.seed)
+    loaders = build_id_loaders(config.dataset, seed=training_defaults.seed)
     teacher = load_teacher(config.teacher, device)
     perturbation_forwarder = (
         ResNetFeatureForwarder(teacher, config.student.feature_layer)

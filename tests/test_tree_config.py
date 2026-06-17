@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from distill_ood_detection.config import load_config, parse_config
 
@@ -71,6 +72,21 @@ class TreeConfigTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             parse_config(raw)
+
+    def test_dataset_dir_can_be_overridden_from_environment(self) -> None:
+        raw = {
+            "experiment_name": "shared_data_dir",
+            "dataset": {"data_dir": "data"},
+        }
+
+        with patch.dict(
+            "os.environ",
+            {"DISTILL_OOD_DATA_DIR": "/shared/datasets"},
+            clear=False,
+        ):
+            config = parse_config(raw)
+
+        self.assertEqual(config.dataset.data_dir, "/shared/datasets")
 
 
 if __name__ == "__main__":

@@ -114,3 +114,10 @@ def get_hf_token() -> str | None:
 
     load_project_dotenv()
     return os.getenv("HF_TOKEN") or os.getenv("HF_token")
+
+
+def get_data_dir_override() -> str | None:
+    """Return the shared dataset directory override from the environment."""
+
+    load_project_dotenv()
+    return os.getenv("DISTILL_OOD_DATA_DIR")

@@ -44,6 +44,11 @@ Submitted jobs should run with `PYTHONPATH` pointing at `src/` and use
 `uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli ...`
 after the GPU environment has been synced.
 
+If the cluster provides a shared dataset folder, set it with
+`DISTILL_OOD_DATA_DIR` in the job environment or repository `.env` file. This
+overrides `dataset.data_dir` from experiment YAML files and avoids downloading
+datasets into the repository-local `data/` directory.
+
 Example from the repository root:
 
 ```bash
