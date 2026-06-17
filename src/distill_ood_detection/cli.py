@@ -5,7 +5,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from distill_ood_detection.config import load_config, load_teacher_activation_config
+from distill_ood_detection.config import (
+    load_config,
+    load_teacher_activation_config,
+    load_teacher_probability_config,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -81,6 +85,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("configs/teachers/resnet18_cifar10_layers.yaml"),
         help="Path to a YAML teacher activation export config.",
     )
+    probabilities_parser = subparsers.add_parser("export-teacher-probabilities")
+    probabilities_parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/teachers/resnet50_cifar10_probabilities.yaml"),
+        help="Path to a YAML teacher probability export config.",
+    )
     return parser
 
 
@@ -120,6 +131,13 @@ def main() -> None:
 
         config = load_teacher_activation_config(args.config)
         run_teacher_activation_export(config)
+    if args.command == "export-teacher-probabilities":
+        from distill_ood_detection.experiments.export_teacher_probabilities import (
+            run_teacher_probability_export,
+        )
+
+        config = load_teacher_probability_config(args.config)
+        run_teacher_probability_export(config)
 
 
 if __name__ == "__main__":

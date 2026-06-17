@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
-from torchvision.models.resnet import BasicBlock, ResNet
+from torchvision.models.resnet import BasicBlock, Bottleneck, ResNet
 
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
@@ -19,6 +19,22 @@ class CifarResNet18(ResNet):
 
     def __init__(self, num_classes: int = 10) -> None:
         super().__init__(block=BasicBlock, layers=[2, 2, 2, 2], num_classes=num_classes)
+        self.conv1 = nn.Conv2d(
+            3,
+            64,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
+        )
+        self.maxpool = nn.Identity()
+
+
+class CifarResNet50(ResNet):
+    """ResNet-50 variant with the CIFAR stem used by the HF checkpoint."""
+
+    def __init__(self, num_classes: int = 10) -> None:
+        super().__init__(block=Bottleneck, layers=[3, 4, 6, 3], num_classes=num_classes)
         self.conv1 = nn.Conv2d(
             3,
             64,
@@ -128,9 +144,9 @@ class ResNetFeatureForwarder(nn.Module):
 
 
 def load_teacher(config: TeacherConfig, device: torch.device) -> nn.Module:
-    """Load the pretrained ResNet-18 CIFAR teacher from Hugging Face."""
+    """Load a pretrained CIFAR teacher from Hugging Face."""
 
-    model = CifarResNet18(num_classes=config.num_classes)
+    model = build_teacher_model(config)
     state_dict = _download_state_dict(config)
     model.load_state_dict(state_dict)
     model.to(device)
@@ -138,6 +154,17 @@ def load_teacher(config: TeacherConfig, device: torch.device) -> nn.Module:
     for parameter in model.parameters():
         parameter.requires_grad = False
     return model
+
+
+def build_teacher_model(config: TeacherConfig) -> nn.Module:
+    """Build one teacher model inferred from the Hugging Face model id."""
+
+    architecture = _infer_architecture_from_hf_model_id(config.hf_model_id)
+    if architecture == "resnet18":
+        return CifarResNet18(num_classes=config.num_classes)
+    if architecture == "resnet50":
+        return CifarResNet50(num_classes=config.num_classes)
+    raise AssertionError(f"Unsupported inferred architecture: {architecture}")
 
 
 def _download_state_dict(config: TeacherConfig) -> dict[str, torch.Tensor]:
@@ -158,3 +185,19 @@ def _download_state_dict(config: TeacherConfig) -> dict[str, torch.Tensor]:
             token=token,
         )
         return torch.load(path, map_location="cpu", weights_only=True)
+
+
+def _infer_architecture_from_hf_model_id(hf_model_id: str) -> str:
+    """Infer the teacher architecture from the configured Hugging Face model id."""
+
+    model_id = hf_model_id.lower()
+    if "resnet18" in model_id:
+        return "resnet18"
+    if "resnet50" in model_id:
+        return "resnet50"
+    msg = (
+        "Could not infer teacher architecture from hf_model_id. "
+        "Expected a model id containing 'resnet18' or 'resnet50', got "
+        f"{hf_model_id!r}."
+    )
+    raise ValueError(msg)

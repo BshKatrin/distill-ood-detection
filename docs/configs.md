@@ -81,3 +81,17 @@ The matching manifest is saved at:
 ```text
 runs/<experiment_name>/teacher_activations/manifest.json
 ```
+
+Teacher probability configs omit `layers` and export deterministic raw-image
+teacher probabilities for the ID test split and configured OOD datasets. Each
+dataset artifact is saved at:
+
+```text
+runs/<experiment_name>/teacher_probabilities/<dataset_name>/probabilities.pt
+```
+
+The matching manifest is saved at:
+
+```text
+runs/<experiment_name>/teacher_probabilities/manifest.json
+```

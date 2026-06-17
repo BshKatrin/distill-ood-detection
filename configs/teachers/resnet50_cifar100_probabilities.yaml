@@ -1,4 +1,4 @@
-experiment_name: teacher_resnet18_cifar100_activations
+experiment_name: teacher_resnet50_cifar100_probabilities
 output_dir: runs
 device: auto
 seed: 42
@@ -18,10 +18,6 @@ dataset:
       split: test
 
 teacher:
-  hf_model_id: edadaltocg/resnet18_cifar100
+  hf_model_id: edadaltocg/resnet50_cifar100
   revision: main
   num_classes: 100
-
-layers:
-  - layer3
-  - layer4

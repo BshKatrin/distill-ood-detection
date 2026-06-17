@@ -1,10 +1,10 @@
-experiment_name: teacher_resnet18_cifar100_activations
+experiment_name: teacher_resnet50_cifar10_probabilities
 output_dir: runs
 device: auto
 seed: 42
 
 dataset:
-  name: cifar100
+  name: cifar10
   data_dir: data
   batch_size: 256
   num_workers: 2
@@ -14,14 +14,10 @@ dataset:
       split: test
     - name: svhn
       split: test
-    - name: cifar10
+    - name: cifar100
       split: test
 
 teacher:
-  hf_model_id: edadaltocg/resnet18_cifar100
+  hf_model_id: edadaltocg/resnet50_cifar10
   revision: main
-  num_classes: 100
-
-layers:
-  - layer3
-  - layer4
+  num_classes: 10

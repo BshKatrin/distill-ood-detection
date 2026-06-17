@@ -10,10 +10,16 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from distill_ood_detection.config import parse_teacher_activation_config
+from distill_ood_detection.config import (
+    parse_teacher_activation_config,
+    parse_teacher_probability_config,
+)
 from distill_ood_detection.datasets.inference import NamedLoader
 from distill_ood_detection.experiments.export_teacher_activations import (
     export_loader_activations,
+)
+from distill_ood_detection.experiments.export_teacher_probabilities import (
+    export_loader_probabilities,
 )
 
 
@@ -52,6 +58,22 @@ class TeacherActivationExportTests(unittest.TestCase):
 
         self.assertEqual(config.layers, ("layer3", "layer4"))
         self.assertEqual(config.dataset.ood_datasets[0].name, "mnist")
+
+    def test_parses_teacher_probability_config(self) -> None:
+        config = parse_teacher_probability_config(
+            {
+                "experiment_name": "teacher_probs",
+                "dataset": {
+                    "name": "cifar10",
+                    "ood_datasets": [{"name": "svhn", "split": "test"}],
+                },
+                "teacher": {"hf_model_id": "edadaltocg/resnet50_cifar10"},
+            }
+        )
+
+        self.assertEqual(config.experiment_name, "teacher_probs")
+        self.assertEqual(config.dataset.ood_datasets[0].name, "svhn")
+        self.assertEqual(config.teacher.hf_model_id, "edadaltocg/resnet50_cifar10")
 
     def test_exports_one_pt_file_per_layer(self) -> None:
         teacher = ToyTeacher()
@@ -92,6 +114,35 @@ class TeacherActivationExportTests(unittest.TestCase):
         self.assertEqual(tuple(layer4["activations"].shape), (3, 5, 8, 8))
         self.assertEqual(tuple(layer3["labels"].shape), (3,))
         self.assertEqual(layer3["layer"], "layer3")
+
+    def test_exports_teacher_probabilities_pt(self) -> None:
+        teacher = ToyTeacher()
+        images = torch.zeros(3, 3, 8, 8)
+        labels = torch.tensor([0, 1, 0])
+        loader = DataLoader(TensorDataset(images, labels), batch_size=2)
+        named_loader = NamedLoader(name="toy_test", split="test", loader=loader)
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            artifact = export_loader_probabilities(
+                teacher=teacher,
+                named_loader=named_loader,
+                output_dir=output_dir,
+                device=torch.device("cpu"),
+                metadata={"model": "teacher", "dataset": "toy_test", "split": "test"},
+            )
+
+            self.assertEqual(artifact["path"], str(output_dir / "toy_test" / "probabilities.pt"))
+
+            saved = torch.load(
+                output_dir / "toy_test" / "probabilities.pt",
+                map_location="cpu",
+                weights_only=False,
+            )
+
+        self.assertEqual(tuple(saved["probabilities"].shape), (3, 2))
+        self.assertEqual(tuple(saved["labels"].shape), (3,))
+        self.assertNotIn("logits", saved)
 
 
 if __name__ == "__main__":

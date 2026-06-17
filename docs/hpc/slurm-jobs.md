@@ -79,6 +79,33 @@ The script maps these environment variables to CLI flags:
 - `INCLUDE_TRAIN=1`: add `infer-probabilities --include-train`.
 - `INCLUDE_VALIDATION=1`: add `infer-probabilities --include-validation`.
 
+## Teacher-only probability exports
+
+Use
+[slurm_scripts/export_teacher_probabilities.sbatch](../../slurm_scripts/export_teacher_probabilities.sbatch)
+to export deterministic teacher probability artifacts from configs under
+`configs/teachers/`.
+
+The script accepts one or more config paths as positional arguments and runs
+them sequentially in one GPU job:
+
+```bash
+sbatch \
+  --gres=gpu:1 \
+  slurm_scripts/export_teacher_probabilities.sbatch \
+  configs/teachers/resnet50_cifar10_probabilities.yaml \
+  configs/teachers/resnet50_cifar100_probabilities.yaml
+```
+
+For longer config lists, set `CONFIG_LIST` to a newline-delimited file, using
+the same format supported by `run_configs.sbatch`.
+
+Teacher probability artifacts are written under:
+
+```text
+runs/<experiment_name>/teacher_probabilities/
+```
+
 ## Report tables
 
 Use [slurm_scripts/export_metrics_table.sbatch](../../slurm_scripts/export_metrics_table.sbatch)

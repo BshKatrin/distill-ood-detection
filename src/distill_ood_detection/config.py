@@ -287,6 +287,18 @@ class TeacherActivationConfig:
     seed: int = 123
 
 
+@dataclass(frozen=True)
+class TeacherProbabilityConfig:
+    """Configuration for exporting deterministic teacher probabilities."""
+
+    experiment_name: str
+    output_dir: str = "runs"
+    dataset: DatasetConfig = field(default_factory=DatasetConfig)
+    teacher: TeacherConfig = field(default_factory=TeacherConfig)
+    device: str = "auto"
+    seed: int = 123
+
+
 def load_config(path: Path) -> ExperimentConfig:
     """Load an experiment configuration from a YAML file."""
 
@@ -301,6 +313,14 @@ def load_teacher_activation_config(path: Path) -> TeacherActivationConfig:
     with path.open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle) or {}
     return parse_teacher_activation_config(raw)
+
+
+def load_teacher_probability_config(path: Path) -> TeacherProbabilityConfig:
+    """Load a teacher probability export configuration from a YAML file."""
+
+    with path.open("r", encoding="utf-8") as handle:
+        raw = yaml.safe_load(handle) or {}
+    return parse_teacher_probability_config(raw)
 
 
 def parse_teacher_activation_config(raw: dict[str, Any]) -> TeacherActivationConfig:
@@ -329,6 +349,29 @@ def parse_teacher_activation_config(raw: dict[str, Any]) -> TeacherActivationCon
         raise ValueError("layers must contain at least one teacher layer")
     if any(not isinstance(layer, str) or not layer for layer in config.layers):
         raise ValueError("layers must contain non-empty layer names")
+    return config
+
+
+def parse_teacher_probability_config(raw: dict[str, Any]) -> TeacherProbabilityConfig:
+    """Parse a raw dictionary into a teacher probability export config."""
+
+    dataset_raw = raw.get("dataset", {}).copy()
+    if "ood_datasets" in dataset_raw:
+        dataset_raw["ood_datasets"] = tuple(
+            OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
+        )
+    dataset = DatasetConfig(**dataset_raw)
+    teacher = TeacherConfig(**raw.get("teacher", {}))
+    config = TeacherProbabilityConfig(
+        experiment_name=raw["experiment_name"],
+        output_dir=raw.get("output_dir", "runs"),
+        dataset=dataset,
+        teacher=teacher,
+        device=raw.get("device", "auto"),
+        seed=raw.get("seed", 123),
+    )
+    if teacher.num_classes <= 0:
+        raise ValueError("teacher.num_classes must be positive")
     return config
 
 

@@ -9,8 +9,10 @@ from torch import nn
 
 from distill_ood_detection.models.teacher import (
     CifarResNet18,
+    CifarResNet50,
     ResNetFeatureForwarder,
     TeacherFeatureExtractor,
+    _infer_architecture_from_hf_model_id,
 )
 
 
@@ -68,6 +70,33 @@ class TeacherFeatureExtractorTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             ResNetFeatureForwarder(teacher, "avgpool")
+
+    def test_resnet50_forwarder_resumes_from_feature_layer(self) -> None:
+        teacher = CifarResNet50(num_classes=3)
+        teacher.eval()
+        forwarder = ResNetFeatureForwarder(teacher, "layer4")
+        images = torch.randn(2, 3, 32, 32)
+
+        features = forwarder.forward_to_features(images)
+        resumed_logits = forwarder.forward_from_features(features)
+        full_logits = teacher(images)
+
+        self.assertEqual(tuple(features.shape), (2, 2048, 4, 4))
+        torch.testing.assert_close(resumed_logits, full_logits)
+
+    def test_infers_architecture_from_hf_model_id(self) -> None:
+        self.assertEqual(
+            _infer_architecture_from_hf_model_id("edadaltocg/resnet18_cifar10"),
+            "resnet18",
+        )
+        self.assertEqual(
+            _infer_architecture_from_hf_model_id("edadaltocg/resnet50_cifar100"),
+            "resnet50",
+        )
+
+    def test_rejects_unknown_teacher_architecture(self) -> None:
+        with self.assertRaises(ValueError):
+            _infer_architecture_from_hf_model_id("edadaltocg/wide_resnet_cifar10")
 
 
 if __name__ == "__main__":
