@@ -122,6 +122,7 @@ class ExperimentConfig:
     experiment_name: str
     dataset_name: str
     ood_dataset_keys: tuple[str, ...]
+    teacher_label: str
     student_kind: str
     feature_source: str
     perturbation: str | None
@@ -260,6 +261,7 @@ def experiment_config(path: Path) -> ExperimentConfig:
     experiment_name = config["experiment_name"]
     output_dir = ROOT / config.get("output_dir", "runs")
     feature_layer = student.get("feature_layer")
+    teacher_hf_model_id = config["teacher"]["hf_model_id"]
     perturbation = (
         config.get("strategy", {})
         .get("perturbation", {})
@@ -274,6 +276,7 @@ def experiment_config(path: Path) -> ExperimentConfig:
             f"{ood_dataset['name']}_{ood_dataset['split']}"
             for ood_dataset in dataset.get("ood_datasets", [])
         ),
+        teacher_label=teacher_name_label(teacher_hf_model_id),
         student_kind=student_kind_label(student["kind"]),
         feature_source=feature_source_label(feature_layer),
         perturbation=(
@@ -361,19 +364,19 @@ def available_configs(
     return existing_configs
 
 
-def teacher_reference_runs() -> dict[str, RunArtifacts]:
-    """Load baseline raw-image teacher artifacts by ID dataset."""
+def teacher_reference_runs(
+    configs: Iterable[ExperimentConfig],
+) -> dict[tuple[str, str], TeacherProbabilityRunArtifacts]:
+    """Load teacher-only probability artifacts keyed by ID dataset and teacher label."""
 
-    configs = [
-        experiment_config(path)
-        for path in expand_config_paths([ROOT / "configs" / "baseline"])
-    ]
-    references: dict[str, RunArtifacts] = {}
-    for config in available_configs(configs, warn=False):
-        if config.feature_source != "Raw Pixels":
+    required_teacher_labels = {config.teacher_label for config in configs}
+    references: dict[tuple[str, str], TeacherProbabilityRunArtifacts] = {}
+    for manifest_path in sorted((ROOT / "runs").glob("*/teacher_probabilities/manifest.json")):
+        run_dir = manifest_path.parents[1]
+        run = TeacherProbabilityRunArtifacts(run_dir)
+        if run.teacher_label not in required_teacher_labels:
             continue
-        run = RunArtifacts(config.run_dir)
-        references.setdefault(run.id_dataset_key, run)
+        references.setdefault((run.id_dataset_key, run.teacher_label), run)
     return references
 
 
@@ -563,6 +566,41 @@ class RunArtifacts:
         return f"{teacher_name_label(hf_model_id)} MSP"
 
 
+class TeacherProbabilityRunArtifacts:
+    """Loaded teacher-only probability artifacts for one teacher export run."""
+
+    def __init__(self, run_dir: Path) -> None:
+        self.run_dir = run_dir
+        self.run_name = run_dir.name
+        self.manifest = self._load_manifest()
+        self.id_dataset_key = f"{self.manifest['dataset']['name']}_test"
+        teacher = self.manifest.get("teacher", {})
+        hf_model_id = teacher.get("hf_model_id", "")
+        self.teacher_label = teacher_name_label(hf_model_id)
+        self._artifact_paths = self._paths()
+
+    def _load_manifest(self) -> dict[str, Any]:
+        manifest_path = self.run_dir / "teacher_probabilities" / "manifest.json"
+        with manifest_path.open() as file:
+            return json.load(file)
+
+    def _paths(self) -> dict[str, Path]:
+        paths = {}
+        for entry in self.manifest["artifacts"]:
+            dataset_key = entry["dataset"]
+            declared_path = ROOT / entry["path"]
+            fallback_path = (
+                self.run_dir / "teacher_probabilities" / dataset_key / "probabilities.pt"
+            )
+            paths[dataset_key] = declared_path if declared_path.exists() else fallback_path
+        return paths
+
+    def artifact_path(self, dataset_key: str) -> Path:
+        """Return the path to one teacher-only probability artifact."""
+
+        return self._artifact_paths[dataset_key]
+
+
 def metric_for_scores(
     id_scores: np.ndarray,
     ood_scores: np.ndarray,
@@ -580,7 +618,8 @@ def metric_for_scores(
 
 
 def teacher_metrics_by_column(
-    teacher_runs_by_id_dataset: dict[str, RunArtifacts],
+    teacher_runs: dict[tuple[str, str], TeacherProbabilityRunArtifacts],
+    teacher_label: str,
     columns: list[tuple[str, str]],
     metric_cache: MetricCache,
 ) -> dict[tuple[str, str], str]:
@@ -595,13 +634,10 @@ def teacher_metrics_by_column(
             f"{DATASET_LABELS.get(id_dataset_key, id_dataset_key)} (ID) vs "
             f"{DATASET_LABELS.get(ood_dataset_key, ood_dataset_key)}",
         )
-        if id_dataset_key not in teacher_runs_by_id_dataset:
-            msg = (
-                "Missing baseline raw-image teacher artifacts for "
-                f"{DATASET_LABELS.get(id_dataset_key, id_dataset_key)}."
-            )
-            raise FileNotFoundError(msg)
-        run = teacher_runs_by_id_dataset[id_dataset_key]
+        run = teacher_runs.get((id_dataset_key, teacher_label))
+        if run is None:
+            values[(id_dataset_key, ood_dataset_key)] = ""
+            continue
         values[(id_dataset_key, ood_dataset_key)] = teacher_metric(
             run,
             id_dataset_key,
@@ -611,34 +647,16 @@ def teacher_metrics_by_column(
     return values
 
 
-def teacher_score_label_for_columns(
-    teacher_runs_by_id_dataset: dict[str, RunArtifacts],
-    columns: list[tuple[str, str]],
-) -> str:
-    """Return the rendered teacher MSP row label for the requested columns."""
-
-    labels = {
-        teacher_runs_by_id_dataset[id_dataset_key].teacher_score_label
-        for id_dataset_key, _ood_dataset_key in columns
-        if id_dataset_key in teacher_runs_by_id_dataset
-    }
-    if not labels:
-        return "Teacher MSP"
-    if len(labels) == 1:
-        return next(iter(labels))
-    return " / ".join(sorted(labels))
-
-
 def teacher_metric(
-    run: RunArtifacts,
+    run: TeacherProbabilityRunArtifacts,
     id_dataset_key: str,
     ood_dataset_key: str,
     metric_cache: MetricCache,
 ) -> str:
     """Compute or load one cached Teacher MSP metric table cell."""
 
-    id_teacher_path = run.teacher_artifact_path(id_dataset_key)
-    ood_teacher_path = run.teacher_artifact_path(ood_dataset_key)
+    id_teacher_path = run.artifact_path(id_dataset_key)
+    ood_teacher_path = run.artifact_path(ood_dataset_key)
     fingerprints = [
         artifact_fingerprint(id_teacher_path),
         artifact_fingerprint(ood_teacher_path),
@@ -666,13 +684,13 @@ def teacher_metric(
 
 
 def teacher_msp_scores_for_dataset(
-    run: RunArtifacts,
+    run: TeacherProbabilityRunArtifacts,
     dataset_key: str,
 ) -> np.ndarray:
     """Compute teacher MSP scores for one dataset artifact."""
 
     probabilities = load_artifact_array(
-        run.teacher_artifact_path(dataset_key),
+        run.artifact_path(dataset_key),
         "probabilities",
     )
     if probabilities.ndim != 2:
@@ -869,7 +887,7 @@ def group_configs_by_id_dataset(
 def build_table_rows(
     configs: list[ExperimentConfig],
     runs: list[RunArtifacts],
-    teacher_runs_by_id_dataset: dict[str, RunArtifacts],
+    teacher_runs: dict[tuple[str, str], TeacherProbabilityRunArtifacts],
     columns: list[tuple[str, str]],
     metric_cache: MetricCache,
 ) -> list[str]:
@@ -882,26 +900,25 @@ def build_table_rows(
         for group in row_groups
     )
     metric_cell_index = 0
-    progress(f"computing Teacher MSP row across {len(columns)} columns")
-    teacher_values = teacher_metrics_by_column(
-        teacher_runs_by_id_dataset,
-        columns,
-        metric_cache,
-    )
-    teacher_score_label = teacher_score_label_for_columns(
-        teacher_runs_by_id_dataset,
-        columns,
-    )
     strategy = configs[0].strategy
-    teacher_prefix = "Teacher & - & - & " + teacher_score_label
-    if strategy == "perturbation":
-        teacher_prefix = "Teacher & - & - & - & " + teacher_score_label
-    rows.append(
-        teacher_prefix
-        + " & "
-        + " & ".join(teacher_values[column] for column in columns)
-        + r" \\",
-    )
+    teacher_labels = list(dict.fromkeys(config.teacher_label for config in configs))
+    for teacher_label in teacher_labels:
+        progress(f"computing {teacher_label} MSP row across {len(columns)} columns")
+        teacher_values = teacher_metrics_by_column(
+            teacher_runs,
+            teacher_label,
+            columns,
+            metric_cache,
+        )
+        teacher_prefix = "Teacher & - & - & " + f"{teacher_label} MSP"
+        if strategy == "perturbation":
+            teacher_prefix = "Teacher & - & - & - & " + f"{teacher_label} MSP"
+        rows.append(
+            teacher_prefix
+            + " & "
+            + " & ".join(teacher_values[column] for column in columns)
+            + r" \\",
+        )
 
     runs_by_name = {run.run_name: run for run in runs}
     for group in row_groups:
@@ -1013,7 +1030,7 @@ def build_strategy_table(
     strategy: str,
     configs: list[ExperimentConfig],
     runs: list[RunArtifacts],
-    teacher_runs_by_id_dataset: dict[str, RunArtifacts],
+    teacher_runs: dict[tuple[str, str], TeacherProbabilityRunArtifacts],
     metric_cache: MetricCache,
 ) -> str:
     """Render one LaTeX metrics table for one OOD strategy."""
@@ -1043,7 +1060,7 @@ def build_strategy_table(
     rows = build_table_rows(
         configs,
         runs,
-        teacher_runs_by_id_dataset,
+        teacher_runs,
         columns,
         metric_cache,
     )
@@ -1121,7 +1138,7 @@ def report_sort_key(config: ExperimentConfig) -> tuple[int, int, int, str, str, 
 def build_latex_document(
     strategy: str,
     configs: list[ExperimentConfig],
-    teacher_runs_by_id_dataset: dict[str, RunArtifacts],
+    teacher_runs: dict[tuple[str, str], TeacherProbabilityRunArtifacts],
     metric_cache: MetricCache,
 ) -> str:
     """Render one standalone LaTeX metrics table."""
@@ -1135,7 +1152,7 @@ def build_latex_document(
         strategy,
         configs,
         runs,
-        teacher_runs_by_id_dataset,
+        teacher_runs,
         metric_cache,
     )
     return rf"""\documentclass[border=2pt]{{standalone}}
@@ -1211,7 +1228,7 @@ def main() -> None:
         raise ValueError(msg)
     configs = [experiment_config(path) for path in expand_config_paths(args.configs)]
     configs_by_strategy = grouped_available_configs(configs)
-    teacher_runs_by_id_dataset = teacher_reference_runs()
+    teacher_runs = teacher_reference_runs(configs)
     metric_cache = MetricCache(args.cache)
 
     if args.output is not None and len(configs_by_strategy) != 1:
@@ -1223,7 +1240,7 @@ def main() -> None:
         latex = build_latex_document(
             strategy,
             strategy_configs,
-            teacher_runs_by_id_dataset,
+            teacher_runs,
             metric_cache,
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
