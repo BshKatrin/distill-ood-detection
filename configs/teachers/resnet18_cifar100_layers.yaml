@@ -1,4 +1,4 @@
-experiment_name: teacher_resnet18_cifar100_activations
+experiment_name: teacher_resnet18_cifar100
 output_dir: runs
 device: auto
 seed: 42

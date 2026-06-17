@@ -1,3 +1,6 @@
+# MacOS
+.DS_Store
+
 TODO.md
 slurm/
 slurm_scripts/legacy

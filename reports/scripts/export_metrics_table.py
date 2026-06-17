@@ -75,8 +75,6 @@ OOD_DATASET_ORDER_BY_ID = {
     "cifar100_test": ["mnist_test", "svhn_test", "cifar10_test"],
 }
 
-TEACHER_SCORE_LABEL = "Teacher MSP"
-
 OOD_SCORE_LABELS = {
     MAX_PROBABILITY_DIFFERENCE: "Max Diff",
     ABSOLUTE_MAX_PROBABILITY_DIFFERENCE: "Abs. Max Diff",
@@ -216,6 +214,18 @@ def perturbation_label(perturbation: str | None) -> str:
         "spatial_dependent": "Spatial",
     }
     return labels.get(perturbation, perturbation.replace("_", " ").title())
+
+
+def teacher_name_label(hf_model_id: str) -> str:
+    """Return the report label for one teacher checkpoint."""
+
+    model_id = hf_model_id.lower()
+    if "resnet18" in model_id:
+        return "ResNet-18"
+    if "resnet50" in model_id:
+        return "ResNet-50"
+    model_name = hf_model_id.rsplit("/", maxsplit=1)[-1]
+    return model_name.replace("_", " ").title()
 
 
 def method_keys_from_config(config: dict[str, Any]) -> tuple[str, ...]:
@@ -542,6 +552,16 @@ class RunArtifacts:
 
         return (dataset_key, method_key) in self._student_artifact_paths
 
+    @property
+    def teacher_score_label(self) -> str:
+        """Return the teacher MSP row label for this run."""
+
+        teacher = self.manifest.get("teacher", {})
+        hf_model_id = teacher.get("hf_model_id")
+        if not isinstance(hf_model_id, str) or not hf_model_id:
+            return "Teacher MSP"
+        return f"{teacher_name_label(hf_model_id)} MSP"
+
 
 def metric_for_scores(
     id_scores: np.ndarray,
@@ -589,6 +609,24 @@ def teacher_metrics_by_column(
             metric_cache,
         )
     return values
+
+
+def teacher_score_label_for_columns(
+    teacher_runs_by_id_dataset: dict[str, RunArtifacts],
+    columns: list[tuple[str, str]],
+) -> str:
+    """Return the rendered teacher MSP row label for the requested columns."""
+
+    labels = {
+        teacher_runs_by_id_dataset[id_dataset_key].teacher_score_label
+        for id_dataset_key, _ood_dataset_key in columns
+        if id_dataset_key in teacher_runs_by_id_dataset
+    }
+    if not labels:
+        return "Teacher MSP"
+    if len(labels) == 1:
+        return next(iter(labels))
+    return " / ".join(sorted(labels))
 
 
 def teacher_metric(
@@ -850,10 +888,14 @@ def build_table_rows(
         columns,
         metric_cache,
     )
+    teacher_score_label = teacher_score_label_for_columns(
+        teacher_runs_by_id_dataset,
+        columns,
+    )
     strategy = configs[0].strategy
-    teacher_prefix = "Teacher & - & - & " + TEACHER_SCORE_LABEL
+    teacher_prefix = "Teacher & - & - & " + teacher_score_label
     if strategy == "perturbation":
-        teacher_prefix = "Teacher & - & - & - & " + TEACHER_SCORE_LABEL
+        teacher_prefix = "Teacher & - & - & - & " + teacher_score_label
     rows.append(
         teacher_prefix
         + " & "

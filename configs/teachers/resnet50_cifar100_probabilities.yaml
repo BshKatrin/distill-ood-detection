@@ -1,4 +1,4 @@
-experiment_name: teacher_resnet50_cifar100_probabilities
+experiment_name: teacher_resnet50_cifar100
 output_dir: runs
 device: auto
 seed: 42
