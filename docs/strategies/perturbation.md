@@ -74,6 +74,11 @@ By default, probability inference uses the unmodified teacher embedding `z`. The
 
 Use `strategy.perturbation.evaluation_draws` to set `K` when running `infer-probabilities --apply-perturbation`. Without that flag, the process is not stochastic and probability inference exports one deterministic draw.
 
+The two inference modes are saved under separate directories to avoid overwriting artifacts:
+
+- default unperturbed inference: `runs/<experiment_name>/probabilities/unperturbed/`
+- perturbed inference: `runs/<experiment_name>/probabilities/perturbed/`
+
 ## Distillation Objective
 
 Train the student to reproduce the teacher output using one of the following objectives:

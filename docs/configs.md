@@ -95,3 +95,20 @@ The matching manifest is saved at:
 ```text
 runs/<experiment_name>/teacher_probabilities/manifest.json
 ```
+
+## Student probability artifacts
+
+`distill-ood infer-probabilities` writes student and teacher probability
+artifacts under:
+
+```text
+runs/<experiment_name>/probabilities/
+```
+
+For perturbation-strategy experiments, inference can be run with or without
+stochastic perturbations. These modes are separated to avoid overwriting:
+
+```text
+runs/<experiment_name>/probabilities/unperturbed/
+runs/<experiment_name>/probabilities/perturbed/
+```

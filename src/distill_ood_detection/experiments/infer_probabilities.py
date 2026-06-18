@@ -57,7 +57,7 @@ def run_probability_inference(
     set_seed(training_defaults.seed)
     device = resolve_device(training_defaults.device)
     experiment_dir = Path(config.output_dir) / config.experiment_name
-    output_dir = experiment_dir / "probabilities"
+    output_dir = _probability_output_dir(experiment_dir, config, apply_perturbation)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     loaders = []
@@ -343,6 +343,17 @@ def _selected_checkpoints(checkpoint: CheckpointSelection) -> tuple[Literal["bes
     if checkpoint == "both":
         return ("best", "latest")
     return (checkpoint,)
+
+
+def _probability_output_dir(
+    experiment_dir: Path,
+    config: ExperimentConfig,
+    apply_perturbation: bool,
+) -> Path:
+    if config.strategy.name != "perturbation":
+        return experiment_dir / "probabilities"
+    mode_name = "perturbed" if apply_perturbation else "unperturbed"
+    return experiment_dir / "probabilities" / mode_name
 
 
 def _student_checkpoint_path(
