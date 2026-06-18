@@ -82,7 +82,7 @@ class TreeInferenceOutputTests(unittest.TestCase):
     def test_perturbation_outputs_keep_draw_dimension(self) -> None:
         loader = _loader()
         forwarder = _PerturbationForwarder()
-        config = PerturbationConfig(evaluation_draws=3, apply_to_eval=True)
+        config = PerturbationConfig(evaluation_draws=3)
         student = _PerturbationStudent()
 
         outputs = collect_perturbation_model_outputs(
@@ -91,12 +91,14 @@ class TreeInferenceOutputTests(unittest.TestCase):
             config,
             loader,
             torch.device("cpu"),
+            apply_perturbation=True,
         )
         teacher_outputs = collect_perturbed_teacher_outputs(
             forwarder,
             config,
             loader,
             torch.device("cpu"),
+            apply_perturbation=True,
         )
 
         self.assertEqual(tuple(outputs.logits.shape), (2, 3, 2))
@@ -105,10 +107,10 @@ class TreeInferenceOutputTests(unittest.TestCase):
         self.assertEqual(tuple(teacher_outputs.probabilities.shape), (2, 3, 2))
         self.assertEqual(outputs.labels.tolist(), [0, 1])
 
-    def test_perturbation_outputs_use_single_draw_without_eval_perturbation(self) -> None:
+    def test_perturbation_outputs_use_single_draw_without_apply_perturbation(self) -> None:
         loader = _loader()
         forwarder = _PerturbationForwarder()
-        config = PerturbationConfig(evaluation_draws=3, apply_to_eval=False)
+        config = PerturbationConfig(evaluation_draws=3)
         student = _PerturbationStudent()
 
         outputs = collect_perturbation_model_outputs(
@@ -133,7 +135,7 @@ class TreeInferenceOutputTests(unittest.TestCase):
     def test_perturbation_tree_outputs_keep_draw_dimension(self) -> None:
         loader = _loader()
         forwarder = _PerturbationForwarder()
-        config = PerturbationConfig(evaluation_draws=3, apply_to_eval=True)
+        config = PerturbationConfig(evaluation_draws=3)
         model = _FeatureShapeModel()
 
         outputs = collect_perturbation_tree_model_outputs(
@@ -143,6 +145,7 @@ class TreeInferenceOutputTests(unittest.TestCase):
             config,
             loader,
             torch.device("cpu"),
+            apply_perturbation=True,
         )
 
         self.assertEqual(tuple(outputs.logits.shape), (2, 3, 2))

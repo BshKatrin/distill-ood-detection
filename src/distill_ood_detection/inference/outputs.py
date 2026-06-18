@@ -88,6 +88,7 @@ def collect_perturbation_model_outputs(
     perturbation_config: PerturbationConfig,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
+    apply_perturbation: bool = False,
 ) -> ModelOutputs:
     """Collect per-draw outputs for a perturbation-aware student."""
 
@@ -102,12 +103,13 @@ def collect_perturbation_model_outputs(
         draw_logits: list[torch.Tensor] = []
         draw_probabilities: list[torch.Tensor] = []
         batch_size = features.shape[0]
-        evaluation_draws = _evaluation_draws(perturbation_config)
+        evaluation_draws = _evaluation_draws(perturbation_config, apply_perturbation)
         for draw_count in _draw_chunks(evaluation_draws, batch_size):
             expanded_features = features.repeat_interleave(draw_count, dim=0)
             perturbation_batch = _evaluation_perturbation_batch(
                 expanded_features,
                 perturbation_config,
+                apply_perturbation=apply_perturbation,
             )
             logits = model(perturbation_batch.student_inputs)
             logits = logits.reshape(batch_size, draw_count, -1)
@@ -129,6 +131,7 @@ def collect_perturbed_teacher_outputs(
     perturbation_config: PerturbationConfig,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
+    apply_perturbation: bool = False,
 ) -> ModelOutputs:
     """Collect per-draw perturbed teacher logits and probabilities."""
 
@@ -142,12 +145,13 @@ def collect_perturbed_teacher_outputs(
         draw_logits: list[torch.Tensor] = []
         draw_probabilities: list[torch.Tensor] = []
         batch_size = features.shape[0]
-        evaluation_draws = _evaluation_draws(perturbation_config)
+        evaluation_draws = _evaluation_draws(perturbation_config, apply_perturbation)
         for draw_count in _draw_chunks(evaluation_draws, batch_size):
             expanded_features = features.repeat_interleave(draw_count, dim=0)
             perturbation_batch = _evaluation_perturbation_batch(
                 expanded_features,
                 perturbation_config,
+                apply_perturbation=apply_perturbation,
             )
             logits = perturbation_forwarder.forward_from_features(
                 perturbation_batch.perturbed_features
@@ -244,6 +248,7 @@ def collect_perturbation_tree_model_outputs(
     perturbation_config: PerturbationConfig,
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
+    apply_perturbation: bool = False,
 ) -> ModelOutputs:
     """Collect per-draw outputs from a perturbation-aware tree student."""
 
@@ -257,12 +262,13 @@ def collect_perturbation_tree_model_outputs(
         draw_logits: list[np.ndarray] = []
         draw_probabilities: list[np.ndarray] = []
         batch_size = features.shape[0]
-        evaluation_draws = _evaluation_draws(perturbation_config)
+        evaluation_draws = _evaluation_draws(perturbation_config, apply_perturbation)
         for draw_count in _draw_chunks(evaluation_draws, batch_size):
             expanded_features = features.repeat_interleave(draw_count, dim=0)
             perturbation_batch = _evaluation_perturbation_batch(
                 expanded_features,
                 perturbation_config,
+                apply_perturbation=apply_perturbation,
             )
             student_features = (
                 torch.flatten(perturbation_batch.student_inputs, start_dim=1)
@@ -315,14 +321,15 @@ def _draw_chunks(total_draws: int, batch_size: int, max_examples: int = 2048) ->
     return tuple(chunks)
 
 
-def _evaluation_draws(config: PerturbationConfig) -> int:
-    return config.evaluation_draws if config.apply_to_eval else 1
+def _evaluation_draws(config: PerturbationConfig, apply_perturbation: bool) -> int:
+    return config.evaluation_draws if apply_perturbation else 1
 
 
 def _evaluation_perturbation_batch(
     features: torch.Tensor,
     config: PerturbationConfig,
+    apply_perturbation: bool,
 ):
-    if config.apply_to_eval:
+    if apply_perturbation:
         return sample_clipping_perturbation(features, config)
     return build_unperturbed_perturbation_batch(features, config)

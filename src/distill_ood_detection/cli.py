@@ -78,6 +78,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also infer the deterministic ID validation split.",
     )
+    infer_parser.add_argument(
+        "--apply-perturbation",
+        action="store_true",
+        help=(
+            "Apply stochastic perturbations during perturbation-strategy inference. "
+            "Defaults to deterministic unperturbed inference."
+        ),
+    )
     activations_parser = subparsers.add_parser("export-teacher-activations")
     activations_parser.add_argument(
         "--config",
@@ -123,6 +131,7 @@ def main() -> None:
             tree_mode=args.tree_mode,
             include_train=args.include_train,
             include_validation=args.include_validation,
+            apply_perturbation=args.apply_perturbation,
         )
     if args.command == "export-teacher-activations":
         from distill_ood_detection.experiments.export_teacher_activations import (

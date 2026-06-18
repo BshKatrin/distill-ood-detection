@@ -23,6 +23,7 @@ def accuracy(
     feature_extractor: nn.Module | None = None,
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,
+    apply_perturbation: bool = False,
 ) -> float:
     """Compute top-1 classification accuracy."""
 
@@ -41,11 +42,12 @@ def accuracy(
                 raise ValueError("perturbation_config is required for perturbation accuracy")
             features = perturbation_forwarder.forward_to_features(images)
             logits_sum = None
-            draws = perturbation_config.evaluation_draws if perturbation_config.apply_to_eval else 1
+            draws = perturbation_config.evaluation_draws if apply_perturbation else 1
             for _ in range(draws):
                 perturbation_batch = _evaluation_perturbation_batch(
                     features,
                     perturbation_config,
+                    apply_perturbation=apply_perturbation,
                 )
                 logits = model(perturbation_batch.student_inputs)
                 logits_sum = logits if logits_sum is None else logits_sum + logits
@@ -73,6 +75,7 @@ def distillation_validation_metrics(
     feature_extractor: nn.Module | None = None,
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,
+    apply_perturbation: bool = False,
 ) -> dict[str, float]:
     """Compute validation metrics for student distillation."""
 
@@ -96,6 +99,7 @@ def distillation_validation_metrics(
             perturbation_batch = _evaluation_perturbation_batch(
                 features,
                 perturbation_config,
+                apply_perturbation=apply_perturbation,
             )
             teacher_logits = perturbation_forwarder.forward_from_features(
                 perturbation_batch.perturbed_features
@@ -142,7 +146,8 @@ def distillation_validation_metrics(
 def _evaluation_perturbation_batch(
     features: torch.Tensor,
     config: PerturbationConfig,
+    apply_perturbation: bool,
 ):
-    if config.apply_to_eval:
+    if apply_perturbation:
         return sample_clipping_perturbation(features, config)
     return build_unperturbed_perturbation_batch(features, config)

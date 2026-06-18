@@ -62,17 +62,17 @@ The intermediate embedding is extracted from a convolutional layer and has shape
 
 ## OOD Score
 
-The perturbation strategy can be stochastic at evaluation time. This is controlled by `strategy.perturbation.apply_to_eval`.
+The perturbation strategy can be stochastic at probability-inference time. This is controlled by the `distill-ood infer-probabilities --apply-perturbation` command-line flag.
 
-When `apply_to_eval: true`, validation, test, and OOD inference samples are perturbed in the same format used during training. The OOD Score for a sample is estimated as the expected score over multiple perturbation draws:
+When `--apply-perturbation` is set, test and OOD inference samples are perturbed in the same format used during training. The OOD Score for a sample is estimated as the expected score over multiple perturbation draws:
 
 1. Generate `K > 0` independent perturbations.
 2. Compute the selected OOD Score for each perturbation.
 3. Average the scores across all perturbations.
 
-When `apply_to_eval: false`, perturbations are used only during training. Validation, test, and OOD inference use the unmodified teacher embedding `z`. The student still receives a perturbation-aware input vector, but the perturbation component is a neutral all-ones vector with the same shape as `u`, so the input is `concat(flatten(z), flatten(1))`.
+By default, probability inference uses the unmodified teacher embedding `z`. The student still receives a perturbation-aware input vector, but the perturbation component is a neutral all-ones vector with the same shape as `u`, so the input is `concat(flatten(z), flatten(1))`.
 
-Use `evaluation_draws` to set `K` when `apply_to_eval: true`. When `apply_to_eval: false`, the process is not stochastic, so configs should set `evaluation_draws: 1` and evaluation exports use one deterministic draw.
+Use `strategy.perturbation.evaluation_draws` to set `K` when running `infer-probabilities --apply-perturbation`. Without that flag, the process is not stochastic and probability inference exports one deterministic draw.
 
 ## Distillation Objective
 
@@ -87,7 +87,7 @@ See [Objectives](../objectives/README.md) for details.
 ## Implementation
 
 - Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`.
-- `strategy.perturbation.apply_to_eval` controls whether validation, test, and OOD inference split samples are perturbed. Training samples are always perturbed for this strategy.
+- `distill-ood infer-probabilities --apply-perturbation` controls whether probability inference samples are perturbed. Training samples are always perturbed for this strategy.
 - ResNet feature continuation is implemented by `ResNetFeatureForwarder` in [teacher.py](../../src/distill_ood_detection/models/teacher.py).
 - Raw pre-perturbation teacher activations can be exported with `distill-ood export-teacher-activations --config configs/teachers/resnet18_cifar10_layers.yaml`. Each configured layer is saved as a separate `.pt` file under `runs/<experiment_name>/teacher_activations/<dataset_name>/`.
 - PyTorch student training is implemented in [train_student.py](../../src/distill_ood_detection/experiments/train_student.py).

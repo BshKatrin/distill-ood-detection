@@ -91,7 +91,6 @@ class StudentModelTests(unittest.TestCase):
                     "u_max": 0.8,
                     "clipping_mode": "channel_dependent",
                     "evaluation_draws": 3,
-                    "apply_to_eval": True,
                 },
             },
             "training": {
@@ -106,7 +105,6 @@ class StudentModelTests(unittest.TestCase):
         self.assertEqual(config.strategy.name, "perturbation")
         self.assertEqual(config.strategy.perturbation.clipping_mode, "channel_dependent")
         self.assertEqual(config.strategy.perturbation.evaluation_draws, 3)
-        self.assertTrue(config.strategy.perturbation.apply_to_eval)
         self.assertEqual(config.student.input_shape, (16385,))
         self.assertEqual(config.training.enabled_methods(), ("kl_divergence",))
 
@@ -114,26 +112,6 @@ class StudentModelTests(unittest.TestCase):
         raw = {
             "experiment_name": "bad_perturbation_config",
             "strategy": {"name": "perturbation"},
-        }
-
-        with self.assertRaises(ValueError):
-            parse_config(raw)
-
-    def test_rejects_non_boolean_perturbation_eval_flag(self) -> None:
-        raw = {
-            "experiment_name": "bad_perturbation_eval_flag_config",
-            "student": {
-                "kind": "linear",
-                "feature_layer": "layer3",
-                "input_shape": [16385],
-                "num_classes": 10,
-            },
-            "strategy": {
-                "name": "perturbation",
-                "perturbation": {
-                    "apply_to_eval": "false",
-                },
-            },
         }
 
         with self.assertRaises(ValueError):

@@ -49,6 +49,7 @@ def run_probability_inference(
     tree_mode: TreeDistillationMode | None = None,
     include_train: bool = False,
     include_validation: bool = False,
+    apply_perturbation: bool = False,
 ) -> dict[str, object]:
     """Infer teacher and student logits/probabilities for ID and OOD datasets."""
 
@@ -100,6 +101,7 @@ def run_probability_inference(
             teacher_metadata["strategy"] = config.strategy.name
             teacher_metadata["feature_layer"] = config.student.feature_layer
             teacher_metadata["perturbation"] = asdict(config.strategy.perturbation)
+            teacher_metadata["apply_perturbation"] = apply_perturbation
             set_seed(training_defaults.seed)
         save_model_outputs(
             path=teacher_path,
@@ -109,6 +111,7 @@ def run_probability_inference(
                     config.strategy.perturbation,
                     named_loader.loader,
                     device,
+                    apply_perturbation=apply_perturbation,
                 )
                 if perturbation_forwarder is not None
                 else collect_model_outputs(teacher, named_loader.loader, device)
@@ -131,6 +134,7 @@ def run_probability_inference(
                     device=device,
                     feature_extractor=feature_extractor,
                     perturbation_forwarder=perturbation_forwarder,
+                    apply_perturbation=apply_perturbation,
                 )
             )
         else:
@@ -147,6 +151,7 @@ def run_probability_inference(
                     method=method,
                     feature_extractor=feature_extractor,
                     perturbation_forwarder=perturbation_forwarder,
+                    apply_perturbation=apply_perturbation,
                 )
             )
 
@@ -154,6 +159,7 @@ def run_probability_inference(
         "experiment_name": config.experiment_name,
         "dataset": asdict(config.dataset),
         "checkpoint_selection": checkpoint,
+        "apply_perturbation": apply_perturbation,
         "artifacts": artifacts,
     }
     write_json(output_dir / "manifest.json", manifest)
@@ -172,6 +178,7 @@ def _infer_torch_students(
     method: DistillationMethod | None,
     feature_extractor: TeacherFeatureExtractor | None,
     perturbation_forwarder: ResNetFeatureForwarder | None,
+    apply_perturbation: bool,
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
     methods = (method,) if method else config.training.enabled_methods()
@@ -202,6 +209,7 @@ def _infer_torch_students(
             if perturbation_forwarder is not None:
                 metadata["strategy"] = config.strategy.name
                 metadata["perturbation"] = asdict(config.strategy.perturbation)
+                metadata["apply_perturbation"] = apply_perturbation
                 set_seed(config.training.defaults.seed)
             save_model_outputs(
                 path=probability_path,
@@ -212,6 +220,7 @@ def _infer_torch_students(
                         config.strategy.perturbation,
                         loader,
                         device,
+                        apply_perturbation=apply_perturbation,
                     )
                     if perturbation_forwarder is not None
                     else collect_model_outputs(student, loader, device)
@@ -253,6 +262,7 @@ def _infer_tree_students(
     device: torch.device,
     feature_extractor: TeacherFeatureExtractor | None,
     perturbation_forwarder: ResNetFeatureForwarder | None,
+    apply_perturbation: bool,
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
     modes = (tree_mode,) if tree_mode else config.tree.enabled_modes()
@@ -285,6 +295,7 @@ def _infer_tree_students(
                 metadata["strategy"] = config.strategy.name
                 metadata["feature_layer"] = config.student.feature_layer
                 metadata["perturbation"] = asdict(config.strategy.perturbation)
+                metadata["apply_perturbation"] = apply_perturbation
                 set_seed(config.training.defaults.seed)
             save_model_outputs(
                 path=probability_path,
@@ -296,6 +307,7 @@ def _infer_tree_students(
                         config.strategy.perturbation,
                         loader,
                         device,
+                        apply_perturbation=apply_perturbation,
                     )
                     if perturbation_forwarder is not None
                     else collect_feature_tree_model_outputs(

@@ -211,7 +211,7 @@ def _train_random_forest_student(
         feature_extractor=feature_extractor,
         perturbation_forwarder=perturbation_forwarder,
         config=config,
-        apply_perturbation=config.strategy.perturbation.apply_to_eval,
+        apply_perturbation=False,
     )
     validation_metrics = _tree_metrics(
         model=model,
@@ -228,7 +228,7 @@ def _train_random_forest_student(
         feature_extractor=feature_extractor,
         perturbation_forwarder=perturbation_forwarder,
         config=config,
-        apply_perturbation=config.strategy.perturbation.apply_to_eval,
+        apply_perturbation=False,
     )
     test_metrics = _tree_metrics(
         model=model,

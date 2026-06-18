@@ -28,6 +28,7 @@ METHOD="${METHOD:-}"
 TREE_MODE="${TREE_MODE:-}"
 INCLUDE_TRAIN="${INCLUDE_TRAIN:-0}"
 INCLUDE_VALIDATION="${INCLUDE_VALIDATION:-0}"
+APPLY_PERTURBATION="${APPLY_PERTURBATION:-0}"
 
 configs=("$@")
 
@@ -135,6 +136,10 @@ infer_config() {
 
   if [ "${INCLUDE_VALIDATION}" = "1" ]; then
     args+=(--include-validation)
+  fi
+
+  if [ "${APPLY_PERTURBATION}" = "1" ]; then
+    args+=(--apply-perturbation)
   fi
 
   echo "[$(date --iso-8601=seconds)] Inferring probabilities: ${config}"

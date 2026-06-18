@@ -78,6 +78,7 @@ The script maps these environment variables to CLI flags:
   `infer-probabilities --tree-mode` for tree configs.
 - `INCLUDE_TRAIN=1`: add `infer-probabilities --include-train`.
 - `INCLUDE_VALIDATION=1`: add `infer-probabilities --include-validation`.
+- `APPLY_PERTURBATION=1`: add `infer-probabilities --apply-perturbation`.
 
 ## Teacher-only probability exports
 
