@@ -18,7 +18,10 @@ from distill_ood_detection.config import (
     ExperimentConfig,
     TreeDistillationMode,
 )
-from distill_ood_detection.distillation.perturbation import sample_clipping_perturbation
+from distill_ood_detection.distillation.perturbation import (
+    build_unperturbed_perturbation_batch,
+    sample_clipping_perturbation,
+)
 from distill_ood_detection.datasets.inference import (
     build_in_distribution_test_loader,
     build_in_distribution_train_loader,
@@ -88,6 +91,7 @@ def run_tree_experiment(
         feature_extractor=feature_extractor,
         perturbation_forwarder=perturbation_forwarder,
         config=config,
+        apply_perturbation=True,
     )
     train_teacher_path = (
         experiment_dir
@@ -207,6 +211,7 @@ def _train_random_forest_student(
         feature_extractor=feature_extractor,
         perturbation_forwarder=perturbation_forwarder,
         config=config,
+        apply_perturbation=config.strategy.perturbation.apply_to_eval,
     )
     validation_metrics = _tree_metrics(
         model=model,
@@ -223,6 +228,7 @@ def _train_random_forest_student(
         feature_extractor=feature_extractor,
         perturbation_forwarder=perturbation_forwarder,
         config=config,
+        apply_perturbation=config.strategy.perturbation.apply_to_eval,
     )
     test_metrics = _tree_metrics(
         model=model,
@@ -323,6 +329,7 @@ def _collect_tree_dataset(
     feature_extractor: TeacherFeatureExtractor | None = None,
     perturbation_forwarder: ResNetFeatureForwarder | None = None,
     config: ExperimentConfig | None = None,
+    apply_perturbation: bool = True,
 ) -> "_TreeDataset":
     feature_batches: list[np.ndarray] = []
     logits_batches: list[torch.Tensor] = []
@@ -339,10 +346,16 @@ def _collect_tree_dataset(
             if config is None:
                 raise ValueError("config is required for perturbation tree collection")
             features = perturbation_forwarder.forward_to_features(images)
-            perturbation_batch = sample_clipping_perturbation(
-                features,
-                config.strategy.perturbation,
-            )
+            if apply_perturbation:
+                perturbation_batch = sample_clipping_perturbation(
+                    features,
+                    config.strategy.perturbation,
+                )
+            else:
+                perturbation_batch = build_unperturbed_perturbation_batch(
+                    features,
+                    config.strategy.perturbation,
+                )
             feature_batches.append(
                 torch.flatten(perturbation_batch.student_inputs, start_dim=1)
                 .cpu()

@@ -55,24 +55,67 @@ def sample_clipping_perturbation(
     )
 
 
+def build_unperturbed_perturbation_batch(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+) -> PerturbationBatch:
+    """Build perturbation-aware inputs without modifying teacher features.
+
+    The neutral perturbation vector is all ones. This preserves the input shape
+    expected by perturbation-aware students while leaving ``z`` unchanged.
+    """
+
+    if features.ndim != 4:
+        raise ValueError(
+            "unperturbed perturbation inputs expect convolutional features with shape "
+            "(batch, channels, height, width)"
+        )
+    percentiles = torch.ones(
+        _percentile_shape(features, config),
+        device=features.device,
+        dtype=features.dtype,
+    )
+    perturbations = torch.flatten(percentiles, start_dim=1)
+    student_inputs = torch.cat(
+        [
+            torch.flatten(features, start_dim=1),
+            perturbations,
+        ],
+        dim=1,
+    )
+    return PerturbationBatch(
+        student_inputs=student_inputs,
+        original_features=features,
+        perturbations=perturbations,
+        perturbed_features=features,
+        percentiles=percentiles,
+    )
+
+
 def _sample_percentiles(
     features: torch.Tensor,
     config: PerturbationConfig,
 ) -> torch.Tensor:
-    batch_size, channels, height, width = features.shape
-    if config.clipping_mode == "constant":
-        shape = (batch_size, 1)
-    elif config.clipping_mode == "spatial_dependent":
-        shape = (batch_size, height, width)
-    elif config.clipping_mode == "channel_dependent":
-        shape = (batch_size, channels)
-    else:
-        raise ValueError(f"Unsupported clipping mode: {config.clipping_mode}")
     return torch.empty(
-        shape,
+        _percentile_shape(features, config),
         device=features.device,
         dtype=features.dtype,
     ).uniform_(config.u_min, config.u_max)
+
+
+def _percentile_shape(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+) -> tuple[int, ...]:
+    batch_size, channels, height, width = features.shape
+    if config.clipping_mode == "constant":
+        return (batch_size, 1)
+    elif config.clipping_mode == "spatial_dependent":
+        return (batch_size, height, width)
+    elif config.clipping_mode == "channel_dependent":
+        return (batch_size, channels)
+    else:
+        raise ValueError(f"Unsupported clipping mode: {config.clipping_mode}")
 
 
 def _clip_feature_batch(

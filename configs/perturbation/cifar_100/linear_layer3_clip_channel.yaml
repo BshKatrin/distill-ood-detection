@@ -32,7 +32,8 @@ strategy:
     u_min: 0.5
     u_max: 1.0
     clipping_mode: channel_dependent
-    evaluation_draws: 50
+    evaluation_draws: 1
+    apply_to_eval: false
 
 optimizer:
   mse_logits:

@@ -13,7 +13,10 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from distill_ood_detection.config import PerturbationConfig, TreeDistillationMode
-from distill_ood_detection.distillation.perturbation import sample_clipping_perturbation
+from distill_ood_detection.distillation.perturbation import (
+    build_unperturbed_perturbation_batch,
+    sample_clipping_perturbation,
+)
 
 
 @dataclass(frozen=True)
@@ -99,9 +102,10 @@ def collect_perturbation_model_outputs(
         draw_logits: list[torch.Tensor] = []
         draw_probabilities: list[torch.Tensor] = []
         batch_size = features.shape[0]
-        for draw_count in _draw_chunks(perturbation_config.evaluation_draws, batch_size):
+        evaluation_draws = _evaluation_draws(perturbation_config)
+        for draw_count in _draw_chunks(evaluation_draws, batch_size):
             expanded_features = features.repeat_interleave(draw_count, dim=0)
-            perturbation_batch = sample_clipping_perturbation(
+            perturbation_batch = _evaluation_perturbation_batch(
                 expanded_features,
                 perturbation_config,
             )
@@ -138,9 +142,10 @@ def collect_perturbed_teacher_outputs(
         draw_logits: list[torch.Tensor] = []
         draw_probabilities: list[torch.Tensor] = []
         batch_size = features.shape[0]
-        for draw_count in _draw_chunks(perturbation_config.evaluation_draws, batch_size):
+        evaluation_draws = _evaluation_draws(perturbation_config)
+        for draw_count in _draw_chunks(evaluation_draws, batch_size):
             expanded_features = features.repeat_interleave(draw_count, dim=0)
-            perturbation_batch = sample_clipping_perturbation(
+            perturbation_batch = _evaluation_perturbation_batch(
                 expanded_features,
                 perturbation_config,
             )
@@ -252,9 +257,10 @@ def collect_perturbation_tree_model_outputs(
         draw_logits: list[np.ndarray] = []
         draw_probabilities: list[np.ndarray] = []
         batch_size = features.shape[0]
-        for draw_count in _draw_chunks(perturbation_config.evaluation_draws, batch_size):
+        evaluation_draws = _evaluation_draws(perturbation_config)
+        for draw_count in _draw_chunks(evaluation_draws, batch_size):
             expanded_features = features.repeat_interleave(draw_count, dim=0)
-            perturbation_batch = sample_clipping_perturbation(
+            perturbation_batch = _evaluation_perturbation_batch(
                 expanded_features,
                 perturbation_config,
             )
@@ -307,3 +313,16 @@ def _draw_chunks(total_draws: int, batch_size: int, max_examples: int = 2048) ->
         chunks.append(current)
         remaining -= current
     return tuple(chunks)
+
+
+def _evaluation_draws(config: PerturbationConfig) -> int:
+    return config.evaluation_draws if config.apply_to_eval else 1
+
+
+def _evaluation_perturbation_batch(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+):
+    if config.apply_to_eval:
+        return sample_clipping_perturbation(features, config)
+    return build_unperturbed_perturbation_batch(features, config)

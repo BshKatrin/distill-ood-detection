@@ -1,4 +1,4 @@
-experiment_name: perturbation_linear_layer4_student_resnet18_cifar100_clip_spatial
+experiment_name: perturbation_linear_layer3_student_resnet18_cifar100_clip_channel_eval_perturbation
 output_dir: runs
 
 dataset:
@@ -22,8 +22,8 @@ teacher:
 
 student:
   kind: linear
-  feature_layer: layer4
-  input_shape: [8208] # 512 * 4 * 4 + 4 * 4
+  feature_layer: layer3
+  input_shape: [16640] # 256 * 8 * 8 + 256
   num_classes: 100
 
 strategy:
@@ -31,9 +31,9 @@ strategy:
   perturbation:
     u_min: 0.5
     u_max: 1.0
-    clipping_mode: spatial_dependent
-    evaluation_draws: 1
-    apply_to_eval: false
+    clipping_mode: channel_dependent
+    evaluation_draws: 50
+    apply_to_eval: true
 
 optimizer:
   mse_logits:

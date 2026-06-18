@@ -9,6 +9,7 @@ import torch
 from distill_ood_detection.config import PerturbationConfig
 from distill_ood_detection.distillation.perturbation import (
     _clip_single_feature_map,
+    build_unperturbed_perturbation_batch,
     sample_clipping_perturbation,
 )
 
@@ -53,6 +54,18 @@ class PerturbationTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             sample_clipping_perturbation(torch.zeros(2, 3), config)
+
+    def test_unperturbed_batch_preserves_features_with_neutral_perturbation(self) -> None:
+        features = torch.arange(2 * 3 * 4 * 4, dtype=torch.float32).reshape(2, 3, 4, 4)
+        config = PerturbationConfig(clipping_mode="channel_dependent")
+
+        batch = build_unperturbed_perturbation_batch(features, config)
+
+        torch.testing.assert_close(batch.perturbed_features, features)
+        torch.testing.assert_close(batch.percentiles, torch.ones(2, 3))
+        torch.testing.assert_close(batch.perturbations, torch.ones(2, 3))
+        torch.testing.assert_close(batch.student_inputs[:, :48], torch.flatten(features, start_dim=1))
+        torch.testing.assert_close(batch.student_inputs[:, 48:], torch.ones(2, 3))
 
     def test_vectorized_clipping_matches_torch_quantile_reference(self) -> None:
         feature_map = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)

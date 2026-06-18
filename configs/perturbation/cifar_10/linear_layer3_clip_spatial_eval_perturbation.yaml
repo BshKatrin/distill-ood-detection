@@ -1,8 +1,8 @@
-experiment_name: perturbation_linear_layer4_student_resnet18_cifar100_clip_spatial
+experiment_name: perturbation_linear_layer3_student_resnet18_cifar10_clip_spatial_eval_perturbation
 output_dir: runs
 
 dataset:
-  name: cifar100
+  name: cifar10
   data_dir: data
   batch_size: 256
   num_workers: 2
@@ -12,19 +12,18 @@ dataset:
       split: test
     - name: svhn
       split: test
-    - name: cifar10
+    - name: cifar100
       split: test
 
 teacher:
-  hf_model_id: edadaltocg/resnet18_cifar100
+  hf_model_id: edadaltocg/resnet18_cifar10
   revision: main
-  num_classes: 100
 
 student:
   kind: linear
-  feature_layer: layer4
-  input_shape: [8208] # 512 * 4 * 4 + 4 * 4
-  num_classes: 100
+  feature_layer: layer3
+  input_shape: [16448] # 256 * 8 * 8 + 8 * 8
+  num_classes: 10
 
 strategy:
   name: perturbation
@@ -32,8 +31,8 @@ strategy:
     u_min: 0.5
     u_max: 1.0
     clipping_mode: spatial_dependent
-    evaluation_draws: 1
-    apply_to_eval: false
+    evaluation_draws: 50
+    apply_to_eval: true
 
 optimizer:
   mse_logits:

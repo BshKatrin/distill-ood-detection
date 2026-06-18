@@ -9,7 +9,10 @@ from torch.utils.data import DataLoader
 
 from distill_ood_detection.config import DistillationMethod, PerturbationConfig
 from distill_ood_detection.distillation.losses import distillation_loss
-from distill_ood_detection.distillation.perturbation import sample_clipping_perturbation
+from distill_ood_detection.distillation.perturbation import (
+    build_unperturbed_perturbation_batch,
+    sample_clipping_perturbation,
+)
 
 
 @torch.no_grad()
@@ -38,12 +41,16 @@ def accuracy(
                 raise ValueError("perturbation_config is required for perturbation accuracy")
             features = perturbation_forwarder.forward_to_features(images)
             logits_sum = None
-            for _ in range(perturbation_config.evaluation_draws):
-                perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+            draws = perturbation_config.evaluation_draws if perturbation_config.apply_to_eval else 1
+            for _ in range(draws):
+                perturbation_batch = _evaluation_perturbation_batch(
+                    features,
+                    perturbation_config,
+                )
                 logits = model(perturbation_batch.student_inputs)
                 logits_sum = logits if logits_sum is None else logits_sum + logits
             assert logits_sum is not None
-            predictions = (logits_sum / perturbation_config.evaluation_draws).argmax(dim=1)
+            predictions = (logits_sum / draws).argmax(dim=1)
         else:
             inputs = images
             if feature_extractor is not None:
@@ -86,7 +93,10 @@ def distillation_validation_metrics(
             if perturbation_config is None:
                 raise ValueError("perturbation_config is required for perturbation validation")
             features = perturbation_forwarder.forward_to_features(images)
-            perturbation_batch = sample_clipping_perturbation(features, perturbation_config)
+            perturbation_batch = _evaluation_perturbation_batch(
+                features,
+                perturbation_config,
+            )
             teacher_logits = perturbation_forwarder.forward_from_features(
                 perturbation_batch.perturbed_features
             )
@@ -127,3 +137,12 @@ def distillation_validation_metrics(
         "validation_distillation_loss": total_distillation_loss / total,
         "validation_kl_divergence": total_kl / total,
     }
+
+
+def _evaluation_perturbation_batch(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+):
+    if config.apply_to_eval:
+        return sample_clipping_perturbation(features, config)
+    return build_unperturbed_perturbation_batch(features, config)

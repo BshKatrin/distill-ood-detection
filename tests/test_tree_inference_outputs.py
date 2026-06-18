@@ -82,7 +82,7 @@ class TreeInferenceOutputTests(unittest.TestCase):
     def test_perturbation_outputs_keep_draw_dimension(self) -> None:
         loader = _loader()
         forwarder = _PerturbationForwarder()
-        config = PerturbationConfig(evaluation_draws=3)
+        config = PerturbationConfig(evaluation_draws=3, apply_to_eval=True)
         student = _PerturbationStudent()
 
         outputs = collect_perturbation_model_outputs(
@@ -105,10 +105,35 @@ class TreeInferenceOutputTests(unittest.TestCase):
         self.assertEqual(tuple(teacher_outputs.probabilities.shape), (2, 3, 2))
         self.assertEqual(outputs.labels.tolist(), [0, 1])
 
+    def test_perturbation_outputs_use_single_draw_without_eval_perturbation(self) -> None:
+        loader = _loader()
+        forwarder = _PerturbationForwarder()
+        config = PerturbationConfig(evaluation_draws=3, apply_to_eval=False)
+        student = _PerturbationStudent()
+
+        outputs = collect_perturbation_model_outputs(
+            student,
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+        )
+        teacher_outputs = collect_perturbed_teacher_outputs(
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+        )
+
+        self.assertEqual(tuple(outputs.logits.shape), (2, 1, 2))
+        self.assertEqual(tuple(outputs.probabilities.shape), (2, 1, 2))
+        self.assertEqual(tuple(teacher_outputs.logits.shape), (2, 1, 2))
+        self.assertEqual(tuple(teacher_outputs.probabilities.shape), (2, 1, 2))
+
     def test_perturbation_tree_outputs_keep_draw_dimension(self) -> None:
         loader = _loader()
         forwarder = _PerturbationForwarder()
-        config = PerturbationConfig(evaluation_draws=3)
+        config = PerturbationConfig(evaluation_draws=3, apply_to_eval=True)
         model = _FeatureShapeModel()
 
         outputs = collect_perturbation_tree_model_outputs(

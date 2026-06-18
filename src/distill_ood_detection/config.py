@@ -91,6 +91,7 @@ class PerturbationConfig:
     u_max: float = 1.0
     clipping_mode: ClippingMode = "constant"
     evaluation_draws: int = 1
+    apply_to_eval: bool = False
 
 
 @dataclass(frozen=True)
@@ -469,6 +470,8 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError("strategy.perturbation requires 0 <= u_min < u_max <= 1")
     if perturbation.evaluation_draws <= 0:
         raise ValueError("strategy.perturbation.evaluation_draws must be positive")
+    if not isinstance(perturbation.apply_to_eval, bool):
+        raise ValueError("strategy.perturbation.apply_to_eval must be a boolean")
     return strategy
 
 
