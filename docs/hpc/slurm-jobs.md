@@ -84,7 +84,7 @@ The script maps these environment variables to CLI flags:
 
 Use
 [slurm_scripts/export_teacher_probabilities.sbatch](../../slurm_scripts/export_teacher_probabilities.sbatch)
-to export deterministic teacher probability artifacts from configs under
+to export deterministic teacher logit/probability artifacts from configs under
 `configs/teachers/`.
 
 The script accepts one or more config paths as positional arguments and runs
@@ -101,7 +101,7 @@ sbatch \
 For longer config lists, set `CONFIG_LIST` to a newline-delimited file, using
 the same format supported by `run_configs.sbatch`.
 
-Teacher probability artifacts are written under:
+Teacher logit/probability artifacts are written under:
 
 ```text
 runs/<experiment_name>/teacher_probabilities/

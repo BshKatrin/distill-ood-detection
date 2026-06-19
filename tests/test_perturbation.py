@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+import tempfile
 
 import torch
 
@@ -11,8 +12,10 @@ from distill_ood_detection.config import PerturbationConfig, load_config
 from distill_ood_detection.distillation.perturbation import (
     _clip_single_feature_map,
     build_unperturbed_perturbation_batch,
+    fit_pca_projector_from_activations,
     sample_clipping_perturbation,
     sample_mc_dropout_perturbation,
+    sample_perturbation,
 )
 
 
@@ -36,18 +39,24 @@ class PerturbationTests(unittest.TestCase):
                 perturbation = config.strategy.perturbation
                 if perturbation.method == "mc_dropout":
                     perturbation_dim = 0
+                    expected_shape = (feature_dim + perturbation_dim,)
+                elif perturbation.method == "pca_projection":
+                    expected_shape = (perturbation.pca_components,)
                 elif perturbation.clipping_mode == "constant":
                     perturbation_dim = 1
+                    expected_shape = (feature_dim + perturbation_dim,)
                 elif perturbation.clipping_mode == "spatial_dependent":
                     perturbation_dim = height * width
+                    expected_shape = (feature_dim + perturbation_dim,)
                 elif perturbation.clipping_mode == "channel_dependent":
                     perturbation_dim = channels
+                    expected_shape = (feature_dim + perturbation_dim,)
                 else:
                     self.fail(
                         f"Unexpected perturbation config in {path}: {perturbation}"
                     )
 
-                self.assertEqual(config.student.input_shape, (feature_dim + perturbation_dim,))
+                self.assertEqual(config.student.input_shape, expected_shape)
 
     def test_clipping_modes_return_perturbation_aware_inputs(self) -> None:
         features = torch.arange(2 * 3 * 4 * 4, dtype=torch.float32).reshape(2, 3, 4, 4)
@@ -161,6 +170,27 @@ class PerturbationTests(unittest.TestCase):
         torch.testing.assert_close(batch.perturbed_features, features)
         torch.testing.assert_close(batch.student_inputs, torch.flatten(features, start_dim=1))
         torch.testing.assert_close(batch.perturbations, torch.ones(2, 48))
+
+    def test_pca_projection_uses_fitted_components(self) -> None:
+        activations = torch.arange(5 * 2 * 2 * 2, dtype=torch.float32).reshape(5, 2, 2, 2)
+
+        with tempfile.TemporaryDirectory() as directory:
+            activation_path = Path(directory) / "layer4.pt"
+            torch.save({"activations": activations}, activation_path)
+
+            projector = fit_pca_projector_from_activations(activation_path, n_components=3)
+
+        self.assertEqual(tuple(projector.mean.shape), (8,))
+        self.assertEqual(tuple(projector.components.shape), (3, 8))
+
+        batch = sample_perturbation(
+            activations[:2],
+            PerturbationConfig(method="pca_projection", pca_components=3),
+            pca_projector=projector,
+        )
+
+        self.assertEqual(tuple(batch.student_inputs.shape), (2, 3))
+        torch.testing.assert_close(batch.perturbed_features, activations[:2])
 
     def test_vectorized_clipping_matches_torch_quantile_reference(self) -> None:
         feature_map = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)

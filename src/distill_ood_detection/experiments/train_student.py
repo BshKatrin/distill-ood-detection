@@ -10,6 +10,11 @@ import mlflow
 from distill_ood_detection.config import DistillationMethod, ExperimentConfig
 from distill_ood_detection.datasets.inference import build_id_loaders
 from distill_ood_detection.distillation.train import train_student
+from distill_ood_detection.distillation.perturbation import (
+    fit_pca_projector_from_activations,
+    pca_projector_path,
+    save_pca_projector,
+)
 from distill_ood_detection.evaluation.metrics import accuracy
 from distill_ood_detection.models.student import build_student
 from distill_ood_detection.models.teacher import (
@@ -39,6 +44,26 @@ def run_experiment(
 
     loaders = build_id_loaders(config.dataset, seed=training_defaults.seed)
     teacher = load_teacher(config.teacher, device)
+    pca_projector = None
+    if config.strategy.name == "perturbation" and config.strategy.perturbation.method == "pca_projection":
+        activation_path = config.strategy.perturbation.pca_activation_path
+        if activation_path is None:
+            raise ValueError(
+                "strategy.perturbation.pca_activation_path is required for PCA projection"
+            )
+        pca_projector = fit_pca_projector_from_activations(
+            Path(activation_path),
+            config.strategy.perturbation.pca_components,
+        ).to(device)
+        save_pca_projector(
+            pca_projector_path(experiment_dir),
+            pca_projector,
+            {
+                "activation_path": activation_path,
+                "pca_components": config.strategy.perturbation.pca_components,
+                "feature_layer": config.student.feature_layer,
+            },
+        )
     perturbation_forwarder = (
         ResNetFeatureForwarder(teacher, config.student.feature_layer)
         if config.strategy.name == "perturbation"
@@ -93,6 +118,7 @@ def run_experiment(
                         if config.strategy.name == "perturbation"
                         else None
                     ),
+                    pca_projector=pca_projector,
                 )
                 summary["test_accuracy"] = accuracy(
                     student,
@@ -105,6 +131,7 @@ def run_experiment(
                         if config.strategy.name == "perturbation"
                         else None
                     ),
+                    pca_projector=pca_projector,
                 )
                 write_json(output_dir / "metrics.json", summary)
                 if config.mlflow.enabled:

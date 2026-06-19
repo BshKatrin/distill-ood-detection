@@ -92,6 +92,46 @@ The first Monte-Carlo dropout configs use `dropout_probability: 0.5`. The unsuff
 - `configs/perturbation/cifar_100/linear_layer4_mc_dropout_channel.yaml`
 - `configs/perturbation/cifar_100/linear_layer4_mc_dropout_spatial.yaml`
 
+#### PCA projection
+
+This perturbation method reduces a flattened teacher embedding with a fixed PCA projection before passing it to the student:
+
+`z_pca = PCA(flatten(z), n_components)`
+
+where `n_components = strategy.perturbation.pca_components`.
+
+The PCA basis is fitted from a previously exported teacher activation artifact. Export teacher activations first, for example:
+
+```bash
+distill-ood export-teacher-activations --config configs/teachers/resnet18_cifar10.yaml
+```
+
+Then point the student config at the ID activation artifact:
+
+```yaml
+strategy:
+  name: perturbation
+  perturbation:
+    method: pca_projection
+    pca_components: 128
+    pca_activation_path: runs/teacher_resnet18_cifar10/teacher_activations/cifar10_test/layer4.pt
+```
+
+Training fits the PCA projector once from `pca_activation_path` and saves it under:
+
+```text
+runs/<experiment_name>/pca_projector.pt
+```
+
+Probability inference reloads this saved projector, so inference uses the same PCA basis as training. The teacher target remains the unperturbed teacher continuation from `z`; only the student input is reduced to `z_pca`.
+
+Initial PCA configs are:
+
+- `configs/perturbation/cifar_10/linear_layer4_pca128.yaml`
+- `configs/perturbation/cifar_10/linear_layer4_pca512.yaml`
+- `configs/perturbation/cifar_100/linear_layer4_pca128.yaml`
+- `configs/perturbation/cifar_100/linear_layer4_pca512.yaml`
+
 ## OOD Score
 
 The perturbation strategy can be stochastic at probability-inference time. This is controlled by the `distill-ood infer-probabilities --apply-perturbation` command-line flag.
@@ -102,7 +142,7 @@ When `--apply-perturbation` is set, test and OOD inference samples are perturbed
 2. Compute the selected OOD Score for each perturbation.
 3. Average the scores across all perturbations.
 
-By default, probability inference uses the unmodified teacher embedding `z`. For clipping, the student still receives a perturbation-aware input vector, but the perturbation component is a neutral all-ones vector with the same shape as `u`, so the input is `concat(flatten(z), flatten(1))`. For Monte-Carlo dropout, the default unperturbed input is just `flatten(z)`.
+By default, probability inference uses the unmodified teacher embedding `z`. For clipping, the student still receives a perturbation-aware input vector, but the perturbation component is a neutral all-ones vector with the same shape as `u`, so the input is `concat(flatten(z), flatten(1))`. For Monte-Carlo dropout, the default unperturbed input is just `flatten(z)`. For PCA projection, inference always applies the saved PCA projector to `flatten(z)`.
 
 Use `strategy.perturbation.evaluation_draws` to set `K` when running `infer-probabilities --apply-perturbation`. Without that flag, the process is not stochastic and probability inference exports one deterministic draw.
 
@@ -123,7 +163,7 @@ See [Objectives](../objectives/README.md) for details.
 
 ## Implementation
 
-- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`. For Monte-Carlo dropout, the student input is `flatten(dropout(z, p))` and the teacher target is the unperturbed continuation from `z`.
+- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`. For Monte-Carlo dropout, the student input is `flatten(dropout(z, p))` and the teacher target is the unperturbed continuation from `z`. For PCA projection, the student input is the saved PCA projection of `flatten(z)`.
 - `distill-ood infer-probabilities --apply-perturbation` controls whether probability inference samples are perturbed. Training samples are always perturbed for this strategy.
 - ResNet feature continuation is implemented by `ResNetFeatureForwarder` in [teacher.py](../../src/distill_ood_detection/models/teacher.py).
 - Raw pre-perturbation teacher activations can be exported with `distill-ood export-teacher-activations --config configs/teachers/resnet18_cifar10_layers.yaml`. Each configured layer is saved as a separate `.pt` file under `runs/<experiment_name>/teacher_activations/<dataset_name>/`.

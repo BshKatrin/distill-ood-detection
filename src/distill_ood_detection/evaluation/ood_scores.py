@@ -11,6 +11,9 @@ MAX_PROBABILITY_DIFFERENCE = "max_probability_difference"
 ABSOLUTE_MAX_PROBABILITY_DIFFERENCE = "absolute_max_probability_difference"
 STUDENT_TEACHER_KL_DIVERGENCE = "student_teacher_kl_divergence"
 LOGIT_L2_DISTANCE = "logit_l2_distance"
+ENERGY = "energy"
+ENERGY_GAP = "energy_gap"
+ABSOLUTE_ENERGY_GAP = "absolute_energy_gap"
 
 # Signs convert raw scores to the repository convention used by OOD metrics:
 # ID is the positive class, so larger signed scores are more ID-like.
@@ -19,6 +22,9 @@ SIGNS: Mapping[str, int] = {
     ABSOLUTE_MAX_PROBABILITY_DIFFERENCE: -1,
     STUDENT_TEACHER_KL_DIVERGENCE: -1,
     LOGIT_L2_DISTANCE: -1,
+    ENERGY: +1,
+    ENERGY_GAP: +1,
+    ABSOLUTE_ENERGY_GAP: -1,
 }
 
 
@@ -94,6 +100,20 @@ def _logit_matrices(
 
 def _center_outputs(outputs: NDArray[np.float64]) -> NDArray[np.float64]:
     return outputs - outputs.mean(axis=-1, keepdims=True)
+
+
+def _logsumexp(outputs: NDArray[np.float64], axis: int) -> NDArray[np.float64]:
+    maxima = outputs.max(axis=axis, keepdims=True)
+    summed = np.exp(outputs - maxima).sum(axis=axis)
+    return np.squeeze(maxima, axis=axis) + np.log(summed)
+
+
+def _validate_temperature(temperature: float) -> float:
+    temperature = float(temperature)
+    if not np.isfinite(temperature) or temperature <= 0.0:
+        msg = f"temperature must be a positive finite value, got {temperature}."
+        raise ValueError(msg)
+    return temperature
 
 
 def _as_probability_matrix(
@@ -274,3 +294,107 @@ def logit_l2_distance(
     scores = np.linalg.norm(centered_teacher - centered_student, ord=2, axis=-1)
     scores = _maybe_average_draws(scores, average_draws)
     return _maybe_signed(scores, LOGIT_L2_DISTANCE, signed)
+
+
+def energy(
+    logits: ArrayLike,
+    temperature: float = 1.0,
+    signed: bool = False,
+    average_draws: bool = True,
+) -> NDArray[np.float64]:
+    """Compute the sign-adjusted energy confidence score for each sample.
+
+    This returns ``T * logsumexp(logits / T)``, which is the negative of the
+    free energy from energy-based OOD detection. The sign follows this
+    repository's convention where larger scores are more ID-like.
+
+    Args:
+        logits: Model logits with shape ``(n_samples, n_classes)``.
+        temperature: Positive energy temperature.
+        signed: If True, apply this score's sign so higher values are more
+            ID-like.
+        average_draws: If True and inputs have shape
+            ``(n_samples, n_draws, n_classes)``, average per-draw scores for
+            each sample.
+
+    Returns:
+        One raw or signed energy score per sample.
+    """
+
+    temperature = _validate_temperature(temperature)
+    outputs = _as_output_matrix(logits, "logits")
+    scores = temperature * _logsumexp(outputs / temperature, axis=-1)
+    scores = _maybe_average_draws(scores, average_draws)
+    return _maybe_signed(scores, ENERGY, signed)
+
+
+def energy_gap(
+    teacher_logits: ArrayLike,
+    student_logits: ArrayLike,
+    temperature: float = 1.0,
+    signed: bool = False,
+    average_draws: bool = True,
+) -> NDArray[np.float64]:
+    """Compute teacher energy minus student energy for each sample.
+
+    Args:
+        teacher_logits: Teacher logits with shape ``(n_samples, n_classes)``.
+        student_logits: Student logits with shape ``(n_samples, n_classes)``.
+        temperature: Positive energy temperature.
+        signed: If True, apply this score's sign so higher values are more
+            ID-like.
+        average_draws: If True and inputs have shape
+            ``(n_samples, n_draws, n_classes)``, average per-draw scores for
+            each sample.
+
+    Returns:
+        One raw or signed energy gap score per sample.
+    """
+
+    teacher, student = _logit_matrices(teacher_logits, student_logits)
+    scores = energy(
+        teacher,
+        temperature=temperature,
+        average_draws=False,
+    ) - energy(
+        student,
+        temperature=temperature,
+        average_draws=False,
+    )
+    scores = _maybe_average_draws(scores, average_draws)
+    return _maybe_signed(scores, ENERGY_GAP, signed)
+
+
+def absolute_energy_gap(
+    teacher_logits: ArrayLike,
+    student_logits: ArrayLike,
+    temperature: float = 1.0,
+    signed: bool = False,
+    average_draws: bool = True,
+) -> NDArray[np.float64]:
+    """Compute absolute teacher-student energy gap for each sample.
+
+    Args:
+        teacher_logits: Teacher logits with shape ``(n_samples, n_classes)``.
+        student_logits: Student logits with shape ``(n_samples, n_classes)``.
+        temperature: Positive energy temperature.
+        signed: If True, apply this score's sign so higher values are more
+            ID-like.
+        average_draws: If True and inputs have shape
+            ``(n_samples, n_draws, n_classes)``, average per-draw scores for
+            each sample.
+
+    Returns:
+        One raw or signed absolute energy gap score per sample.
+    """
+
+    scores = np.abs(
+        energy_gap(
+            teacher_logits,
+            student_logits,
+            temperature=temperature,
+            average_draws=False,
+        )
+    )
+    scores = _maybe_average_draws(scores, average_draws)
+    return _maybe_signed(scores, ABSOLUTE_ENERGY_GAP, signed)

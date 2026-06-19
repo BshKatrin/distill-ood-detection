@@ -21,6 +21,7 @@ from distill_ood_detection.config import (
 )
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.distillation.perturbation import sample_perturbation
+from distill_ood_detection.distillation.perturbation import PcaProjector
 from distill_ood_detection.evaluation.metrics import distillation_validation_metrics
 from distill_ood_detection.utils import write_json
 
@@ -39,6 +40,7 @@ def train_student(
     feature_extractor: nn.Module | None = None,
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,
+    pca_projector: PcaProjector | None = None,
 ) -> dict[str, float | int | str]:
     """Train a student against teacher predictions and save trace artifacts."""
     student.to(device)
@@ -74,6 +76,7 @@ def train_student(
                     perturbation_batch = sample_perturbation(
                         features,
                         perturbation_config,
+                        pca_projector=pca_projector,
                     )
                     teacher_logits = perturbation_forwarder.forward_from_features(
                         perturbation_batch.perturbed_features
@@ -114,6 +117,7 @@ def train_student(
             feature_extractor=feature_extractor,
             perturbation_forwarder=perturbation_forwarder,
             perturbation_config=perturbation_config,
+            pca_projector=pca_projector,
         )
         validation_accuracy = validation_metrics["validation_accuracy"]
         validation_distillation_loss = validation_metrics["validation_distillation_loss"]

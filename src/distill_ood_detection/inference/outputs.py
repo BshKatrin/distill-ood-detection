@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 
 from distill_ood_detection.config import PerturbationConfig, TreeDistillationMode
 from distill_ood_detection.distillation.perturbation import (
+    PcaProjector,
     build_unperturbed_perturbation_batch,
     sample_perturbation,
 )
@@ -89,6 +90,7 @@ def collect_perturbation_model_outputs(
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
     apply_perturbation: bool = False,
+    pca_projector: PcaProjector | None = None,
 ) -> ModelOutputs:
     """Collect per-draw outputs for a perturbation-aware student."""
 
@@ -110,6 +112,7 @@ def collect_perturbation_model_outputs(
                 expanded_features,
                 perturbation_config,
                 apply_perturbation=apply_perturbation,
+                pca_projector=pca_projector,
             )
             logits = model(perturbation_batch.student_inputs)
             logits = logits.reshape(batch_size, draw_count, -1)
@@ -132,6 +135,7 @@ def collect_perturbed_teacher_outputs(
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
     apply_perturbation: bool = False,
+    pca_projector: PcaProjector | None = None,
 ) -> ModelOutputs:
     """Collect per-draw perturbed teacher logits and probabilities."""
 
@@ -152,6 +156,7 @@ def collect_perturbed_teacher_outputs(
                 expanded_features,
                 perturbation_config,
                 apply_perturbation=apply_perturbation,
+                pca_projector=pca_projector,
             )
             logits = perturbation_forwarder.forward_from_features(
                 perturbation_batch.perturbed_features
@@ -249,6 +254,7 @@ def collect_perturbation_tree_model_outputs(
     loader: DataLoader[tuple[torch.Tensor, int]],
     device: torch.device,
     apply_perturbation: bool = False,
+    pca_projector: PcaProjector | None = None,
 ) -> ModelOutputs:
     """Collect per-draw outputs from a perturbation-aware tree student."""
 
@@ -269,6 +275,7 @@ def collect_perturbation_tree_model_outputs(
                 expanded_features,
                 perturbation_config,
                 apply_perturbation=apply_perturbation,
+                pca_projector=pca_projector,
             )
             student_features = (
                 torch.flatten(perturbation_batch.student_inputs, start_dim=1)
@@ -329,7 +336,12 @@ def _evaluation_perturbation_batch(
     features: torch.Tensor,
     config: PerturbationConfig,
     apply_perturbation: bool,
+    pca_projector: PcaProjector | None = None,
 ):
     if apply_perturbation:
-        return sample_perturbation(features, config)
-    return build_unperturbed_perturbation_batch(features, config)
+        return sample_perturbation(features, config, pca_projector=pca_projector)
+    return build_unperturbed_perturbation_batch(
+        features,
+        config,
+        pca_projector=pca_projector,
+    )

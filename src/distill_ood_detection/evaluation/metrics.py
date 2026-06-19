@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from distill_ood_detection.config import DistillationMethod, PerturbationConfig
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.distillation.perturbation import (
+    PcaProjector,
     build_unperturbed_perturbation_batch,
     sample_perturbation,
 )
@@ -23,6 +24,7 @@ def accuracy(
     feature_extractor: nn.Module | None = None,
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,
+    pca_projector: PcaProjector | None = None,
     apply_perturbation: bool = False,
 ) -> float:
     """Compute top-1 classification accuracy."""
@@ -48,6 +50,7 @@ def accuracy(
                     features,
                     perturbation_config,
                     apply_perturbation=apply_perturbation,
+                    pca_projector=pca_projector,
                 )
                 logits = model(perturbation_batch.student_inputs)
                 logits_sum = logits if logits_sum is None else logits_sum + logits
@@ -75,6 +78,7 @@ def distillation_validation_metrics(
     feature_extractor: nn.Module | None = None,
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,
+    pca_projector: PcaProjector | None = None,
     apply_perturbation: bool = False,
 ) -> dict[str, float]:
     """Compute validation metrics for student distillation."""
@@ -100,6 +104,7 @@ def distillation_validation_metrics(
                 features,
                 perturbation_config,
                 apply_perturbation=apply_perturbation,
+                pca_projector=pca_projector,
             )
             teacher_logits = perturbation_forwarder.forward_from_features(
                 perturbation_batch.perturbed_features
@@ -147,7 +152,12 @@ def _evaluation_perturbation_batch(
     features: torch.Tensor,
     config: PerturbationConfig,
     apply_perturbation: bool,
+    pca_projector: PcaProjector | None = None,
 ):
     if apply_perturbation:
-        return sample_perturbation(features, config)
-    return build_unperturbed_perturbation_batch(features, config)
+        return sample_perturbation(features, config, pca_projector=pca_projector)
+    return build_unperturbed_perturbation_batch(
+        features,
+        config,
+        pca_projector=pca_projector,
+    )

@@ -24,7 +24,7 @@ DistillationMethod = Literal[
 TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
 StrategyName = Literal["baseline", "perturbation"]
-PerturbationMethod = Literal["clipping", "mc_dropout"]
+PerturbationMethod = Literal["clipping", "mc_dropout", "pca_projection"]
 ClippingMode = Literal["constant", "spatial_dependent", "channel_dependent"]
 DropoutMode = Literal["element", "channel", "spatial"]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
@@ -95,6 +95,8 @@ class PerturbationConfig:
     clipping_mode: ClippingMode = "constant"
     dropout_probability: float = 0.5
     dropout_mode: DropoutMode = "element"
+    pca_components: int = 128
+    pca_activation_path: str | None = None
     evaluation_draws: int = 1
 
 
@@ -464,7 +466,7 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(f"Unsupported strategy config fields: {unknown}")
     if strategy.name not in {"baseline", "perturbation"}:
         raise ValueError(f"Unsupported strategy: {strategy.name}")
-    if perturbation.method not in {"clipping", "mc_dropout"}:
+    if perturbation.method not in {"clipping", "mc_dropout", "pca_projection"}:
         raise ValueError(f"Unsupported perturbation method: {perturbation.method}")
     if perturbation.clipping_mode not in {
         "constant",
@@ -480,6 +482,8 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         )
     if perturbation.dropout_mode not in {"element", "channel", "spatial"}:
         raise ValueError(f"Unsupported dropout mode: {perturbation.dropout_mode}")
+    if perturbation.pca_components <= 0:
+        raise ValueError("strategy.perturbation.pca_components must be positive")
     if perturbation.evaluation_draws <= 0:
         raise ValueError("strategy.perturbation.evaluation_draws must be positive")
     return strategy

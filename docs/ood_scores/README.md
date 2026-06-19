@@ -24,6 +24,13 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
   - `sign: +1`
   - **Status**: Not implemented in `ood_scores.py`.
 
+- Energy: Teacher-only energy baseline from
+  [Energy-based Out-of-distribution Detection](https://arxiv.org/pdf/2010.03759).
+  The paper defines free energy as `-T * logsumexp(logits / T)`, where lower
+  values are more ID-like. This project stores the sign-adjusted score
+  `T * logsumexp(logits / T)` so that higher values are more ID-like.
+  - `sign: +1`
+
 - KL (teacher || student): KL divergence from the teacher probability distribution to the student probability distribution.
   - `sign: -1`
 
@@ -34,6 +41,14 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
   - `sign: -1`
 
 - Centered-logit L2 distance: L2 distance between mean-centered teacher logits and mean-centered student logits.
+  - `sign: -1`
+
+- Energy gap: Teacher energy minus student energy, using the same sign-adjusted
+  energy definition as above.
+  - `sign: +1`
+
+- Absolute energy gap: Absolute value of the teacher-student energy gap. This
+  is a mismatch score, so it is negated before computing OOD metrics.
   - `sign: -1`
 
 ## Implementation

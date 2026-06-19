@@ -17,11 +17,17 @@ import yaml
 
 from distill_ood_detection.evaluation.ood_metrics import ood_detection_metrics
 from distill_ood_detection.evaluation.ood_scores import (
+    ABSOLUTE_ENERGY_GAP,
     ABSOLUTE_MAX_PROBABILITY_DIFFERENCE,
+    ENERGY,
+    ENERGY_GAP,
     LOGIT_L2_DISTANCE,
     MAX_PROBABILITY_DIFFERENCE,
     STUDENT_TEACHER_KL_DIVERGENCE,
+    absolute_energy_gap,
     absolute_max_probability_difference,
+    energy,
+    energy_gap,
     logit_l2_distance,
     max_probability_difference,
     student_teacher_kl_divergence,
@@ -68,6 +74,7 @@ PERTURBATION_ORDER = {
     "Constant": 0,
     "Channel": 1,
     "Spatial": 2,
+    "Element": 3,
 }
 
 OOD_DATASET_ORDER_BY_ID = {
@@ -80,6 +87,20 @@ OOD_SCORE_LABELS = {
     ABSOLUTE_MAX_PROBABILITY_DIFFERENCE: "Abs. Max Diff",
     STUDENT_TEACHER_KL_DIVERGENCE: "KL Div.",
     LOGIT_L2_DISTANCE: "Logit L2",
+    ENERGY: "Energy",
+    ENERGY_GAP: "Energy Gap",
+    ABSOLUTE_ENERGY_GAP: "Abs. Energy Gap",
+}
+
+TEACHER_SCORE_LABELS = {
+    "msp": "MSP",
+    ENERGY: "Energy",
+}
+
+LOGIT_SCORE_KEYS = {
+    LOGIT_L2_DISTANCE,
+    ENERGY_GAP,
+    ABSOLUTE_ENERGY_GAP,
 }
 
 PROBABILITY_SCORE_FUNCTIONS: dict[
@@ -110,6 +131,13 @@ SCORE_ORDER = [
     ABSOLUTE_MAX_PROBABILITY_DIFFERENCE,
     STUDENT_TEACHER_KL_DIVERGENCE,
     LOGIT_L2_DISTANCE,
+    ENERGY_GAP,
+    ABSOLUTE_ENERGY_GAP,
+]
+
+TEACHER_SCORE_ORDER = [
+    "msp",
+    ENERGY,
 ]
 
 
@@ -164,19 +192,6 @@ def to_numpy(value: Any) -> np.ndarray:
     return np.asarray(value)
 
 
-def teacher_msp_scores(artifact: dict[str, Any]) -> np.ndarray:
-    """Compute maximum softmax probability scores from one teacher artifact."""
-
-    probabilities = to_numpy(artifact["probabilities"])
-    if probabilities.ndim != 2:
-        msg = (
-            "Teacher MSP must use raw-image teacher probabilities with shape "
-            f"(n_samples, n_classes), got {probabilities.shape}."
-        )
-        raise ValueError(msg)
-    return probabilities.max(axis=1)
-
-
 def load_yaml(path: Path) -> dict[str, Any]:
     """Load one YAML experiment config."""
 
@@ -211,6 +226,7 @@ def perturbation_label(perturbation: str | None) -> str:
     labels = {
         "channel_dependent": "Channel",
         "constant": "Constant",
+        "element": "Element",
         "spatial": "Spatial",
         "spatial_dependent": "Spatial",
     }
@@ -262,11 +278,10 @@ def experiment_config(path: Path) -> ExperimentConfig:
     output_dir = ROOT / config.get("output_dir", "runs")
     feature_layer = student.get("feature_layer")
     teacher_hf_model_id = config["teacher"]["hf_model_id"]
-    perturbation = (
-        config.get("strategy", {})
-        .get("perturbation", {})
-        .get("clipping_mode")
-    )
+    perturbation_config = config.get("strategy", {}).get("perturbation", {})
+    perturbation = perturbation_config.get("clipping_mode")
+    if perturbation is None and perturbation_config.get("method") == "mc_dropout":
+        perturbation = perturbation_config.get("dropout_mode")
     return ExperimentConfig(
         path=path,
         strategy=strategy,
@@ -332,12 +347,26 @@ def deduplicate_configs(
 def run_artifacts_available(config: ExperimentConfig) -> bool:
     """Return whether all probability manifest artifacts exist locally."""
 
-    manifest_path = config.run_dir / "probabilities" / "manifest.json"
+    manifest_path = probability_manifest_path(config.run_dir)
     if not manifest_path.exists():
         return False
     with manifest_path.open() as file:
         manifest = json.load(file)
     return all((ROOT / entry["path"]).exists() for entry in manifest["artifacts"])
+
+
+def probability_manifest_path(run_dir: Path) -> Path:
+    """Return the saved probability manifest path for one run directory."""
+
+    candidates = [
+        run_dir / "probabilities" / "manifest.json",
+        run_dir / "probabilities" / "perturbed" / "manifest.json",
+        run_dir / "probabilities" / "unperturbed" / "manifest.json",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
 
 
 def available_configs(
@@ -516,7 +545,7 @@ class RunArtifacts:
         self._student_artifact_paths = self._student_paths()
 
     def _load_manifest(self) -> dict[str, Any]:
-        manifest_path = self.run_dir / "probabilities" / "manifest.json"
+        manifest_path = probability_manifest_path(self.run_dir)
         with manifest_path.open() as file:
             return json.load(file)
 
@@ -615,16 +644,18 @@ def metric_for_scores(
 def teacher_metrics_by_column(
     teacher_runs: dict[tuple[str, str], TeacherProbabilityRunArtifacts],
     teacher_label: str,
+    score_key: str,
     columns: list[tuple[str, str]],
     metric_cache: MetricCache,
 ) -> dict[tuple[str, str], str]:
-    """Compute teacher MSP metrics for each report column."""
+    """Compute teacher baseline metrics for each report column."""
 
     values = {}
     total_columns = len(columns)
+    score_label = TEACHER_SCORE_LABELS[score_key]
     for column_index, (id_dataset_key, ood_dataset_key) in enumerate(columns, start=1):
         progress(
-            "teacher MSP "
+            f"teacher {score_label} "
             f"{column_index}/{total_columns}: "
             f"{DATASET_LABELS.get(id_dataset_key, id_dataset_key)} (ID) vs "
             f"{DATASET_LABELS.get(ood_dataset_key, ood_dataset_key)}",
@@ -633,12 +664,20 @@ def teacher_metrics_by_column(
         if run is None:
             values[(id_dataset_key, ood_dataset_key)] = ""
             continue
-        values[(id_dataset_key, ood_dataset_key)] = teacher_metric(
-            run,
-            id_dataset_key,
-            ood_dataset_key,
-            metric_cache,
-        )
+        try:
+            values[(id_dataset_key, ood_dataset_key)] = teacher_metric(
+                run,
+                id_dataset_key,
+                ood_dataset_key,
+                score_key,
+                metric_cache,
+            )
+        except KeyError as error:
+            progress(
+                f"blank teacher {score_label}: missing artifact key {error!s} "
+                f"for {run.run_name}"
+            )
+            values[(id_dataset_key, ood_dataset_key)] = ""
     return values
 
 
@@ -646,9 +685,10 @@ def teacher_metric(
     run: TeacherProbabilityRunArtifacts,
     id_dataset_key: str,
     ood_dataset_key: str,
+    score_key: str,
     metric_cache: MetricCache,
 ) -> str:
-    """Compute or load one cached Teacher MSP metric table cell."""
+    """Compute or load one cached teacher baseline metric table cell."""
 
     id_teacher_path = run.artifact_path(id_dataset_key)
     ood_teacher_path = run.artifact_path(ood_dataset_key)
@@ -657,18 +697,19 @@ def teacher_metric(
         artifact_fingerprint(ood_teacher_path),
     ]
     key = {
-        "kind": "teacher_msp",
+        "kind": "teacher_baseline",
         "run": run.run_name,
+        "score": score_key,
         "id_dataset": id_dataset_key,
         "ood_dataset": ood_dataset_key,
     }
     cached = metric_cache.get(key, fingerprints)
     if cached is not None:
-        progress("cache hit Teacher MSP")
+        progress(f"cache hit Teacher {TEACHER_SCORE_LABELS[score_key]}")
         return format_metric(cached)
 
-    id_scores = teacher_msp_scores_for_dataset(run, id_dataset_key)
-    ood_scores = teacher_msp_scores_for_dataset(run, ood_dataset_key)
+    id_scores = teacher_scores_for_dataset(run, id_dataset_key, score_key)
+    ood_scores = teacher_scores_for_dataset(run, ood_dataset_key, score_key)
     try:
         metrics = metric_for_scores(id_scores, ood_scores)
     finally:
@@ -678,11 +719,28 @@ def teacher_metric(
     return format_metric(metrics)
 
 
-def teacher_msp_scores_for_dataset(
+def teacher_scores_for_dataset(
     run: TeacherProbabilityRunArtifacts,
     dataset_key: str,
+    score_key: str,
 ) -> np.ndarray:
-    """Compute teacher MSP scores for one dataset artifact."""
+    """Compute teacher baseline scores for one dataset artifact."""
+
+    if score_key == ENERGY:
+        logits = load_artifact_array(run.artifact_path(dataset_key), "logits")
+        if logits.ndim != 2:
+            msg = (
+                "Teacher energy must use raw-image teacher logits with shape "
+                f"(n_samples, n_classes), got {logits.shape}."
+            )
+            raise ValueError(msg)
+        try:
+            return energy(logits, signed=True)
+        finally:
+            del logits
+    if score_key != "msp":
+        msg = f"Unsupported teacher baseline score: {score_key}"
+        raise ValueError(msg)
 
     probabilities = load_artifact_array(
         run.artifact_path(dataset_key),
@@ -708,7 +766,7 @@ def student_scores_for_dataset(
 ) -> np.ndarray:
     """Compute student-teacher OOD scores for one dataset artifact pair."""
 
-    artifact_key = "logits" if score_key == LOGIT_L2_DISTANCE else "probabilities"
+    artifact_key = "logits" if score_key in LOGIT_SCORE_KEYS else "probabilities"
     teacher_values = load_artifact_array(
         run.teacher_artifact_path(dataset_key),
         artifact_key,
@@ -720,6 +778,10 @@ def student_scores_for_dataset(
     try:
         if score_key == LOGIT_L2_DISTANCE:
             return logit_l2_distance(teacher_values, student_values, signed=True)
+        if score_key == ENERGY_GAP:
+            return energy_gap(teacher_values, student_values, signed=True)
+        if score_key == ABSOLUTE_ENERGY_GAP:
+            return absolute_energy_gap(teacher_values, student_values, signed=True)
         score_function = PROBABILITY_SCORE_FUNCTIONS[score_key]
         return score_function(teacher_values, student_values)
     finally:
@@ -736,7 +798,7 @@ def student_metric(
     """Compute one student metric table cell."""
 
     id_dataset_key = run.id_dataset_key
-    artifact_key = "logits" if score_key == LOGIT_L2_DISTANCE else "probabilities"
+    artifact_key = "logits" if score_key in LOGIT_SCORE_KEYS else "probabilities"
     id_teacher_path = run.teacher_artifact_path(id_dataset_key)
     id_student_path = run.student_artifact_path(id_dataset_key, method_key)
     ood_teacher_path = run.teacher_artifact_path(ood_dataset_key)
@@ -898,22 +960,27 @@ def build_table_rows(
     strategy = configs[0].strategy
     teacher_labels = sorted({teacher_label for _dataset_key, teacher_label in teacher_runs})
     for teacher_label in teacher_labels:
-        progress(f"computing {teacher_label} MSP row across {len(columns)} columns")
-        teacher_values = teacher_metrics_by_column(
-            teacher_runs,
-            teacher_label,
-            columns,
-            metric_cache,
-        )
-        teacher_prefix = "Teacher & - & - & " + f"{teacher_label} MSP"
-        if strategy == "perturbation":
-            teacher_prefix = "Teacher & - & - & - & " + f"{teacher_label} MSP"
-        rows.append(
-            teacher_prefix
-            + " & "
-            + " & ".join(teacher_values[column] for column in columns)
-            + r" \\",
-        )
+        for teacher_score_key in TEACHER_SCORE_ORDER:
+            score_label = TEACHER_SCORE_LABELS[teacher_score_key]
+            progress(
+                f"computing {teacher_label} {score_label} row across {len(columns)} columns"
+            )
+            teacher_values = teacher_metrics_by_column(
+                teacher_runs,
+                teacher_label,
+                teacher_score_key,
+                columns,
+                metric_cache,
+            )
+            teacher_prefix = "Teacher & - & - & " + f"{teacher_label} {score_label}"
+            if strategy == "perturbation":
+                teacher_prefix = "Teacher & - & - & - & " + f"{teacher_label} {score_label}"
+            rows.append(
+                teacher_prefix
+                + " & "
+                + " & ".join(teacher_values[column] for column in columns)
+                + r" \\",
+            )
 
     runs_by_name = {run.run_name: run for run in runs}
     for group in row_groups:

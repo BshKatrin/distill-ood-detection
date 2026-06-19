@@ -7,7 +7,10 @@ import unittest
 import numpy as np
 
 from distill_ood_detection.evaluation import (
+    absolute_energy_gap,
     absolute_max_probability_difference,
+    energy,
+    energy_gap,
     logit_l2_distance,
     max_probability_difference,
     student_teacher_kl_divergence,
@@ -59,6 +62,33 @@ class OODScoreTests(unittest.TestCase):
             np.array([0.0, np.sqrt(8.0)]),
         )
 
+    def test_energy_uses_temperature_scaled_logsumexp(self) -> None:
+        logits = np.array([[1.0, 2.0, 3.0], [0.0, -1.0, -2.0]])
+        temperature = 2.0
+        shifted = logits / temperature
+        expected = temperature * (
+            shifted.max(axis=1)
+            + np.log(np.exp(shifted - shifted.max(axis=1, keepdims=True)).sum(axis=1))
+        )
+
+        np.testing.assert_allclose(
+            energy(logits, temperature=temperature),
+            expected,
+        )
+
+    def test_energy_gap(self) -> None:
+        teacher = np.array([[1.0, 2.0], [0.0, 4.0]])
+        student = np.array([[0.0, 1.0], [1.0, 1.0]])
+
+        np.testing.assert_allclose(
+            energy_gap(teacher, student),
+            energy(teacher) - energy(student),
+        )
+        np.testing.assert_allclose(
+            absolute_energy_gap(teacher, student),
+            np.abs(energy(teacher) - energy(student)),
+        )
+
     def test_signed_scores_follow_id_positive_convention(self) -> None:
         teacher = np.array([[0.7, 0.3], [0.1, 0.9]])
         student = np.array([[0.4, 0.6], [0.2, 0.8]])
@@ -81,12 +111,27 @@ class OODScoreTests(unittest.TestCase):
             logit_l2_distance(teacher_logits, student_logits, signed=True),
             -logit_l2_distance(teacher_logits, student_logits),
         )
+        np.testing.assert_allclose(
+            energy(teacher_logits, signed=True),
+            energy(teacher_logits),
+        )
+        np.testing.assert_allclose(
+            energy_gap(teacher_logits, student_logits, signed=True),
+            energy_gap(teacher_logits, student_logits),
+        )
+        np.testing.assert_allclose(
+            absolute_energy_gap(teacher_logits, student_logits, signed=True),
+            -absolute_energy_gap(teacher_logits, student_logits),
+        )
 
     def test_defines_sign_for_every_ood_score(self) -> None:
         self.assertEqual(
             set(SIGNS),
             {
                 "absolute_max_probability_difference",
+                "absolute_energy_gap",
+                "energy",
+                "energy_gap",
                 "logit_l2_distance",
                 "max_probability_difference",
                 "student_teacher_kl_divergence",
@@ -102,6 +147,18 @@ class OODScoreTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             logit_l2_distance(teacher, student)
+
+        with self.assertRaises(ValueError):
+            energy_gap(teacher, student)
+
+    def test_rejects_invalid_energy_temperature(self) -> None:
+        logits = np.array([[1.0, 2.0]])
+
+        with self.assertRaises(ValueError):
+            energy(logits, temperature=0.0)
+
+        with self.assertRaises(ValueError):
+            energy(logits, temperature=-1.0)
 
     def test_student_teacher_kl_divergence_rejects_zero_student_support(self) -> None:
         teacher = np.array([[0.8, 0.2]])
@@ -137,6 +194,36 @@ class OODScoreTests(unittest.TestCase):
         np.testing.assert_allclose(
             student_teacher_kl_divergence(teacher, student),
             per_draw_kl.mean(axis=1),
+        )
+
+    def test_averages_per_draw_energy_scores_for_perturbation_outputs(self) -> None:
+        teacher = np.array(
+            [
+                [[1.0, 3.0], [2.0, 4.0]],
+                [[0.0, 4.0], [1.0, 5.0]],
+            ]
+        )
+        student = np.array(
+            [
+                [[1.0, 2.0], [3.0, 4.0]],
+                [[1.0, 3.0], [1.0, 4.0]],
+            ]
+        )
+
+        per_draw_energy = energy(teacher, average_draws=False)
+        per_draw_gap = energy_gap(teacher, student, average_draws=False)
+
+        np.testing.assert_allclose(
+            energy(teacher),
+            per_draw_energy.mean(axis=1),
+        )
+        np.testing.assert_allclose(
+            energy_gap(teacher, student),
+            per_draw_gap.mean(axis=1),
+        )
+        np.testing.assert_allclose(
+            absolute_energy_gap(teacher, student),
+            np.abs(per_draw_gap).mean(axis=1),
         )
 
     def test_averages_per_draw_logit_scores_for_perturbation_outputs(self) -> None:

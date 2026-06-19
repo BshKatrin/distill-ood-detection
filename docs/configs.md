@@ -62,8 +62,8 @@ that distinguishes the experiment. For example:
 
 When a strategy needs a stronger or alternate sampling regime, keep the
 original file and add a sibling with a suffix that names the variant, such as
-`_aggressive`, `_mc_dropout`, `_mc_dropout_channel`, or
-`_mc_dropout_spatial`.
+`_aggressive`, `_mc_dropout`, `_mc_dropout_channel`,
+`_mc_dropout_spatial`, `_pca128`, or `_pca512`.
 
 Prefer short, descriptive names that make related configs easy to scan.
 
@@ -88,8 +88,8 @@ runs/<experiment_name>/teacher_activations/manifest.json
 ```
 
 Teacher probability configs omit `layers` and export deterministic raw-image
-teacher probabilities for the ID test split and configured OOD datasets. Each
-dataset artifact is saved at:
+teacher logits and probabilities for the ID test split and configured OOD
+datasets. Each dataset artifact is saved at:
 
 ```text
 runs/<experiment_name>/teacher_probabilities/<dataset_name>/probabilities.pt
@@ -121,4 +121,7 @@ runs/<experiment_name>/probabilities/perturbed/
 Clipping perturbation configs use student input shapes that include both the
 flattened feature tensor and the perturbation code. Monte-Carlo dropout configs
 use only the flattened feature tensor because the dropout mask is not provided
-to the student.
+to the student. PCA projection configs use `student.input_shape` equal to the
+configured number of PCA components and require
+`strategy.perturbation.pca_activation_path` to point at an exported ID teacher
+activation artifact.

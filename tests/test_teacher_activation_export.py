@@ -141,8 +141,8 @@ class TeacherActivationExportTests(unittest.TestCase):
             )
 
         self.assertEqual(tuple(saved["probabilities"].shape), (3, 2))
+        self.assertEqual(tuple(saved["logits"].shape), (3, 2))
         self.assertEqual(tuple(saved["labels"].shape), (3,))
-        self.assertNotIn("logits", saved)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,11 @@ from distill_ood_detection.datasets.inference import (
     build_in_distribution_validation_loader,
     build_ood_loaders,
 )
+from distill_ood_detection.distillation.perturbation import (
+    PcaProjector,
+    load_pca_projector,
+    pca_projector_path,
+)
 from distill_ood_detection.inference import (
     collect_feature_model_outputs,
     collect_feature_tree_model_outputs,
@@ -72,6 +77,12 @@ def run_probability_inference(
         ]
     )
     teacher = load_teacher(config.teacher, device)
+    pca_projector = None
+    if (
+        config.strategy.name == "perturbation"
+        and config.strategy.perturbation.method == "pca_projection"
+    ):
+        pca_projector = load_pca_projector(pca_projector_path(experiment_dir), device)
     perturbation_forwarder = (
         ResNetFeatureForwarder(teacher, config.student.feature_layer)
         if config.strategy.name == "perturbation"
@@ -112,6 +123,7 @@ def run_probability_inference(
                     named_loader.loader,
                     device,
                     apply_perturbation=apply_perturbation,
+                    pca_projector=pca_projector,
                 )
                 if perturbation_forwarder is not None
                 else collect_model_outputs(teacher, named_loader.loader, device)
@@ -135,6 +147,7 @@ def run_probability_inference(
                     feature_extractor=feature_extractor,
                     perturbation_forwarder=perturbation_forwarder,
                     apply_perturbation=apply_perturbation,
+                    pca_projector=pca_projector,
                 )
             )
         else:
@@ -152,6 +165,7 @@ def run_probability_inference(
                     feature_extractor=feature_extractor,
                     perturbation_forwarder=perturbation_forwarder,
                     apply_perturbation=apply_perturbation,
+                    pca_projector=pca_projector,
                 )
             )
 
@@ -179,6 +193,7 @@ def _infer_torch_students(
     feature_extractor: TeacherFeatureExtractor | None,
     perturbation_forwarder: ResNetFeatureForwarder | None,
     apply_perturbation: bool,
+    pca_projector: PcaProjector | None,
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
     methods = (method,) if method else config.training.enabled_methods()
@@ -221,6 +236,7 @@ def _infer_torch_students(
                         loader,
                         device,
                         apply_perturbation=apply_perturbation,
+                        pca_projector=pca_projector,
                     )
                     if perturbation_forwarder is not None
                     else collect_model_outputs(student, loader, device)
@@ -263,6 +279,7 @@ def _infer_tree_students(
     feature_extractor: TeacherFeatureExtractor | None,
     perturbation_forwarder: ResNetFeatureForwarder | None,
     apply_perturbation: bool,
+    pca_projector: PcaProjector | None,
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
     modes = (tree_mode,) if tree_mode else config.tree.enabled_modes()
@@ -308,6 +325,7 @@ def _infer_tree_students(
                         loader,
                         device,
                         apply_perturbation=apply_perturbation,
+                        pca_projector=pca_projector,
                     )
                     if perturbation_forwarder is not None
                     else collect_feature_tree_model_outputs(

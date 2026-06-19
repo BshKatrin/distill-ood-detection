@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 
@@ -18,6 +19,28 @@ class PerturbationBatch:
     perturbations: torch.Tensor
     perturbed_features: torch.Tensor
     percentiles: torch.Tensor
+
+
+@dataclass(frozen=True)
+class PcaProjector:
+    """Fixed PCA projection from flattened teacher features."""
+
+    mean: torch.Tensor
+    components: torch.Tensor
+
+    def to(self, device: torch.device) -> PcaProjector:
+        """Move PCA tensors to a device."""
+
+        return PcaProjector(
+            mean=self.mean.to(device),
+            components=self.components.to(device),
+        )
+
+    def transform(self, features: torch.Tensor) -> torch.Tensor:
+        """Project convolutional features onto PCA components."""
+
+        flat_features = torch.flatten(features, start_dim=1)
+        return (flat_features - self.mean) @ self.components.T
 
 
 def sample_clipping_perturbation(
@@ -58,6 +81,7 @@ def sample_clipping_perturbation(
 def sample_perturbation(
     features: torch.Tensor,
     config: PerturbationConfig,
+    pca_projector: PcaProjector | None = None,
 ) -> PerturbationBatch:
     """Sample the perturbation configured for stochastic distillation."""
 
@@ -65,6 +89,10 @@ def sample_perturbation(
         return sample_clipping_perturbation(features, config)
     if config.method == "mc_dropout":
         return sample_mc_dropout_perturbation(features, config)
+    if config.method == "pca_projection":
+        if pca_projector is None:
+            raise ValueError("pca_projector is required for PCA projection")
+        return build_pca_projection_batch(features, pca_projector)
     raise ValueError(f"Unsupported perturbation method: {config.method}")
 
 
@@ -98,6 +126,7 @@ def sample_mc_dropout_perturbation(
 def build_unperturbed_perturbation_batch(
     features: torch.Tensor,
     config: PerturbationConfig,
+    pca_projector: PcaProjector | None = None,
 ) -> PerturbationBatch:
     """Build perturbation-aware inputs without modifying teacher features.
 
@@ -107,6 +136,10 @@ def build_unperturbed_perturbation_batch(
 
     if config.method == "mc_dropout":
         return build_unperturbed_mc_dropout_batch(features, config)
+    if config.method == "pca_projection":
+        if pca_projector is None:
+            raise ValueError("pca_projector is required for PCA projection")
+        return build_pca_projection_batch(features, pca_projector)
     if features.ndim != 4:
         raise ValueError(
             "unperturbed perturbation inputs expect convolutional features with shape "
@@ -153,6 +186,87 @@ def build_unperturbed_mc_dropout_batch(
         perturbed_features=features,
         percentiles=mask,
     )
+
+
+def build_pca_projection_batch(
+    features: torch.Tensor,
+    projector: PcaProjector,
+) -> PerturbationBatch:
+    """Project features through a fitted PCA basis for student input."""
+
+    if features.ndim != 4:
+        raise ValueError(
+            "PCA projection expects convolutional features with shape "
+            "(batch, channels, height, width)"
+        )
+    projected = projector.transform(features)
+    empty = features.new_empty((features.shape[0], 0))
+    return PerturbationBatch(
+        student_inputs=projected,
+        original_features=features,
+        perturbations=empty,
+        perturbed_features=features,
+        percentiles=empty,
+    )
+
+
+def fit_pca_projector_from_activations(
+    activation_path: Path,
+    n_components: int,
+) -> PcaProjector:
+    """Fit a PCA projector from an exported teacher activation artifact."""
+
+    artifact = torch.load(activation_path, map_location="cpu", weights_only=False)
+    activations = artifact.get("activations")
+    if not torch.is_tensor(activations):
+        raise ValueError(f"Activation artifact is missing tensor 'activations': {activation_path}")
+    values = torch.flatten(activations.float(), start_dim=1)
+    if n_components > values.shape[1]:
+        raise ValueError(
+            f"pca_components={n_components} exceeds flattened activation dimension "
+            f"{values.shape[1]}"
+        )
+    mean = values.mean(dim=0)
+    centered = values - mean
+    _, _, vh = torch.linalg.svd(centered, full_matrices=False)
+    return PcaProjector(
+        mean=mean,
+        components=vh[:n_components].contiguous(),
+    )
+
+
+def save_pca_projector(path: Path, projector: PcaProjector, metadata: dict[str, object]) -> None:
+    """Save a fitted PCA projector artifact."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            **metadata,
+            "mean": projector.mean.cpu(),
+            "components": projector.components.cpu(),
+        },
+        path,
+    )
+
+
+def load_pca_projector(path: Path, device: torch.device | None = None) -> PcaProjector:
+    """Load a fitted PCA projector artifact."""
+
+    artifact = torch.load(path, map_location="cpu", weights_only=False)
+    mean = artifact.get("mean")
+    components = artifact.get("components")
+    if not torch.is_tensor(mean) or not torch.is_tensor(components):
+        raise ValueError(f"PCA projector artifact is missing tensors: {path}")
+    projector = PcaProjector(mean=mean.float(), components=components.float())
+    if device is not None:
+        projector = projector.to(device)
+    return projector
+
+
+def pca_projector_path(experiment_dir: Path) -> Path:
+    """Return the standard PCA projector artifact path for an experiment."""
+
+    return experiment_dir / "pca_projector.pt"
 
 
 def _sample_dropout_mask(

@@ -103,6 +103,34 @@ class ProbabilityInferenceTests(unittest.TestCase):
         self.assertEqual(config.strategy.perturbation.dropout_mode, "channel")
         self.assertEqual(config.strategy.perturbation.evaluation_draws, 50)
 
+    def test_pca_projection_config_parses_components_and_activation_path(self) -> None:
+        config = parse_config(
+            {
+                "experiment_name": "pca_config",
+                "student": {
+                    "kind": "linear",
+                    "feature_layer": "layer4",
+                    "input_shape": [128],
+                    "num_classes": 10,
+                },
+                "strategy": {
+                    "name": "perturbation",
+                    "perturbation": {
+                        "method": "pca_projection",
+                        "pca_components": 128,
+                        "pca_activation_path": "runs/teacher/teacher_activations/cifar10_test/layer4.pt",
+                    },
+                },
+            }
+        )
+
+        self.assertEqual(config.strategy.perturbation.method, "pca_projection")
+        self.assertEqual(config.strategy.perturbation.pca_components, 128)
+        self.assertEqual(
+            config.strategy.perturbation.pca_activation_path,
+            "runs/teacher/teacher_activations/cifar10_test/layer4.pt",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

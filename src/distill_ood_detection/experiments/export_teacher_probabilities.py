@@ -1,4 +1,4 @@
-"""Export deterministic teacher probabilities for ID and configured OOD datasets."""
+"""Export deterministic teacher outputs for ID and configured OOD datasets."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from distill_ood_detection.utils import resolve_device, set_seed, write_json
 def run_teacher_probability_export(
     config: TeacherProbabilityConfig,
 ) -> dict[str, object]:
-    """Export deterministic teacher probabilities for the configured datasets."""
+    """Export deterministic teacher logits and probabilities for configured datasets."""
 
     set_seed(config.seed)
     device = resolve_device(config.device)
@@ -69,7 +69,7 @@ def export_loader_probabilities(
     device: torch.device,
     metadata: dict[str, object],
 ) -> dict[str, object]:
-    """Collect and save teacher probabilities for one dataset loader."""
+    """Collect and save teacher logits and probabilities for one dataset loader."""
 
     outputs = collect_model_outputs(teacher, named_loader.loader, device)
     path = output_dir / named_loader.name / "probabilities.pt"
@@ -77,6 +77,7 @@ def export_loader_probabilities(
     torch.save(
         {
             **metadata,
+            "logits": outputs.logits,
             "probabilities": outputs.probabilities,
             "labels": outputs.labels,
         },
