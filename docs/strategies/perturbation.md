@@ -1,8 +1,8 @@
 # Perturbation Strategy
 
-This strategy is a perturbation-based stochastic distillation algorithm. The core idea is to perturb an intermediate image embedding produced by the teacher model, then train the student to predict the teacher output for that perturbed embedding.
+This strategy is a perturbation-based stochastic distillation algorithm. The core idea is to perturb an intermediate image embedding produced by the teacher model, then train the student to predict a teacher output from the perturbed embedding.
 
-The student must receive enough information to be perturbation-aware: it should observe both the perturbed embedding and the sampled perturbation applied to the original embedding.
+For clipping-based perturbations, the student receives both the perturbed embedding and the sampled perturbation applied to the original embedding. For Monte-Carlo dropout, the student receives only the dropped embedding.
 
 ## Teacher Model
 
@@ -29,7 +29,9 @@ The following student architectures are evaluated:
 
 `y_tilde_teacher` and `y_tilde_student` may be represented either as logits or as probability distributions after softmax, depending on the selected distillation objective.
 
-### Perturbation strategies
+### Perturbation methods
+
+Set `strategy.perturbation.method` to choose the perturbation method. Existing configs that omit this field use `clipping`.
 
 #### Clipping-based
 
@@ -52,6 +54,9 @@ Examples:
 - `u = 0.9` corresponds to clipping at the 90th percentile.
 - Smaller values of `u` produce stronger perturbations.
 
+The repository keeps the standard configs at `u_min: 0.5, u_max: 1.0` and
+adds `_aggressive` variants at `u_min: 0.0, u_max: 0.5` for stronger clipping.
+
 The intermediate embedding is extracted from a convolutional layer and has shape `(i, j, d)`, where `i, j` are spatial coordinates and `d` is the channel dimension.
 
 ##### Clipping modes
@@ -60,17 +65,44 @@ The intermediate embedding is extracted from a convolutional layer and has shape
 - `spatial_dependent`: `u` has shape `(i, j)`. A separate clipping threshold is computed for each spatial location `(i, j)` using all channel values at that location.
 - `channel_dependent`: `u` has shape `(d)`. A separate clipping threshold is computed for each channel `d` using all spatial values in that channel. The threshold is shared across spatial locations.
 
+#### Monte-Carlo dropout
+
+This perturbation method randomly drops elements of the intermediate teacher embedding before passing it to the student:
+
+`z_drop = dropout(z, p)`
+
+where `p = strategy.perturbation.dropout_probability`.
+
+Set `strategy.perturbation.dropout_mode` to choose which parts of the feature tensor are dropped:
+
+- `element`: Drop individual activation values independently.
+- `channel`: Drop whole channels independently. A dropped channel is removed at every spatial location.
+- `spatial`: Drop whole spatial locations independently. A dropped location is removed across all channels.
+
+The teacher target remains the unperturbed teacher continuation from `z`. The student is therefore trained to predict the teacher output from incomplete feature evidence, rather than to imitate a teacher that has also seen the same dropped embedding.
+
+At inference time, use `distill-ood infer-probabilities --apply-perturbation` to keep dropout active and export `K = strategy.perturbation.evaluation_draws` stochastic student draws. This is the Monte-Carlo dropout estimate. The implementation samples dropout masks directly for the feature tensor, so dropout remains active without putting the full model into training mode.
+
+The first Monte-Carlo dropout configs use `dropout_probability: 0.5`. The unsuffixed files use `dropout_mode: element`; `_channel` and `_spatial` variants use structured dropout:
+
+- `configs/perturbation/cifar_10/linear_layer4_mc_dropout.yaml`
+- `configs/perturbation/cifar_10/linear_layer4_mc_dropout_channel.yaml`
+- `configs/perturbation/cifar_10/linear_layer4_mc_dropout_spatial.yaml`
+- `configs/perturbation/cifar_100/linear_layer4_mc_dropout.yaml`
+- `configs/perturbation/cifar_100/linear_layer4_mc_dropout_channel.yaml`
+- `configs/perturbation/cifar_100/linear_layer4_mc_dropout_spatial.yaml`
+
 ## OOD Score
 
 The perturbation strategy can be stochastic at probability-inference time. This is controlled by the `distill-ood infer-probabilities --apply-perturbation` command-line flag.
 
-When `--apply-perturbation` is set, test and OOD inference samples are perturbed in the same format used during training. The OOD Score for a sample is estimated as the expected score over multiple perturbation draws:
+When `--apply-perturbation` is set, test and OOD inference samples are perturbed in the same format used during training. The OOD Score for a sample can be estimated as the expected score over multiple perturbation draws:
 
 1. Generate `K > 0` independent perturbations.
 2. Compute the selected OOD Score for each perturbation.
 3. Average the scores across all perturbations.
 
-By default, probability inference uses the unmodified teacher embedding `z`. The student still receives a perturbation-aware input vector, but the perturbation component is a neutral all-ones vector with the same shape as `u`, so the input is `concat(flatten(z), flatten(1))`.
+By default, probability inference uses the unmodified teacher embedding `z`. For clipping, the student still receives a perturbation-aware input vector, but the perturbation component is a neutral all-ones vector with the same shape as `u`, so the input is `concat(flatten(z), flatten(1))`. For Monte-Carlo dropout, the default unperturbed input is just `flatten(z)`.
 
 Use `strategy.perturbation.evaluation_draws` to set `K` when running `infer-probabilities --apply-perturbation`. Without that flag, the process is not stochastic and probability inference exports one deterministic draw.
 
@@ -91,7 +123,7 @@ See [Objectives](../objectives/README.md) for details.
 
 ## Implementation
 
-- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`.
+- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`. For Monte-Carlo dropout, the student input is `flatten(dropout(z, p))` and the teacher target is the unperturbed continuation from `z`.
 - `distill-ood infer-probabilities --apply-perturbation` controls whether probability inference samples are perturbed. Training samples are always perturbed for this strategy.
 - ResNet feature continuation is implemented by `ResNetFeatureForwarder` in [teacher.py](../../src/distill_ood_detection/models/teacher.py).
 - Raw pre-perturbation teacher activations can be exported with `distill-ood export-teacher-activations --config configs/teachers/resnet18_cifar10_layers.yaml`. Each configured layer is saved as a separate `.pt` file under `runs/<experiment_name>/teacher_activations/<dataset_name>/`.

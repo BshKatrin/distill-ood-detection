@@ -11,7 +11,7 @@ from distill_ood_detection.config import DistillationMethod, PerturbationConfig
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.distillation.perturbation import (
     build_unperturbed_perturbation_batch,
-    sample_clipping_perturbation,
+    sample_perturbation,
 )
 
 
@@ -149,5 +149,5 @@ def _evaluation_perturbation_batch(
     apply_perturbation: bool,
 ):
     if apply_perturbation:
-        return sample_clipping_perturbation(features, config)
+        return sample_perturbation(features, config)
     return build_unperturbed_perturbation_batch(features, config)

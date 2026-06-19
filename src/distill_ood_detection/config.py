@@ -24,7 +24,9 @@ DistillationMethod = Literal[
 TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
 StrategyName = Literal["baseline", "perturbation"]
+PerturbationMethod = Literal["clipping", "mc_dropout"]
 ClippingMode = Literal["constant", "spatial_dependent", "channel_dependent"]
+DropoutMode = Literal["element", "channel", "spatial"]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
     "cross_entropy_softmax": "cross_entropy",
 }
@@ -85,11 +87,14 @@ class RandomForestConfig:
 
 @dataclass(frozen=True)
 class PerturbationConfig:
-    """Clipping perturbation settings for stochastic distillation."""
+    """Perturbation settings for stochastic distillation."""
 
+    method: PerturbationMethod = "clipping"
     u_min: float = 0.0
     u_max: float = 1.0
     clipping_mode: ClippingMode = "constant"
+    dropout_probability: float = 0.5
+    dropout_mode: DropoutMode = "element"
     evaluation_draws: int = 1
 
 
@@ -459,6 +464,8 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(f"Unsupported strategy config fields: {unknown}")
     if strategy.name not in {"baseline", "perturbation"}:
         raise ValueError(f"Unsupported strategy: {strategy.name}")
+    if perturbation.method not in {"clipping", "mc_dropout"}:
+        raise ValueError(f"Unsupported perturbation method: {perturbation.method}")
     if perturbation.clipping_mode not in {
         "constant",
         "spatial_dependent",
@@ -467,6 +474,12 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(f"Unsupported clipping mode: {perturbation.clipping_mode}")
     if not 0.0 <= perturbation.u_min < perturbation.u_max <= 1.0:
         raise ValueError("strategy.perturbation requires 0 <= u_min < u_max <= 1")
+    if not 0.0 <= perturbation.dropout_probability < 1.0:
+        raise ValueError(
+            "strategy.perturbation.dropout_probability requires 0 <= p < 1"
+        )
+    if perturbation.dropout_mode not in {"element", "channel", "spatial"}:
+        raise ValueError(f"Unsupported dropout mode: {perturbation.dropout_mode}")
     if perturbation.evaluation_draws <= 0:
         raise ValueError("strategy.perturbation.evaluation_draws must be positive")
     return strategy

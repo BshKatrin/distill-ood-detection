@@ -20,7 +20,7 @@ from distill_ood_detection.config import (
 )
 from distill_ood_detection.distillation.perturbation import (
     build_unperturbed_perturbation_batch,
-    sample_clipping_perturbation,
+    sample_perturbation,
 )
 from distill_ood_detection.datasets.inference import (
     build_in_distribution_test_loader,
@@ -347,7 +347,7 @@ def _collect_tree_dataset(
                 raise ValueError("config is required for perturbation tree collection")
             features = perturbation_forwarder.forward_to_features(images)
             if apply_perturbation:
-                perturbation_batch = sample_clipping_perturbation(
+                perturbation_batch = sample_perturbation(
                     features,
                     config.strategy.perturbation,
                 )

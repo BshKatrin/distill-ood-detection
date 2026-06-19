@@ -20,7 +20,7 @@ from distill_ood_detection.config import (
     ResolvedTrainingMethodConfig,
 )
 from distill_ood_detection.distillation.losses import distillation_loss
-from distill_ood_detection.distillation.perturbation import sample_clipping_perturbation
+from distill_ood_detection.distillation.perturbation import sample_perturbation
 from distill_ood_detection.evaluation.metrics import distillation_validation_metrics
 from distill_ood_detection.utils import write_json
 
@@ -71,7 +71,7 @@ def train_student(
                     if perturbation_config is None:
                         raise ValueError("perturbation_config is required for perturbation training")
                     features = perturbation_forwarder.forward_to_features(images)
-                    perturbation_batch = sample_clipping_perturbation(
+                    perturbation_batch = sample_perturbation(
                         features,
                         perturbation_config,
                     )

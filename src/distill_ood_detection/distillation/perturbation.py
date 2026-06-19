@@ -55,6 +55,46 @@ def sample_clipping_perturbation(
     )
 
 
+def sample_perturbation(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+) -> PerturbationBatch:
+    """Sample the perturbation configured for stochastic distillation."""
+
+    if config.method == "clipping":
+        return sample_clipping_perturbation(features, config)
+    if config.method == "mc_dropout":
+        return sample_mc_dropout_perturbation(features, config)
+    raise ValueError(f"Unsupported perturbation method: {config.method}")
+
+
+def sample_mc_dropout_perturbation(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+) -> PerturbationBatch:
+    """Apply Monte-Carlo dropout to student features.
+
+    The student receives dropped features, while ``perturbed_features`` remains
+    the original tensor so the teacher target is the unperturbed continuation.
+    """
+
+    if features.ndim != 4:
+        raise ValueError(
+            "Monte-Carlo dropout perturbation expects convolutional features "
+            "with shape (batch, channels, height, width)"
+        )
+    mask = _sample_dropout_mask(features, config)
+    keep_probability = 1.0 - config.dropout_probability
+    dropped = features * mask / keep_probability
+    return PerturbationBatch(
+        student_inputs=torch.flatten(dropped, start_dim=1),
+        original_features=features,
+        perturbations=torch.flatten(mask.expand_as(features), start_dim=1),
+        perturbed_features=features,
+        percentiles=mask,
+    )
+
+
 def build_unperturbed_perturbation_batch(
     features: torch.Tensor,
     config: PerturbationConfig,
@@ -65,6 +105,8 @@ def build_unperturbed_perturbation_batch(
     expected by perturbation-aware students while leaving ``z`` unchanged.
     """
 
+    if config.method == "mc_dropout":
+        return build_unperturbed_mc_dropout_batch(features, config)
     if features.ndim != 4:
         raise ValueError(
             "unperturbed perturbation inputs expect convolutional features with shape "
@@ -90,6 +132,48 @@ def build_unperturbed_perturbation_batch(
         perturbed_features=features,
         percentiles=percentiles,
     )
+
+
+def build_unperturbed_mc_dropout_batch(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+) -> PerturbationBatch:
+    """Build MC-dropout-shaped inputs without applying dropout."""
+
+    if features.ndim != 4:
+        raise ValueError(
+            "unperturbed Monte-Carlo dropout inputs expect convolutional features "
+            "with shape (batch, channels, height, width)"
+        )
+    mask = torch.ones_like(features)
+    return PerturbationBatch(
+        student_inputs=torch.flatten(features, start_dim=1),
+        original_features=features,
+        perturbations=torch.flatten(mask, start_dim=1),
+        perturbed_features=features,
+        percentiles=mask,
+    )
+
+
+def _sample_dropout_mask(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+) -> torch.Tensor:
+    batch_size, channels, height, width = features.shape
+    if config.dropout_mode == "element":
+        mask_shape = features.shape
+    elif config.dropout_mode == "channel":
+        mask_shape = (batch_size, channels, 1, 1)
+    elif config.dropout_mode == "spatial":
+        mask_shape = (batch_size, 1, height, width)
+    else:
+        raise ValueError(f"Unsupported dropout mode: {config.dropout_mode}")
+    keep_probability = 1.0 - config.dropout_probability
+    return torch.empty(
+        mask_shape,
+        device=features.device,
+        dtype=features.dtype,
+    ).bernoulli_(keep_probability)
 
 
 def _sample_percentiles(

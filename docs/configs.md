@@ -60,6 +60,11 @@ that distinguishes the experiment. For example:
 - `feature_linear_layer3.yaml`
 - `linear_layer3.yaml`
 
+When a strategy needs a stronger or alternate sampling regime, keep the
+original file and add a sibling with a suffix that names the variant, such as
+`_aggressive`, `_mc_dropout`, `_mc_dropout_channel`, or
+`_mc_dropout_spatial`.
+
 Prefer short, descriptive names that make related configs easy to scan.
 
 ## Teacher artifact configs
@@ -112,3 +117,8 @@ stochastic perturbations. These modes are separated to avoid overwriting:
 runs/<experiment_name>/probabilities/unperturbed/
 runs/<experiment_name>/probabilities/perturbed/
 ```
+
+Clipping perturbation configs use student input shapes that include both the
+flattened feature tensor and the perturbation code. Monte-Carlo dropout configs
+use only the flattened feature tensor because the dropout mask is not provided
+to the student.

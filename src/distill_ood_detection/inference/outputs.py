@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from distill_ood_detection.config import PerturbationConfig, TreeDistillationMode
 from distill_ood_detection.distillation.perturbation import (
     build_unperturbed_perturbation_batch,
-    sample_clipping_perturbation,
+    sample_perturbation,
 )
 
 
@@ -331,5 +331,5 @@ def _evaluation_perturbation_batch(
     apply_perturbation: bool,
 ):
     if apply_perturbation:
-        return sample_clipping_perturbation(features, config)
+        return sample_perturbation(features, config)
     return build_unperturbed_perturbation_batch(features, config)
