@@ -29,7 +29,7 @@ strategy:
   name: perturbation
   perturbation:
     method: mc_dropout
-    dropout_probability: 0.5
+    dropout_probability: 0.8
     dropout_mode: element
     evaluation_draws: 50
 
