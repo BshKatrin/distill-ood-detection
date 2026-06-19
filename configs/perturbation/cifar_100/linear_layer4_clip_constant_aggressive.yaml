@@ -18,6 +18,7 @@ dataset:
 teacher:
   hf_model_id: edadaltocg/resnet18_cifar100
   revision: main
+  num_classes: 100
 
 student:
   kind: linear
