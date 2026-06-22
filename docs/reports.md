@@ -47,6 +47,23 @@ Computed OOD metrics are cached in
 the source artifact paths, sizes, and modification times match. Use `--cache` to
 choose a different cache file.
 
+To export numeric metrics for an explicit list of run names, use
+`--run-names`. This mode reads each run's probability manifest directly, so the
+original experiment config does not need to be present. It writes numeric
+ROC-AUC and FPR@95 values to JSON and includes `n_estimators` when it is present
+in the saved random-forest method metrics:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
+  python reports/scripts/export_metrics_table.py \
+  --run-names random_forest_student_resnet18_cifar10_n50 \
+              random_forest_student_resnet18_cifar10_n200 \
+  --json-output reports/outputs/json/random_forest_n_estimators.json
+```
+
+Without `--json-output`, this mode writes
+`reports/outputs/json/ood_metrics.json`.
+
 On the GPU cluster, run the same exporter through SLURM with
 `slurm_scripts/export_metrics_table.sbatch`. This job should not allocate a GPU;
 it loads saved probability artifacts on CPU and writes the generated LaTeX files

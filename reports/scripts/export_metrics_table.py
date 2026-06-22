@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "reports"
 OUTPUT_DIR = REPORTS_DIR / "outputs" / "latex"
 DEFAULT_CACHE_PATH = REPORTS_DIR / "outputs" / "cache" / "ood_metrics.json"
+DEFAULT_RUN_METRICS_PATH = REPORTS_DIR / "outputs" / "json" / "ood_metrics.json"
 DEFAULT_OUTPUT_PATTERN = "metrics_{strategy}.tex"
 
 DEFAULT_CONFIG_PATHS = [
@@ -580,6 +581,15 @@ class RunArtifacts:
         return (dataset_key, method_key) in self._student_artifact_paths
 
     @property
+    def method_keys(self) -> tuple[str, ...]:
+        """Return student methods or tree modes present in the manifest."""
+
+        methods = {method for _dataset, method in self._student_artifact_paths}
+        ordered = [method for method in METHOD_ORDER if method in methods]
+        ordered.extend(sorted(methods.difference(ordered)))
+        return tuple(ordered)
+
+    @property
     def teacher_score_label(self) -> str:
         """Return the teacher MSP row label for this run."""
 
@@ -788,14 +798,14 @@ def student_scores_for_dataset(
         del teacher_values, student_values
 
 
-def student_metric(
+def student_metric_values(
     run: RunArtifacts,
     method_key: str,
     score_key: str,
     ood_dataset_key: str,
     metric_cache: MetricCache,
-) -> str:
-    """Compute one student metric table cell."""
+) -> dict[str, float]:
+    """Compute numeric OOD metrics for one run, method, score, and OOD dataset."""
 
     id_dataset_key = run.id_dataset_key
     artifact_key = "logits" if score_key in LOGIT_SCORE_KEYS else "probabilities"
@@ -821,7 +831,7 @@ def student_metric(
     cached = metric_cache.get(key, fingerprints)
     if cached is not None:
         progress("cache hit student metric")
-        return format_metric(cached)
+        return cached
 
     id_scores = student_scores_for_dataset(
         run,
@@ -841,7 +851,27 @@ def student_metric(
         del id_scores, ood_scores
         gc.collect()
     metric_cache.set(key, fingerprints, metrics)
-    return format_metric(metrics)
+    return metrics
+
+
+def student_metric(
+    run: RunArtifacts,
+    method_key: str,
+    score_key: str,
+    ood_dataset_key: str,
+    metric_cache: MetricCache,
+) -> str:
+    """Compute one formatted student metric table cell."""
+
+    return format_metric(
+        student_metric_values(
+            run,
+            method_key,
+            score_key,
+            ood_dataset_key,
+            metric_cache,
+        )
+    )
 
 
 def id_dataset_key_from_config(config: ExperimentConfig) -> str:
@@ -1234,6 +1264,96 @@ def output_path_for_strategy(output_dir: Path, strategy: str) -> Path:
     return output_dir / DEFAULT_OUTPUT_PATTERN.format(strategy=strategy)
 
 
+def run_n_estimators(run: RunArtifacts) -> int | dict[str, int] | None:
+    """Load random-forest estimator counts saved by the run, when available."""
+
+    values: dict[str, int] = {}
+    for method_key in run.method_keys:
+        metrics_path = run.run_dir / method_key / "metrics.json"
+        if not metrics_path.exists():
+            continue
+        with metrics_path.open() as file:
+            metrics = json.load(file)
+        value = metrics.get("n_estimators")
+        if isinstance(value, int):
+            values[method_key] = value
+    if not values:
+        return None
+    unique_values = set(values.values())
+    if len(unique_values) == 1:
+        return next(iter(unique_values))
+    return values
+
+
+def export_run_metrics(
+    run_names: Iterable[str],
+    output_path: Path,
+    metric_cache: MetricCache,
+) -> None:
+    """Export numeric OOD metrics for explicitly selected run names to JSON."""
+
+    exported_runs: list[dict[str, Any]] = []
+    for run_name in dict.fromkeys(run_names):
+        run_dir = ROOT / "runs" / run_name
+        manifest_path = probability_manifest_path(run_dir)
+        if not manifest_path.exists():
+            raise FileNotFoundError(
+                f"Missing probability manifest for run {run_name!r}: {manifest_path}"
+            )
+        run = RunArtifacts(run_dir)
+        records: list[dict[str, str | float]] = []
+        for method_key in run.method_keys:
+            for ood_dataset_key in run.ood_dataset_keys:
+                if not run.has_student_artifact(run.id_dataset_key, method_key) or not (
+                    run.has_student_artifact(ood_dataset_key, method_key)
+                ):
+                    progress(
+                        f"skipping incomplete artifacts for {run_name}, {method_key}, "
+                        f"{ood_dataset_key}"
+                    )
+                    continue
+                for score_key in SCORE_ORDER:
+                    progress(
+                        f"exporting {run_name}, {method_key}, {score_key}, "
+                        f"{run.id_dataset_key} vs {ood_dataset_key}"
+                    )
+                    metrics = student_metric_values(
+                        run,
+                        method_key,
+                        score_key,
+                        ood_dataset_key,
+                        metric_cache,
+                    )
+                    records.append(
+                        {
+                            "method": method_key,
+                            "ood_score": score_key,
+                            "id_dataset": run.id_dataset_key,
+                            "ood_dataset": ood_dataset_key,
+                            "roc_auc": metrics["roc_auc"],
+                            "fpr_at_95_tpr": metrics["fpr_at_95_tpr"],
+                        }
+                    )
+        run_payload: dict[str, Any] = {
+            "run_name": run.run_name,
+            "id_dataset": run.id_dataset_key,
+            "ood_datasets": run.ood_dataset_keys,
+            "checkpoint_selection": run.manifest.get("checkpoint_selection"),
+            "apply_perturbation": run.manifest.get("apply_perturbation", False),
+            "metrics": records,
+        }
+        n_estimators = run_n_estimators(run)
+        if n_estimators is not None:
+            run_payload["n_estimators"] = n_estimators
+        exported_runs.append(run_payload)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w") as file:
+        json.dump({"version": 1, "runs": exported_runs}, file, indent=2, sort_keys=True)
+    metric_cache.save()
+    print(f"Wrote {output_path}")
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
 
@@ -1253,6 +1373,25 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=None,
         help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--run-names",
+        nargs="+",
+        default=None,
+        metavar="RUN_NAME",
+        help=(
+            "Export numeric OOD metrics for these runs directly from their "
+            "probability manifests, without requiring config files."
+        ),
+    )
+    parser.add_argument(
+        "--json-output",
+        type=Path,
+        default=None,
+        help=(
+            "JSON destination for --run-names; defaults to "
+            "reports/outputs/json/ood_metrics.json."
+        ),
     )
     parser.add_argument(
         "--output",
@@ -1288,10 +1427,19 @@ def main() -> None:
     if args.runs is not None:
         msg = "--runs is deprecated; pass config files or directories instead."
         raise ValueError(msg)
+    if args.json_output is not None and args.run_names is None:
+        raise ValueError("--json-output requires --run-names.")
+    metric_cache = MetricCache(args.cache)
+    if args.run_names is not None:
+        export_run_metrics(
+            args.run_names,
+            args.json_output or DEFAULT_RUN_METRICS_PATH,
+            metric_cache,
+        )
+        return
     configs = [experiment_config(path) for path in expand_config_paths(args.configs)]
     configs_by_strategy = grouped_available_configs(configs)
     teacher_runs = teacher_reference_runs()
-    metric_cache = MetricCache(args.cache)
 
     if args.output is not None and len(configs_by_strategy) != 1:
         msg = "--output can only be used when one OOD strategy is selected."
