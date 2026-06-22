@@ -1,4 +1,4 @@
-experiment_name: perturbation_linear_layer4_student_resnet18_cifar100_pca512
+experiment_name: perturbation_linear_layer4_student_resnet18_cifar100_pca100
 output_dir: runs
 
 dataset:
@@ -23,14 +23,14 @@ teacher:
 student:
   kind: linear
   feature_layer: layer4
-  input_shape: [512]
+  input_shape: [100]
   num_classes: 100
 
 strategy:
   name: perturbation
   perturbation:
     method: pca_projection
-    pca_components: 512
+    pca_components: 100
     pca_activation_path: runs/teacher_resnet18_cifar100/teacher_activations/cifar100_train/layer4.pt
 
 optimizer:

@@ -140,3 +140,23 @@ Use `--number` to choose a stable notebook prefix and `--overwrite` to replace a
 existing generated notebook. The same command works for any teacher activation
 config, for example `configs/teachers/resnet18_cifar100_layers.yaml`, once its
 matching activation artifacts have been exported.
+
+## PCA explained-variance notebook
+
+Export the leading PCA explained-variance statistics from the complete ID
+training-split activation artifact before opening the notebook. The export uses
+deterministic randomized PCA so it remains practical on a local CPU machine:
+
+```bash
+uv run --project envs/notebooks --no-sync python reports/scripts/export_pca_explained_variance.py \
+  runs/teacher_resnet18_cifar10/teacher_activations/cifar10_train/layer4.pt
+```
+
+The default export estimates 512 components. Increase the range when a target
+variance threshold has not been reached, for example with
+`--max-components 1024`. The command writes the statistics JSON beside the
+activation artifact and generates a numbered notebook under
+`reports/outputs/notebooks/` from
+`reports/templates/notebooks/pca_explained_variance.ipynb`. Use `--number` to
+choose a stable notebook prefix and `--overwrite` to replace an existing
+generated notebook.

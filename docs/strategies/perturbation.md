@@ -103,7 +103,7 @@ where `n_components = strategy.perturbation.pca_components`.
 The PCA basis is fitted from a previously exported teacher activation artifact. Export teacher activations first, for example:
 
 ```bash
-distill-ood export-teacher-activations --config configs/teachers/resnet18_cifar10.yaml
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli export-teacher-activations --config configs/teachers/resnet18_cifar10.yaml
 ```
 
 Then point the student config at the ID activation artifact:
@@ -136,6 +136,11 @@ Initial PCA configs are:
 - `configs/perturbation/cifar_10/linear_layer4_pca512.yaml`
 - `configs/perturbation/cifar_100/linear_layer4_pca128.yaml`
 - `configs/perturbation/cifar_100/linear_layer4_pca512.yaml`
+
+Choose `pca_components` from the cumulative explained variance of the complete
+ID training-split activation artifact. On a local machine, export the PCA
+statistics once and plot the small JSON artifact in the report notebook; see
+[PCA explained-variance notebook](../reports.md#pca-explained-variance-notebook).
 
 ## OOD Score
 
