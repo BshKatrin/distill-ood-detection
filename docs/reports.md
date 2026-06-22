@@ -51,7 +51,10 @@ To export numeric metrics for an explicit list of run names, use
 `--run-names`. This mode reads each run's probability manifest directly, so the
 original experiment config does not need to be present. It writes numeric
 ROC-AUC and FPR@95 values to JSON and includes `n_estimators` when it is present
-in the saved random-forest method metrics:
+in the saved random-forest method metrics. When a student manifest references
+teacher artifacts that are not stored in the student run, the exporter resolves
+the matching centralized export under `runs/*/teacher_probabilities/` using the
+teacher model ID in the run's manifest or `resolved_config.json`:
 
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \

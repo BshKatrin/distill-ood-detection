@@ -172,6 +172,7 @@ def run_probability_inference(
     manifest = {
         "experiment_name": config.experiment_name,
         "dataset": asdict(config.dataset),
+        "teacher": asdict(config.teacher),
         "checkpoint_selection": checkpoint,
         "apply_perturbation": apply_perturbation,
         "artifacts": artifacts,

@@ -29,12 +29,17 @@ class ExportRunMetricsTests(unittest.TestCase):
             run_name = "random_forest_n50"
             run_dir = tmp_path / "runs" / run_name
             probability_dir = run_dir / "probabilities"
+            teacher_run_dir = tmp_path / "runs" / "teacher_resnet18_cifar10"
+            teacher_probability_dir = teacher_run_dir / "teacher_probabilities"
             datasets = ["cifar10_test", "mnist_test"]
             artifacts = []
+            teacher_artifacts = []
             for dataset_index, dataset in enumerate(datasets):
                 dataset_dir = probability_dir / dataset
                 dataset_dir.mkdir(parents=True)
-                teacher_path = dataset_dir / "teacher.pt"
+                teacher_dataset_dir = teacher_probability_dir / dataset
+                teacher_dataset_dir.mkdir(parents=True)
+                teacher_path = teacher_dataset_dir / "probabilities.pt"
                 student_path = dataset_dir / "student_logits_best.pt"
                 teacher_logits = torch.tensor([[4.0, 0.0], [3.0, 1.0]])
                 if dataset_index:
@@ -59,7 +64,9 @@ class ExportRunMetricsTests(unittest.TestCase):
                         {
                             "dataset": dataset,
                             "model": "teacher",
-                            "path": str(teacher_path.relative_to(tmp_path)),
+                            "path": str(
+                                (dataset_dir / "teacher.pt").relative_to(tmp_path)
+                            ),
                         },
                         {
                             "dataset": dataset,
@@ -68,6 +75,12 @@ class ExportRunMetricsTests(unittest.TestCase):
                             "path": str(student_path.relative_to(tmp_path)),
                         },
                     ]
+                )
+                teacher_artifacts.append(
+                    {
+                        "dataset": dataset,
+                        "path": str(teacher_path.relative_to(tmp_path)),
+                    }
                 )
             manifest = {
                 "experiment_name": run_name,
@@ -79,6 +92,23 @@ class ExportRunMetricsTests(unittest.TestCase):
                 "artifacts": artifacts,
             }
             (probability_dir / "manifest.json").write_text(json.dumps(manifest))
+            teacher_manifest = {
+                "experiment_name": "teacher_resnet18_cifar10",
+                "dataset": {
+                    "name": "cifar10",
+                    "ood_datasets": [{"name": "mnist", "split": "test"}],
+                },
+                "teacher": {"hf_model_id": "edadaltocg/resnet18_cifar10"},
+                "artifacts": teacher_artifacts,
+            }
+            (teacher_probability_dir / "manifest.json").write_text(
+                json.dumps(teacher_manifest)
+            )
+            (run_dir / "resolved_config.json").write_text(
+                json.dumps(
+                    {"teacher": {"hf_model_id": "edadaltocg/resnet18_cifar10"}}
+                )
+            )
             metrics_dir = run_dir / "logits"
             metrics_dir.mkdir()
             (metrics_dir / "metrics.json").write_text(

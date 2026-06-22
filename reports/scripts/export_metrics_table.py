@@ -555,7 +555,50 @@ class RunArtifacts:
         for entry in self.manifest["artifacts"]:
             if entry["model"] == "teacher":
                 paths[entry["dataset"]] = ROOT / entry["path"]
+        missing_dataset_keys = {
+            dataset_key for dataset_key, path in paths.items() if not path.exists()
+        }
+        if missing_dataset_keys:
+            teacher_run = self._central_teacher_run()
+            for dataset_key in missing_dataset_keys:
+                paths[dataset_key] = teacher_run.artifact_path(dataset_key)
         return paths
+
+    def _central_teacher_run(self) -> TeacherProbabilityRunArtifacts:
+        """Find the centralized teacher export matching this student run."""
+
+        teacher = self.manifest.get("teacher", {})
+        hf_model_id = teacher.get("hf_model_id")
+        if not isinstance(hf_model_id, str) or not hf_model_id:
+            resolved_config_path = self.run_dir / "resolved_config.json"
+            if resolved_config_path.exists():
+                with resolved_config_path.open() as file:
+                    resolved_config = json.load(file)
+                hf_model_id = resolved_config.get("teacher", {}).get("hf_model_id")
+        if not isinstance(hf_model_id, str) or not hf_model_id:
+            raise ValueError(
+                f"Cannot resolve centralized teacher outputs for {self.run_name}: "
+                "teacher.hf_model_id is absent from the probability manifest and "
+                "resolved_config.json."
+            )
+
+        matches = []
+        for manifest_path in sorted(
+            (ROOT / "runs").glob("*/teacher_probabilities/manifest.json")
+        ):
+            teacher_run = TeacherProbabilityRunArtifacts(manifest_path.parents[1])
+            manifest_teacher = teacher_run.manifest.get("teacher", {})
+            if (
+                teacher_run.id_dataset_key == self.id_dataset_key
+                and manifest_teacher.get("hf_model_id") == hf_model_id
+            ):
+                matches.append(teacher_run)
+        if len(matches) != 1:
+            raise ValueError(
+                f"Expected one centralized teacher probability export for "
+                f"{hf_model_id!r} and {self.id_dataset_key}, found {len(matches)}."
+            )
+        return matches[0]
 
     def _student_paths(self) -> dict[tuple[str, str], Path]:
         paths = {}
