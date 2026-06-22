@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -67,7 +69,7 @@ def accuracy(
 
 
 @torch.no_grad()
-def distillation_validation_metrics(
+def distillation_metrics(
     method: DistillationMethod,
     teacher: nn.Module,
     student: nn.Module,
@@ -80,8 +82,9 @@ def distillation_validation_metrics(
     perturbation_config: PerturbationConfig | None = None,
     pca_projector: PcaProjector | None = None,
     apply_perturbation: bool = False,
+    split: Literal["validation", "test"] = "validation",
 ) -> dict[str, float]:
-    """Compute validation metrics for student distillation."""
+    """Compute student accuracy and distillation metrics for one data split."""
 
     teacher.eval()
     student.eval()
@@ -98,7 +101,9 @@ def distillation_validation_metrics(
         labels = labels.to(device)
         if perturbation_forwarder is not None:
             if perturbation_config is None:
-                raise ValueError("perturbation_config is required for perturbation validation")
+                raise ValueError(
+                    f"perturbation_config is required for perturbation {split} metrics"
+                )
             features = perturbation_forwarder.forward_to_features(images)
             perturbation_batch = _evaluation_perturbation_batch(
                 features,
@@ -142,9 +147,9 @@ def distillation_validation_metrics(
         )
 
     return {
-        "validation_accuracy": correct / total,
-        "validation_distillation_loss": total_distillation_loss / total,
-        "validation_kl_divergence": total_kl / total,
+        f"{split}_accuracy": correct / total,
+        f"{split}_distillation_loss": total_distillation_loss / total,
+        f"{split}_kl_divergence": total_kl / total,
     }
 
 

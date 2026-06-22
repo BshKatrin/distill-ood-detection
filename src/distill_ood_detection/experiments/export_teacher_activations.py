@@ -12,6 +12,7 @@ from torch import nn
 from distill_ood_detection.config import TeacherActivationConfig
 from distill_ood_detection.datasets.inference import (
     NamedLoader,
+    build_in_distribution_full_train_loader,
     build_in_distribution_test_loader,
     build_ood_loaders,
 )
@@ -28,6 +29,7 @@ def run_teacher_activation_export(config: TeacherActivationConfig) -> dict[str, 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     loaders = [
+        build_in_distribution_full_train_loader(config.dataset),
         build_in_distribution_test_loader(config.dataset),
         *build_ood_loaders(config.dataset),
     ]

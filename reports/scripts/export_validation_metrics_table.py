@@ -1,4 +1,4 @@
-"""Export validation accuracy/loss report tables from saved run metrics."""
+"""Export test accuracy/loss report tables from saved run metrics."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "reports"
 OUTPUT_DIR = REPORTS_DIR / "outputs" / "latex"
-DEFAULT_OUTPUT_PATTERN = "metrics_validation_{strategy}.tex"
+DEFAULT_OUTPUT_PATTERN = "metrics_test_{strategy}.tex"
 
 DEFAULT_CONFIG_PATHS = [
     ROOT / "configs" / "baseline",
@@ -29,6 +29,14 @@ DATASET_LABELS = {
 }
 
 ID_DATASET_ORDER = ["cifar10", "cifar100"]
+
+# Published test accuracies from the configured Hugging Face teacher model cards:
+# https://huggingface.co/edadaltocg/resnet18_cifar10
+# https://huggingface.co/edadaltocg/resnet18_cifar100
+TEACHER_TEST_ACCURACIES = {
+    "cifar10": 0.9498,
+    "cifar100": 0.7926,
+}
 
 METHOD_LABELS = {
     "cross_entropy": "CE",
@@ -291,7 +299,7 @@ def latex_escape(text: str) -> str:
 
 
 def load_method_metrics(config: ExperimentConfig, method_key: str) -> dict[str, Any] | None:
-    """Load validation metrics for one method if available."""
+    """Load metrics for one method if available."""
 
     path = metrics_path(config, method_key)
     if not path.exists():
@@ -300,14 +308,21 @@ def load_method_metrics(config: ExperimentConfig, method_key: str) -> dict[str, 
         return json.load(file)
 
 
-def format_validation_metric(metrics: dict[str, Any]) -> str:
-    """Format best validation accuracy and distillation loss as one cell."""
+def format_test_metric(metrics: dict[str, Any]) -> str:
+    """Format best-checkpoint test accuracy and distillation loss as one cell."""
 
-    accuracy = metrics.get("best_validation_accuracy")
-    loss = metrics.get("best_validation_distillation_loss")
+    accuracy = metrics.get("test_accuracy")
+    loss = metrics.get("test_distillation_loss")
     if not isinstance(accuracy, int | float) or not isinstance(loss, int | float):
         return ""
     return f"{accuracy:.4f}/{loss:.4f}"
+
+
+def teacher_test_metric(dataset_name: str) -> str:
+    """Format the published teacher test accuracy without a distillation loss."""
+
+    accuracy = TEACHER_TEST_ACCURACIES[dataset_name]
+    return f"{accuracy:.4f}/--"
 
 
 def report_row_groups(configs: list[ExperimentConfig]) -> list[ReportRowGroup]:
@@ -371,7 +386,10 @@ def group_configs_by_dataset(
 def build_table_rows(configs: list[ExperimentConfig], strategy: str) -> list[str]:
     """Build LaTeX table body rows."""
 
-    rows = []
+    metadata_columns = 4 if strategy == "perturbation" else 3
+    teacher_prefix = " & ".join(["Teacher", *(["--"] * (metadata_columns - 1))])
+    teacher_values = [teacher_test_metric(name) for name in ID_DATASET_ORDER]
+    rows = [teacher_prefix + " & " + " & ".join(teacher_values) + r" \\", r"\midrule"]
     for group in report_row_groups(configs):
         method_keys = group_method_keys(group)
         if not method_keys:
@@ -389,7 +407,7 @@ def build_table_rows(configs: list[ExperimentConfig], strategy: str) -> list[str
                     else None
                 )
                 values.append(
-                    format_validation_metric(metrics)
+                    format_test_metric(metrics)
                     if metrics is not None
                     else ""
                 )
@@ -410,13 +428,13 @@ def build_table_rows(configs: list[ExperimentConfig], strategy: str) -> list[str
         if rows_for_group:
             rows.extend(rows_for_group)
             rows.append(r"\midrule")
-    if rows and rows[-1] == r"\midrule":
+    if rows[-1] == r"\midrule":
         rows.pop()
     return rows
 
 
 def build_strategy_table(strategy: str, configs: list[ExperimentConfig]) -> str:
-    """Render one LaTeX validation metrics table for one OOD strategy."""
+    """Render one LaTeX test metrics table for one OOD strategy."""
 
     metadata_headers = ["Student", "Features"]
     if strategy == "perturbation":
@@ -432,7 +450,7 @@ def build_strategy_table(strategy: str, configs: list[ExperimentConfig]) -> str:
     strategy_title = strategy.replace("_", " ").title()
 
     return rf"""\begin{{tabular}}{{{column_spec}}}
-\multicolumn{{{total_columns}}}{{c}}{{\textbf{{{latex_escape(strategy_title)} Validation Accuracy/Distillation Loss}}}}\\[4pt]
+\multicolumn{{{total_columns}}}{{c}}{{\textbf{{{latex_escape(strategy_title)} Test Accuracy/Distillation Loss}}}}\\[4pt]
 \toprule
 {header_prefix} & {id_headers} \\
 \midrule
@@ -443,7 +461,7 @@ def build_strategy_table(strategy: str, configs: list[ExperimentConfig]) -> str:
 
 
 def build_latex_document(strategy: str, configs: list[ExperimentConfig]) -> str:
-    """Render one standalone LaTeX validation metrics table."""
+    """Render one standalone LaTeX test metrics table."""
 
     body = build_strategy_table(strategy, configs)
     return rf"""\documentclass[border=2pt]{{standalone}}
@@ -496,7 +514,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Generate the report validation metrics LaTeX tables."""
+    """Generate the report test metrics LaTeX tables."""
 
     args = parse_args()
     configs = [experiment_config(path) for path in expand_config_paths(args.configs)]

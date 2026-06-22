@@ -31,7 +31,7 @@ strategy:
   perturbation:
     method: pca_projection
     pca_components: 128
-    pca_activation_path: runs/teacher_resnet18_cifar100/teacher_activations/cifar100_test/layer4.pt
+    pca_activation_path: runs/teacher_resnet18_cifar100/teacher_activations/cifar100_train/layer4.pt
 
 optimizer:
   mse_logits:

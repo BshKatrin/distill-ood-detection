@@ -140,7 +140,7 @@ The script maps these environment variables to exporter flags:
 - `OUTPUT_DIR`: `export_metrics_table.py --output-dir`.
 
 Use [slurm_scripts/export_validation_metrics_table.sbatch](../../slurm_scripts/export_validation_metrics_table.sbatch)
-to compute validation metrics tables on the cluster from existing
+to compute test metrics tables on the cluster from existing
 `runs/<experiment_name>/<method>/metrics.json` artifacts.
 
 This is also a CPU job and should not request a GPU.

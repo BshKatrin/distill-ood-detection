@@ -56,35 +56,40 @@ under `reports/outputs/latex/`.
 sbatch --mem=32G slurm_scripts/export_metrics_table.sbatch
 ```
 
-## Validation metrics table
+## Test metrics table
 
-The validation metrics table is generated from saved method metrics under
+The test metrics table is generated from saved method metrics under
 `runs/<experiment_name>/<method>/metrics.json` and experiment metadata in
 `configs/`. Each ID-dataset cell is formatted as
-`best_validation_accuracy/best_validation_distillation_loss`, using the same
-best-validation-loss checkpoint selection that is used for student probability
-inference.
+`test_accuracy/test_distillation_loss`. Both values are computed in one pass over
+the test split after loading the checkpoint selected by the lowest validation
+distillation loss. A hardcoded Teacher row reports the published test accuracies
+from the Hugging Face model cards for
+[`resnet18_cifar10`](https://huggingface.co/edadaltocg/resnet18_cifar10) and
+[`resnet18_cifar100`](https://huggingface.co/edadaltocg/resnet18_cifar100).
+Its cells use `accuracy/--` because the model cards do not publish a teacher
+distillation loss.
 
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_validation_metrics_table.py
 ```
 
 By default, the exporter reads `configs/baseline/` and `configs/perturbation/`
-and writes `metrics_validation_baseline.tex` and
-`metrics_validation_perturbation.tex` when matching method metrics are
+and writes `metrics_test_baseline.tex` and
+`metrics_test_perturbation.tex` when matching method metrics are
 available. Pass config paths to restrict the output, for example:
 
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_validation_metrics_table.py configs/baseline/cifar_10 configs/perturbation/cifar_10
 ```
 
-Baseline validation tables include `Student`, `Features`, and `Training`
-columns. Perturbation validation tables also include a `Perturbation` column.
+Baseline test tables include `Student`, `Features`, and `Training`
+columns. Perturbation test tables also include a `Perturbation` column.
 Both strategy tables keep `CIFAR-10 (ID)` and `CIFAR-100 (ID)` columns, leaving
 cells blank when local metrics are missing. Rows with the same displayed
 metadata are merged across ID datasets, matching the OOD metrics table layout.
 
-On the GPU cluster, run the validation metrics exporter through SLURM with
+On the GPU cluster, run the test metrics exporter through SLURM with
 `slurm_scripts/export_validation_metrics_table.sbatch`. This job should not
 allocate a GPU; it reads saved method metrics JSON files and writes generated
 LaTeX files under `reports/outputs/latex/`.

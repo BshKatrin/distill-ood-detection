@@ -22,7 +22,7 @@ from distill_ood_detection.config import (
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.distillation.perturbation import sample_perturbation
 from distill_ood_detection.distillation.perturbation import PcaProjector
-from distill_ood_detection.evaluation.metrics import distillation_validation_metrics
+from distill_ood_detection.evaluation.metrics import distillation_metrics
 from distill_ood_detection.utils import write_json
 
 
@@ -106,7 +106,7 @@ def train_student(
                 progress.set_postfix(loss=f"{total_loss / total_examples:.4f}")
 
         train_loss = total_loss / total_examples
-        validation_metrics = distillation_validation_metrics(
+        validation_metrics = distillation_metrics(
             method=method,
             teacher=teacher,
             student=student,
@@ -118,6 +118,7 @@ def train_student(
             perturbation_forwarder=perturbation_forwarder,
             perturbation_config=perturbation_config,
             pca_projector=pca_projector,
+            split="validation",
         )
         validation_accuracy = validation_metrics["validation_accuracy"]
         validation_distillation_loss = validation_metrics["validation_distillation_loss"]

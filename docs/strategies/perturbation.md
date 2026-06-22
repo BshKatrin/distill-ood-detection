@@ -114,16 +114,21 @@ strategy:
   perturbation:
     method: pca_projection
     pca_components: 128
-    pca_activation_path: runs/teacher_resnet18_cifar10/teacher_activations/cifar10_test/layer4.pt
+    pca_activation_path: runs/teacher_resnet18_cifar10/teacher_activations/cifar10_train/layer4.pt
 ```
 
-Training fits the PCA projector once from `pca_activation_path` and saves it under:
+Teacher activation export includes the complete official ID training split in
+addition to ID and OOD test splits. Training fits the PCA projector once from
+the ID training artifact at `pca_activation_path` and saves it under:
 
 ```text
 runs/<experiment_name>/pca_projector.pt
 ```
 
-Probability inference reloads this saved projector, so inference uses the same PCA basis as training. The teacher target remains the unperturbed teacher continuation from `z`; only the student input is reduced to `z_pca`.
+Probability inference reloads this saved projector for every ID and OOD test
+split, so no evaluation activations are used to fit or update PCA. The teacher
+target remains the unperturbed teacher continuation from `z`; only the student
+input is reduced to `z_pca`.
 
 Initial PCA configs are:
 
@@ -166,6 +171,6 @@ See [Objectives](../objectives/README.md) for details.
 - Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`. For Monte-Carlo dropout, the student input is `flatten(dropout(z, p))` and the teacher target is the unperturbed continuation from `z`. For PCA projection, the student input is the saved PCA projection of `flatten(z)`.
 - `distill-ood infer-probabilities --apply-perturbation` controls whether probability inference samples are perturbed. Training samples are always perturbed for this strategy.
 - ResNet feature continuation is implemented by `ResNetFeatureForwarder` in [teacher.py](../../src/distill_ood_detection/models/teacher.py).
-- Raw pre-perturbation teacher activations can be exported with `distill-ood export-teacher-activations --config configs/teachers/resnet18_cifar10_layers.yaml`. Each configured layer is saved as a separate `.pt` file under `runs/<experiment_name>/teacher_activations/<dataset_name>/`.
+- Raw pre-perturbation teacher activations can be exported with `distill-ood export-teacher-activations --config configs/teachers/resnet18_cifar10.yaml`. The export includes the complete official ID training split, ID test split, and configured OOD splits. Each configured layer is saved as a separate `.pt` file under `runs/<experiment_name>/teacher_activations/<dataset_name>/`.
 - PyTorch student training is implemented in [train_student.py](../../src/distill_ood_detection/experiments/train_student.py).
 - Random-forest student training is implemented in [train_tree_student.py](../../src/distill_ood_detection/experiments/train_tree_student.py).

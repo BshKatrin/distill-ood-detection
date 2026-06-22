@@ -6,6 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 import mlflow
+import torch
 
 from distill_ood_detection.config import DistillationMethod, ExperimentConfig
 from distill_ood_detection.datasets.inference import build_id_loaders
@@ -15,7 +16,7 @@ from distill_ood_detection.distillation.perturbation import (
     pca_projector_path,
     save_pca_projector,
 )
-from distill_ood_detection.evaluation.metrics import accuracy
+from distill_ood_detection.evaluation.metrics import accuracy, distillation_metrics
 from distill_ood_detection.models.student import build_student
 from distill_ood_detection.models.teacher import (
     ResNetFeatureForwarder,
@@ -54,6 +55,7 @@ def run_experiment(
         pca_projector = fit_pca_projector_from_activations(
             Path(activation_path),
             config.strategy.perturbation.pca_components,
+            expected_dataset=f"{config.dataset.name}_train",
         ).to(device)
         save_pca_projector(
             pca_projector_path(experiment_dir),
@@ -120,10 +122,22 @@ def run_experiment(
                     ),
                     pca_projector=pca_projector,
                 )
-                summary["test_accuracy"] = accuracy(
-                    student,
-                    loaders.test,
-                    device,
+                best_checkpoint_path = Path(str(summary["best_checkpoint_path"]))
+                student.load_state_dict(
+                    torch.load(
+                        best_checkpoint_path,
+                        map_location=device,
+                        weights_only=True,
+                    )
+                )
+                test_metrics = distillation_metrics(
+                    method=current_method,
+                    teacher=teacher,
+                    student=student,
+                    loader=loaders.test,
+                    device=device,
+                    temperature=method_training_config.temperature,
+                    alpha=method_training_config.alpha,
                     feature_extractor=feature_extractor,
                     perturbation_forwarder=perturbation_forwarder,
                     perturbation_config=(
@@ -132,10 +146,12 @@ def run_experiment(
                         else None
                     ),
                     pca_projector=pca_projector,
+                    split="test",
                 )
+                summary.update(test_metrics)
                 write_json(output_dir / "metrics.json", summary)
                 if config.mlflow.enabled:
-                    mlflow.log_metric("test_accuracy", summary["test_accuracy"])
+                    mlflow.log_metrics(test_metrics)
                     mlflow.log_artifact(str(output_dir / "metrics.json"))
                     mlflow.log_artifact(str(output_dir / "history.json"))
                 summaries.append(summary)

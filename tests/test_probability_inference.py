@@ -118,7 +118,7 @@ class ProbabilityInferenceTests(unittest.TestCase):
                     "perturbation": {
                         "method": "pca_projection",
                         "pca_components": 128,
-                        "pca_activation_path": "runs/teacher/teacher_activations/cifar10_test/layer4.pt",
+                        "pca_activation_path": "runs/teacher/teacher_activations/cifar10_train/layer4.pt",
                     },
                 },
             }
@@ -128,7 +128,7 @@ class ProbabilityInferenceTests(unittest.TestCase):
         self.assertEqual(config.strategy.perturbation.pca_components, 128)
         self.assertEqual(
             config.strategy.perturbation.pca_activation_path,
-            "runs/teacher/teacher_activations/cifar10_test/layer4.pt",
+            "runs/teacher/teacher_activations/cifar10_train/layer4.pt",
         )
 
 

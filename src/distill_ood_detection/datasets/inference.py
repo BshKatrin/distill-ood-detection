@@ -84,8 +84,18 @@ def build_in_distribution_test_loader(config: DatasetConfig) -> NamedLoader:
     )
 
 
+def build_in_distribution_full_train_loader(config: DatasetConfig) -> NamedLoader:
+    """Build the complete official in-distribution training-split loader."""
+
+    return NamedLoader(
+        name=f"{config.name}_train",
+        split="train",
+        loader=_loader(_id_dataset(config, split="train"), config),
+    )
+
+
 def build_in_distribution_train_loader(config: DatasetConfig, seed: int) -> NamedLoader:
-    """Build the in-distribution training split loader."""
+    """Build the student-training subset after removing validation examples."""
 
     train_subset, _ = _id_train_validation_subsets(config, seed)
     return NamedLoader(

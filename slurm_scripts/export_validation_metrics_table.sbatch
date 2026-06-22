@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=validation_metrics
+#SBATCH --job-name=test_metrics
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=8G
 #SBATCH --time=00:30:00
@@ -38,7 +38,7 @@ echo "[$(date --iso-8601=seconds)] Syncing uv notebooks environment"
 uv --version
 uv sync --project envs/notebooks --locked
 
-echo "[$(date --iso-8601=seconds)] Exporting validation metrics tables on CPU"
+echo "[$(date --iso-8601=seconds)] Exporting test metrics tables on CPU"
 uv run --project envs/notebooks --no-sync python "${args[@]}"
 
-echo "[$(date --iso-8601=seconds)] Validation metrics table export complete"
+echo "[$(date --iso-8601=seconds)] Test metrics table export complete"

@@ -176,9 +176,20 @@ class PerturbationTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             activation_path = Path(directory) / "layer4.pt"
-            torch.save({"activations": activations}, activation_path)
+            torch.save(
+                {
+                    "dataset": "cifar10_train",
+                    "split": "train",
+                    "activations": activations,
+                },
+                activation_path,
+            )
 
-            projector = fit_pca_projector_from_activations(activation_path, n_components=3)
+            projector = fit_pca_projector_from_activations(
+                activation_path,
+                n_components=3,
+                expected_dataset="cifar10_train",
+            )
 
         self.assertEqual(tuple(projector.mean.shape), (8,))
         self.assertEqual(tuple(projector.components.shape), (3, 8))
@@ -191,6 +202,25 @@ class PerturbationTests(unittest.TestCase):
 
         self.assertEqual(tuple(batch.student_inputs.shape), (2, 3))
         torch.testing.assert_close(batch.perturbed_features, activations[:2])
+
+    def test_pca_fit_rejects_test_split_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            activation_path = Path(directory) / "layer4.pt"
+            torch.save(
+                {
+                    "dataset": "cifar10_test",
+                    "split": "test",
+                    "activations": torch.zeros(5, 2, 2, 2),
+                },
+                activation_path,
+            )
+
+            with self.assertRaisesRegex(ValueError, "complete ID training-split"):
+                fit_pca_projector_from_activations(
+                    activation_path,
+                    n_components=3,
+                    expected_dataset="cifar10_train",
+                )
 
     def test_vectorized_clipping_matches_torch_quantile_reference(self) -> None:
         feature_map = torch.arange(3 * 4 * 4, dtype=torch.float32).reshape(3, 4, 4)

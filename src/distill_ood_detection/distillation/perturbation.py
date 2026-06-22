@@ -213,10 +213,26 @@ def build_pca_projection_batch(
 def fit_pca_projector_from_activations(
     activation_path: Path,
     n_components: int,
+    expected_dataset: str | None = None,
 ) -> PcaProjector:
-    """Fit a PCA projector from an exported teacher activation artifact."""
+    """Fit PCA from a training-split teacher activation artifact.
+
+    Args:
+        activation_path: Exported teacher activation artifact.
+        n_components: Number of principal components to retain.
+        expected_dataset: Expected artifact dataset key, such as
+            ``cifar10_train``. When provided, both the dataset key and training
+            split metadata are validated before fitting.
+    """
 
     artifact = torch.load(activation_path, map_location="cpu", weights_only=False)
+    if expected_dataset is not None:
+        if artifact.get("dataset") != expected_dataset or artifact.get("split") != "train":
+            raise ValueError(
+                "PCA must be fitted from the complete ID training-split activation "
+                f"artifact {expected_dataset!r}; got dataset={artifact.get('dataset')!r}, "
+                f"split={artifact.get('split')!r}: {activation_path}"
+            )
     activations = artifact.get("activations")
     if not torch.is_tensor(activations):
         raise ValueError(f"Activation artifact is missing tensor 'activations': {activation_path}")

@@ -123,5 +123,6 @@ flattened feature tensor and the perturbation code. Monte-Carlo dropout configs
 use only the flattened feature tensor because the dropout mask is not provided
 to the student. PCA projection configs use `student.input_shape` equal to the
 configured number of PCA components and require
-`strategy.perturbation.pca_activation_path` to point at an exported ID teacher
-activation artifact.
+`strategy.perturbation.pca_activation_path` to point at the exported complete
+ID training-split teacher activation artifact. The fitted projector is then
+reused unchanged for ID and OOD test inference.

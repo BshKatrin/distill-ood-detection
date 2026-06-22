@@ -9,7 +9,10 @@ import torch
 from torch.utils.data import Dataset
 
 from distill_ood_detection.config import DatasetConfig
-from distill_ood_detection.datasets.inference import build_id_loaders
+from distill_ood_detection.datasets.inference import (
+    build_id_loaders,
+    build_in_distribution_full_train_loader,
+)
 
 
 class TinyCifarDataset(Dataset[tuple[torch.Tensor, int]]):
@@ -74,6 +77,19 @@ class ImageDatasetTests(unittest.TestCase):
         self.assertEqual(len(loaders.train.dataset), 8)
         self.assertEqual(len(loaders.validation.dataset), 2)
         self.assertEqual(len(loaders.test.dataset), 4)
+
+    def test_builds_complete_official_train_loader_for_activation_export(self) -> None:
+        config = DatasetConfig(name="cifar100", batch_size=2, num_workers=0)
+
+        with patch(
+            "distill_ood_detection.datasets.inference.CIFAR100",
+            TinyCifarDataset,
+        ):
+            named_loader = build_in_distribution_full_train_loader(config)
+
+        self.assertEqual(named_loader.name, "cifar100_train")
+        self.assertEqual(named_loader.split, "train")
+        self.assertEqual(len(named_loader.loader.dataset), 10)
 
     def test_builds_imagenet_loaders_with_validation_as_test_split(self) -> None:
         TinyImageNetDataset.seen_splits = []
