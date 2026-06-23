@@ -28,6 +28,7 @@ student:
 strategy:
   name: perturbation
   perturbation:
+    teacher_target: clean
     method: mc_dropout
     dropout_probability: 0.8
     dropout_mode: element

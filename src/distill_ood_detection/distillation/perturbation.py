@@ -42,6 +42,16 @@ class PcaProjector:
         flat_features = torch.flatten(features, start_dim=1)
         return (flat_features - self.mean) @ self.components.T
 
+    def inverse_transform(
+        self,
+        projected_features: torch.Tensor,
+        feature_shape: tuple[int, ...],
+    ) -> torch.Tensor:
+        """Reconstruct projected features in the original feature shape."""
+
+        reconstructed = projected_features @ self.components + self.mean
+        return reconstructed.reshape(projected_features.shape[0], *feature_shape)
+
 
 def sample_clipping_perturbation(
     features: torch.Tensor,
@@ -100,11 +110,7 @@ def sample_mc_dropout_perturbation(
     features: torch.Tensor,
     config: PerturbationConfig,
 ) -> PerturbationBatch:
-    """Apply Monte-Carlo dropout to student features.
-
-    The student receives dropped features, while ``perturbed_features`` remains
-    the original tensor so the teacher target is the unperturbed continuation.
-    """
+    """Apply Monte-Carlo dropout to student features."""
 
     if features.ndim != 4:
         raise ValueError(
@@ -118,7 +124,7 @@ def sample_mc_dropout_perturbation(
         student_inputs=torch.flatten(dropped, start_dim=1),
         original_features=features,
         perturbations=torch.flatten(mask.expand_as(features), start_dim=1),
-        perturbed_features=features,
+        perturbed_features=dropped,
         percentiles=mask,
     )
 
@@ -200,14 +206,28 @@ def build_pca_projection_batch(
             "(batch, channels, height, width)"
         )
     projected = projector.transform(features)
+    reconstructed = projector.inverse_transform(projected, tuple(features.shape[1:]))
     empty = features.new_empty((features.shape[0], 0))
     return PerturbationBatch(
         student_inputs=projected,
         original_features=features,
         perturbations=empty,
-        perturbed_features=features,
+        perturbed_features=reconstructed,
         percentiles=empty,
     )
+
+
+def teacher_target_features(
+    batch: PerturbationBatch,
+    config: PerturbationConfig,
+) -> torch.Tensor:
+    """Select clean or perturbed features for the teacher continuation."""
+
+    if config.teacher_target == "clean":
+        return batch.original_features
+    if config.teacher_target == "perturbed":
+        return batch.perturbed_features
+    raise ValueError(f"Unsupported teacher target: {config.teacher_target}")
 
 
 def fit_pca_projector_from_activations(

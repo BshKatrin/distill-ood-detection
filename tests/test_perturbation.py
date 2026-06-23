@@ -16,6 +16,7 @@ from distill_ood_detection.distillation.perturbation import (
     sample_clipping_perturbation,
     sample_mc_dropout_perturbation,
     sample_perturbation,
+    teacher_target_features,
 )
 
 
@@ -124,7 +125,10 @@ class PerturbationTests(unittest.TestCase):
         self.assertEqual(tuple(batch.perturbed_features.shape), tuple(features.shape))
         self.assertEqual(tuple(batch.student_inputs.shape), (2, 48))
         self.assertEqual(tuple(batch.perturbations.shape), (2, 48))
-        torch.testing.assert_close(batch.perturbed_features, features)
+        torch.testing.assert_close(
+            batch.perturbed_features,
+            batch.student_inputs.reshape_as(features),
+        )
         self.assertTrue(torch.any(batch.student_inputs == 0.0))
         self.assertTrue(torch.any(batch.student_inputs == 2.0))
 
@@ -201,7 +205,28 @@ class PerturbationTests(unittest.TestCase):
         )
 
         self.assertEqual(tuple(batch.student_inputs.shape), (2, 3))
-        torch.testing.assert_close(batch.perturbed_features, activations[:2])
+        self.assertEqual(tuple(batch.perturbed_features.shape), (2, 2, 2, 2))
+
+    def test_teacher_target_selects_clean_or_perturbed_features(self) -> None:
+        features = torch.ones(2, 3, 4, 4)
+        torch.manual_seed(123)
+        batch = sample_mc_dropout_perturbation(
+            features,
+            PerturbationConfig(method="mc_dropout", dropout_probability=0.5),
+        )
+
+        clean = teacher_target_features(
+            batch,
+            PerturbationConfig(method="mc_dropout", teacher_target="clean"),
+        )
+        perturbed = teacher_target_features(
+            batch,
+            PerturbationConfig(method="mc_dropout", teacher_target="perturbed"),
+        )
+
+        torch.testing.assert_close(clean, features)
+        torch.testing.assert_close(perturbed, batch.perturbed_features)
+        self.assertFalse(torch.equal(clean, perturbed))
 
     def test_pca_fit_rejects_test_split_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

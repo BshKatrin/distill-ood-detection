@@ -25,6 +25,7 @@ TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
 StrategyName = Literal["baseline", "perturbation"]
 PerturbationMethod = Literal["clipping", "mc_dropout", "pca_projection"]
+TeacherTarget = Literal["clean", "perturbed"]
 ClippingMode = Literal["constant", "spatial_dependent", "channel_dependent"]
 DropoutMode = Literal["element", "channel", "spatial"]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
@@ -90,6 +91,7 @@ class PerturbationConfig:
     """Perturbation settings for stochastic distillation."""
 
     method: PerturbationMethod = "clipping"
+    teacher_target: TeacherTarget = "clean"
     u_min: float = 0.0
     u_max: float = 1.0
     clipping_mode: ClippingMode = "constant"

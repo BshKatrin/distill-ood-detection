@@ -22,6 +22,7 @@ from distill_ood_detection.config import (
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.distillation.perturbation import sample_perturbation
 from distill_ood_detection.distillation.perturbation import PcaProjector
+from distill_ood_detection.distillation.perturbation import teacher_target_features
 from distill_ood_detection.evaluation.metrics import distillation_metrics
 from distill_ood_detection.utils import write_json
 
@@ -79,7 +80,7 @@ def train_student(
                         pca_projector=pca_projector,
                     )
                     teacher_logits = perturbation_forwarder.forward_from_features(
-                        perturbation_batch.perturbed_features
+                        teacher_target_features(perturbation_batch, perturbation_config)
                     )
                     student_inputs = perturbation_batch.student_inputs
                 elif feature_extractor is None:

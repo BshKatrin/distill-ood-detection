@@ -21,6 +21,7 @@ from distill_ood_detection.config import (
 from distill_ood_detection.distillation.perturbation import (
     build_unperturbed_perturbation_batch,
     sample_perturbation,
+    teacher_target_features,
 )
 from distill_ood_detection.datasets.inference import (
     build_in_distribution_test_loader,
@@ -363,7 +364,10 @@ def _collect_tree_dataset(
                 .astype(np.float32)
             )
             logits = perturbation_forwarder.forward_from_features(
-                perturbation_batch.perturbed_features
+                teacher_target_features(
+                    perturbation_batch,
+                    config.strategy.perturbation,
+                )
             )
         elif feature_extractor is not None:
             logits, features = feature_extractor(images)

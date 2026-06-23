@@ -22,12 +22,21 @@ The following student architectures are evaluated:
 
 1. [Teacher] Extract an intermediate image embedding from the teacher model. Denote this embedding as `z`.
 2. [Teacher] Sample a perturbation `u` and apply it to `z` to obtain the perturbed embedding `z_tilde`.
-3. [Teacher] Continue the teacher forward pass from `z_tilde` through the remaining teacher layers to obtain `y_tilde_teacher`.
+3. [Teacher] Continue the teacher forward pass through the remaining layers from either `z` or `z_tilde`, according to `strategy.perturbation.teacher_target`.
 4. [Student] Concatenate `z_tilde` and `u`, then provide the concatenated vector to the student as input.
 5. [Student] Predict `y_tilde_student`.
-6. Compute the distillation loss between `y_tilde_teacher` and `y_tilde_student`.
+6. Compute the distillation loss between the selected teacher target and `y_tilde_student`.
 
 `y_tilde_teacher` and `y_tilde_student` may be represented either as logits or as probability distributions after softmax, depending on the selected distillation objective.
+
+### Teacher target
+
+Set `strategy.perturbation.teacher_target` for every perturbation method:
+
+- `clean`: continue the teacher from the original embedding `z`. Only the student input is perturbed. This is denoising distillation and is the default used by the provided configs.
+- `perturbed`: continue the teacher from `z_tilde`. This distills the teacher's behavior after the same perturbation.
+
+For PCA projection, `z_tilde` is the PCA reconstruction in the original embedding shape, obtained by applying the inverse transform to the reduced student input.
 
 ### Perturbation methods
 
@@ -79,7 +88,7 @@ Set `strategy.perturbation.dropout_mode` to choose which parts of the feature te
 - `channel`: Drop whole channels independently. A dropped channel is removed at every spatial location.
 - `spatial`: Drop whole spatial locations independently. A dropped location is removed across all channels.
 
-The teacher target remains the unperturbed teacher continuation from `z`. The student is therefore trained to predict the teacher output from incomplete feature evidence, rather than to imitate a teacher that has also seen the same dropped embedding.
+The provided configs use the unperturbed teacher continuation from `z`. Set `teacher_target: perturbed` to pass the dropped embedding through the remaining teacher layers instead.
 
 At inference time, use `distill-ood infer-probabilities --apply-perturbation` to keep dropout active and export `K = strategy.perturbation.evaluation_draws` stochastic student draws. This is the Monte-Carlo dropout estimate. The implementation samples dropout masks directly for the feature tensor, so dropout remains active without putting the full model into training mode.
 
@@ -113,6 +122,7 @@ strategy:
   name: perturbation
   perturbation:
     method: pca_projection
+    teacher_target: clean
     pca_components: 128
     pca_activation_path: runs/teacher_resnet18_cifar10/teacher_activations/cifar10_train/layer4.pt
 ```
@@ -127,8 +137,9 @@ runs/<experiment_name>/pca_projector.pt
 
 Probability inference reloads this saved projector for every ID and OOD test
 split, so no evaluation activations are used to fit or update PCA. The teacher
-target remains the unperturbed teacher continuation from `z`; only the student
-input is reduced to `z_pca`.
+target is selected with `teacher_target`. For `clean`, only the student input is
+reduced to `z_pca`. For `perturbed`, the PCA inverse transform reconstructs an
+embedding in the original shape before the remaining teacher layers run.
 
 Initial PCA configs are:
 
@@ -173,7 +184,7 @@ See [Objectives](../objectives/README.md) for details.
 
 ## Implementation
 
-- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`. For Monte-Carlo dropout, the student input is `flatten(dropout(z, p))` and the teacher target is the unperturbed continuation from `z`. For PCA projection, the student input is the saved PCA projection of `flatten(z)`.
+- Perturbation sampling is implemented in [perturbation.py](../../src/distill_ood_detection/distillation/perturbation.py). For clipping perturbations, the student input is `concat(flatten(z_tilde), flatten(u))`. For Monte-Carlo dropout, the student input is `flatten(dropout(z, p))`. For PCA projection, the student input is the saved PCA projection of `flatten(z)`. In every case, `teacher_target` selects clean or perturbed features for the teacher continuation.
 - `distill-ood infer-probabilities --apply-perturbation` controls whether probability inference samples are perturbed. Training samples are always perturbed for this strategy.
 - ResNet feature continuation is implemented by `ResNetFeatureForwarder` in [teacher.py](../../src/distill_ood_detection/models/teacher.py).
 - Raw pre-perturbation teacher activations can be exported with `distill-ood export-teacher-activations --config configs/teachers/resnet18_cifar10.yaml`. The export includes the complete official ID training split, ID test split, and configured OOD splits. Each configured layer is saved as a separate `.pt` file under `runs/<experiment_name>/teacher_activations/<dataset_name>/`.

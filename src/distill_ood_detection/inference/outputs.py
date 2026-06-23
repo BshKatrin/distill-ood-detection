@@ -17,6 +17,7 @@ from distill_ood_detection.distillation.perturbation import (
     PcaProjector,
     build_unperturbed_perturbation_batch,
     sample_perturbation,
+    teacher_target_features,
 )
 
 
@@ -159,7 +160,7 @@ def collect_perturbed_teacher_outputs(
                 pca_projector=pca_projector,
             )
             logits = perturbation_forwarder.forward_from_features(
-                perturbation_batch.perturbed_features
+                teacher_target_features(perturbation_batch, perturbation_config)
             )
             logits = logits.reshape(batch_size, draw_count, -1)
             draw_logits.append(logits)
