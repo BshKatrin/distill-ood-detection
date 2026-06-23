@@ -48,13 +48,14 @@ the source artifact paths, sizes, and modification times match. Use `--cache` to
 choose a different cache file.
 
 To export numeric metrics for an explicit list of run names, use
-`--run-names`. This mode reads each run's probability manifest directly, so the
-original experiment config does not need to be present. It writes numeric
-ROC-AUC and FPR@95 values to JSON and includes `n_estimators` when it is present
-in the saved random-forest method metrics. When a student manifest references
-teacher artifacts that are not stored in the student run, the exporter resolves
-the matching centralized export under `runs/*/teacher_probabilities/` using the
-teacher model ID in the run's manifest or `resolved_config.json`:
+`--run-names`. This mode discovers artifacts directly under
+`probabilities/unperturbed/` and `probabilities/perturbed/`; it does not use the
+probability manifest, which may describe only the most recent partial inference
+rerun. It writes numeric ROC-AUC and FPR@95 values for every available mode to
+JSON and includes both `probability_modes` run metadata and a
+`probability_mode` field on every metric record. Legacy `probabilities/`
+artifacts are treated as `unperturbed`. Dataset metadata comes from
+`resolved_config.json`.
 
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
@@ -116,14 +117,15 @@ PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks
 ```
 
 This writes `reports/outputs/json/test_metrics.json` by default. Use
-`--json-output <path>` to override it. Each method record contains only
-`test_accuracy` and `test_distillation_loss`; a missing saved value is emitted
-as `null` and is never replaced by a validation metric.
+`--json-output <path>` to override it. Test accuracy and distillation loss are
+calculated directly from each mode's test probability artifacts, without using
+the probability manifest. Each method record contains `probability_mode`,
+`test_accuracy`, and `test_distillation_loss`; unsupported tree objectives use
+`null` for distillation loss and never fall back to a validation metric.
 
 On the GPU cluster, run the test metrics exporter through SLURM with
 `slurm_scripts/export_test_metrics_table.sbatch`. This job should not
-allocate a GPU; it reads saved method metrics JSON files and writes generated
-LaTeX files under `reports/outputs/latex/`.
+allocate a GPU; it reads saved artifacts and writes generated report files.
 
 ```bash
 sbatch slurm_scripts/export_test_metrics_table.sbatch

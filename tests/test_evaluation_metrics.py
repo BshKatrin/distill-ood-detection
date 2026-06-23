@@ -76,18 +76,28 @@ def test_report_formatter_uses_test_metrics_only(
     assert module.teacher_test_metric("cifar10") == "0.9498/--"
     assert module.teacher_test_metric("cifar100") == "0.7926/--"
 
-    method_dir = tmp_path / "runs" / "example_run" / "mse_logits"
-    method_dir.mkdir(parents=True)
-    (method_dir / "metrics.json").write_text(
+    run_dir = tmp_path / "runs" / "example_run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "resolved_config.json").write_text(
         json.dumps(
             {
-                "test_accuracy": 0.75,
-                "test_distillation_loss": 0.25,
-                "best_validation_accuracy": 1.0,
-                "best_validation_distillation_loss": 0.001,
+                "dataset": {"name": "cifar10"},
+                "training": {"methods": {"mse_logits": {}}},
             }
         )
     )
+    for mode in ("unperturbed", "perturbed"):
+        dataset_dir = run_dir / "probabilities" / mode / "cifar10_test"
+        dataset_dir.mkdir(parents=True)
+        logits = torch.tensor([[4.0, 1.0], [1.0, 3.0]])
+        if mode == "perturbed":
+            logits = logits.unsqueeze(1).repeat(1, 2, 1)
+        artifact = {"logits": logits, "labels": torch.tensor([0, 1])}
+        torch.save(artifact, dataset_dir / "teacher.pt")
+        torch.save(artifact, dataset_dir / "student_mse_logits_best.pt")
+        (dataset_dir.parent / "manifest.json").write_text(
+            json.dumps({"artifacts": []})
+        )
     monkeypatch.setattr(module, "ROOT", tmp_path)
     output_path = tmp_path / "test_metrics.json"
     module.export_run_metrics(["example_run"], output_path)
@@ -97,12 +107,20 @@ def test_report_formatter_uses_test_metrics_only(
         "runs": [
             {
                 "run_name": "example_run",
+                "probability_modes": ["unperturbed", "perturbed"],
                 "metrics": [
                     {
+                        "probability_mode": "unperturbed",
                         "method": "mse_logits",
-                        "test_accuracy": 0.75,
-                        "test_distillation_loss": 0.25,
-                    }
+                        "test_accuracy": 1.0,
+                        "test_distillation_loss": 0.0,
+                    },
+                    {
+                        "probability_mode": "perturbed",
+                        "method": "mse_logits",
+                        "test_accuracy": 1.0,
+                        "test_distillation_loss": 0.0,
+                    },
                 ],
             }
         ],

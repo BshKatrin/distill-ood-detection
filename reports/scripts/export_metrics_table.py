@@ -346,28 +346,36 @@ def deduplicate_configs(
 
 
 def run_artifacts_available(config: ExperimentConfig) -> bool:
-    """Return whether all probability manifest artifacts exist locally."""
+    """Return whether at least one complete probability mode exists locally."""
 
-    manifest_path = probability_manifest_path(config.run_dir)
-    if not manifest_path.exists():
-        return False
-    with manifest_path.open() as file:
-        manifest = json.load(file)
-    return all((ROOT / entry["path"]).exists() for entry in manifest["artifacts"])
+    return bool(discover_probability_runs(config.run_dir))
 
 
-def probability_manifest_path(run_dir: Path) -> Path:
-    """Return the saved probability manifest path for one run directory."""
+def probability_mode_dirs(run_dir: Path) -> list[tuple[str, Path]]:
+    """Discover perturbed and unperturbed probability directories."""
 
-    candidates = [
-        run_dir / "probabilities" / "manifest.json",
-        run_dir / "probabilities" / "perturbed" / "manifest.json",
-        run_dir / "probabilities" / "unperturbed" / "manifest.json",
+    probability_dir = run_dir / "probabilities"
+    modes = [
+        (mode, probability_dir / mode)
+        for mode in ("unperturbed", "perturbed")
+        if (probability_dir / mode).is_dir()
     ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
+    if modes:
+        return modes
+    if probability_dir.is_dir():
+        return [("unperturbed", probability_dir)]
+    return []
+
+
+def discover_probability_runs(run_dir: Path) -> list[RunArtifacts]:
+    """Load every probability mode containing discoverable student artifacts."""
+
+    runs = []
+    for probability_mode, probability_dir in probability_mode_dirs(run_dir):
+        run = RunArtifacts(run_dir, probability_mode, probability_dir)
+        if run.method_keys:
+            runs.append(run)
+    return runs
 
 
 def available_configs(
@@ -398,8 +406,8 @@ def teacher_reference_runs() -> dict[tuple[str, str], TeacherProbabilityRunArtif
     """Load all teacher-only probability artifacts keyed by ID dataset and teacher label."""
 
     references: dict[tuple[str, str], TeacherProbabilityRunArtifacts] = {}
-    for manifest_path in sorted((ROOT / "runs").glob("*/teacher_probabilities/manifest.json")):
-        run_dir = manifest_path.parents[1]
+    for probability_dir in sorted((ROOT / "runs").glob("*/teacher_probabilities")):
+        run_dir = probability_dir.parent
         run = TeacherProbabilityRunArtifacts(run_dir)
         references.setdefault((run.id_dataset_key, run.teacher_label), run)
     return references
@@ -533,79 +541,42 @@ class MetricCache:
 class RunArtifacts:
     """Loaded artifacts and metadata for one run directory."""
 
-    def __init__(self, run_dir: Path) -> None:
+    def __init__(self, run_dir: Path, probability_mode: str, probability_dir: Path) -> None:
         self.run_dir = run_dir
         self.run_name = run_dir.name
-        self.manifest = self._load_manifest()
-        self.id_dataset_key = f"{self.manifest['dataset']['name']}_test"
+        self.probability_mode = probability_mode
+        self.probability_dir = probability_dir
+        self.resolved_config = self._load_resolved_config()
+        dataset = self.resolved_config["dataset"]
+        self.id_dataset_key = f"{dataset['name']}_test"
         self.ood_dataset_keys = [
             f"{dataset['name']}_{dataset['split']}"
-            for dataset in self.manifest["dataset"]["ood_datasets"]
+            for dataset in dataset.get("ood_datasets", [])
         ]
         self._teacher_artifact_paths = self._teacher_paths()
         self._student_artifact_paths = self._student_paths()
 
-    def _load_manifest(self) -> dict[str, Any]:
-        manifest_path = probability_manifest_path(self.run_dir)
-        with manifest_path.open() as file:
+    def _load_resolved_config(self) -> dict[str, Any]:
+        config_path = self.run_dir / "resolved_config.json"
+        with config_path.open() as file:
             return json.load(file)
 
     def _teacher_paths(self) -> dict[str, Path]:
-        paths = {}
-        for entry in self.manifest["artifacts"]:
-            if entry["model"] == "teacher":
-                paths[entry["dataset"]] = ROOT / entry["path"]
-        missing_dataset_keys = {
-            dataset_key for dataset_key, path in paths.items() if not path.exists()
+        return {
+            dataset_dir.name: dataset_dir / "teacher.pt"
+            for dataset_dir in self.probability_dir.iterdir()
+            if dataset_dir.is_dir() and (dataset_dir / "teacher.pt").exists()
         }
-        if missing_dataset_keys:
-            teacher_run = self._central_teacher_run()
-            for dataset_key in missing_dataset_keys:
-                paths[dataset_key] = teacher_run.artifact_path(dataset_key)
-        return paths
-
-    def _central_teacher_run(self) -> TeacherProbabilityRunArtifacts:
-        """Find the centralized teacher export matching this student run."""
-
-        teacher = self.manifest.get("teacher", {})
-        hf_model_id = teacher.get("hf_model_id")
-        if not isinstance(hf_model_id, str) or not hf_model_id:
-            resolved_config_path = self.run_dir / "resolved_config.json"
-            if resolved_config_path.exists():
-                with resolved_config_path.open() as file:
-                    resolved_config = json.load(file)
-                hf_model_id = resolved_config.get("teacher", {}).get("hf_model_id")
-        if not isinstance(hf_model_id, str) or not hf_model_id:
-            raise ValueError(
-                f"Cannot resolve centralized teacher outputs for {self.run_name}: "
-                "teacher.hf_model_id is absent from the probability manifest and "
-                "resolved_config.json."
-            )
-
-        matches = []
-        for manifest_path in sorted(
-            (ROOT / "runs").glob("*/teacher_probabilities/manifest.json")
-        ):
-            teacher_run = TeacherProbabilityRunArtifacts(manifest_path.parents[1])
-            manifest_teacher = teacher_run.manifest.get("teacher", {})
-            if (
-                teacher_run.id_dataset_key == self.id_dataset_key
-                and manifest_teacher.get("hf_model_id") == hf_model_id
-            ):
-                matches.append(teacher_run)
-        if len(matches) != 1:
-            raise ValueError(
-                f"Expected one centralized teacher probability export for "
-                f"{hf_model_id!r} and {self.id_dataset_key}, found {len(matches)}."
-            )
-        return matches[0]
 
     def _student_paths(self) -> dict[tuple[str, str], Path]:
-        paths = {}
-        for entry in self.manifest["artifacts"]:
-            if entry["model"] == "student":
-                method_key = entry.get("method") or entry.get("mode")
-                paths[(entry["dataset"], method_key)] = ROOT / entry["path"]
+        paths: dict[tuple[str, str], Path] = {}
+        for dataset_dir in sorted(self.probability_dir.iterdir()):
+            if not dataset_dir.is_dir():
+                continue
+            for checkpoint in ("latest", "best"):
+                for path in sorted(dataset_dir.glob(f"student_*_{checkpoint}.pt")):
+                    method_key = path.name[len("student_") : -len(f"_{checkpoint}.pt")]
+                    paths[(dataset_dir.name, method_key)] = path
         return paths
 
     def teacher_artifact_path(self, dataset_key: str) -> Path:
@@ -619,13 +590,13 @@ class RunArtifacts:
         return self._student_artifact_paths[(dataset_key, method_key)]
 
     def has_student_artifact(self, dataset_key: str, method_key: str) -> bool:
-        """Return whether one student probability artifact exists in the manifest."""
+        """Return whether one discovered student probability artifact exists."""
 
         return (dataset_key, method_key) in self._student_artifact_paths
 
     @property
     def method_keys(self) -> tuple[str, ...]:
-        """Return student methods or tree modes present in the manifest."""
+        """Return student methods or tree modes discovered on disk."""
 
         methods = {method for _dataset, method in self._student_artifact_paths}
         ordered = [method for method in METHOD_ORDER if method in methods]
@@ -636,7 +607,7 @@ class RunArtifacts:
     def teacher_score_label(self) -> str:
         """Return the teacher MSP row label for this run."""
 
-        teacher = self.manifest.get("teacher", {})
+        teacher = self.resolved_config.get("teacher", {})
         hf_model_id = teacher.get("hf_model_id")
         if not isinstance(hf_model_id, str) or not hf_model_id:
             return "Teacher MSP"
@@ -649,28 +620,23 @@ class TeacherProbabilityRunArtifacts:
     def __init__(self, run_dir: Path) -> None:
         self.run_dir = run_dir
         self.run_name = run_dir.name
-        self.manifest = self._load_manifest()
-        self.id_dataset_key = f"{self.manifest['dataset']['name']}_test"
-        teacher = self.manifest.get("teacher", {})
-        hf_model_id = teacher.get("hf_model_id", "")
-        self.teacher_label = teacher_name_label(hf_model_id)
+        self.id_dataset_key = self._id_dataset_key()
+        self.teacher_label = teacher_name_label(self.run_name)
         self._artifact_paths = self._paths()
 
-    def _load_manifest(self) -> dict[str, Any]:
-        manifest_path = self.run_dir / "teacher_probabilities" / "manifest.json"
-        with manifest_path.open() as file:
-            return json.load(file)
+    def _id_dataset_key(self) -> str:
+        for dataset_name in ("cifar100", "cifar10"):
+            if dataset_name in self.run_name.lower():
+                return f"{dataset_name}_test"
+        raise ValueError(f"Cannot infer teacher ID dataset from run name: {self.run_name}")
 
     def _paths(self) -> dict[str, Path]:
-        paths = {}
-        for entry in self.manifest["artifacts"]:
-            dataset_key = entry["dataset"]
-            declared_path = ROOT / entry["path"]
-            fallback_path = (
-                self.run_dir / "teacher_probabilities" / dataset_key / "probabilities.pt"
-            )
-            paths[dataset_key] = declared_path if declared_path.exists() else fallback_path
-        return paths
+        probability_dir = self.run_dir / "teacher_probabilities"
+        return {
+            dataset_dir.name: dataset_dir / "probabilities.pt"
+            for dataset_dir in probability_dir.iterdir()
+            if dataset_dir.is_dir() and (dataset_dir / "probabilities.pt").exists()
+        }
 
     def artifact_path(self, dataset_key: str) -> Path:
         """Return the path to one teacher-only probability artifact."""
@@ -865,6 +831,7 @@ def student_metric_values(
     key = {
         "kind": "student",
         "run": run.run_name,
+        "probability_mode": run.probability_mode,
         "method": method_key,
         "score": score_key,
         "artifact_key": artifact_key,
@@ -1279,9 +1246,9 @@ def build_latex_document(
     """Render one standalone LaTeX metrics table."""
 
     runs = [
-        RunArtifacts(config.run_dir)
+        probability_run
         for config in configs
-        if run_artifacts_available(config)
+        for probability_run in discover_probability_runs(config.run_dir)[:1]
     ]
     body = build_strategy_table(
         strategy,
@@ -1338,54 +1305,53 @@ def export_run_metrics(
     exported_runs: list[dict[str, Any]] = []
     for run_name in dict.fromkeys(run_names):
         run_dir = ROOT / "runs" / run_name
-        manifest_path = probability_manifest_path(run_dir)
-        if not manifest_path.exists():
-            raise FileNotFoundError(
-                f"Missing probability manifest for run {run_name!r}: {manifest_path}"
-            )
-        run = RunArtifacts(run_dir)
+        probability_runs = discover_probability_runs(run_dir)
+        if not probability_runs:
+            raise FileNotFoundError(f"Missing probability artifacts for {run_name!r}")
         records: list[dict[str, str | float]] = []
-        for method_key in run.method_keys:
-            for ood_dataset_key in run.ood_dataset_keys:
-                if not run.has_student_artifact(run.id_dataset_key, method_key) or not (
-                    run.has_student_artifact(ood_dataset_key, method_key)
-                ):
-                    progress(
-                        f"skipping incomplete artifacts for {run_name}, {method_key}, "
-                        f"{ood_dataset_key}"
-                    )
-                    continue
-                for score_key in SCORE_ORDER:
-                    progress(
-                        f"exporting {run_name}, {method_key}, {score_key}, "
-                        f"{run.id_dataset_key} vs {ood_dataset_key}"
-                    )
-                    metrics = student_metric_values(
-                        run,
-                        method_key,
-                        score_key,
-                        ood_dataset_key,
-                        metric_cache,
-                    )
-                    records.append(
-                        {
-                            "method": method_key,
-                            "ood_score": score_key,
-                            "id_dataset": run.id_dataset_key,
-                            "ood_dataset": ood_dataset_key,
-                            "roc_auc": metrics["roc_auc"],
-                            "fpr_at_95_tpr": metrics["fpr_at_95_tpr"],
-                        }
-                    )
+        for run in probability_runs:
+            for method_key in run.method_keys:
+                for ood_dataset_key in run.ood_dataset_keys:
+                    if not run.has_student_artifact(run.id_dataset_key, method_key) or not (
+                        run.has_student_artifact(ood_dataset_key, method_key)
+                    ):
+                        progress(
+                            f"skipping incomplete artifacts for {run_name}, {method_key}, "
+                            f"{ood_dataset_key}"
+                        )
+                        continue
+                    for score_key in SCORE_ORDER:
+                        progress(
+                            f"exporting {run_name}, {method_key}, {score_key}, "
+                            f"{run.id_dataset_key} vs {ood_dataset_key}"
+                        )
+                        metrics = student_metric_values(
+                            run,
+                            method_key,
+                            score_key,
+                            ood_dataset_key,
+                            metric_cache,
+                        )
+                        records.append(
+                            {
+                                "probability_mode": run.probability_mode,
+                                "method": method_key,
+                                "ood_score": score_key,
+                                "id_dataset": run.id_dataset_key,
+                                "ood_dataset": ood_dataset_key,
+                                "roc_auc": metrics["roc_auc"],
+                                "fpr_at_95_tpr": metrics["fpr_at_95_tpr"],
+                            }
+                        )
+        first_run = probability_runs[0]
         run_payload: dict[str, Any] = {
-            "run_name": run.run_name,
-            "id_dataset": run.id_dataset_key,
-            "ood_datasets": run.ood_dataset_keys,
-            "checkpoint_selection": run.manifest.get("checkpoint_selection"),
-            "apply_perturbation": run.manifest.get("apply_perturbation", False),
+            "run_name": first_run.run_name,
+            "id_dataset": first_run.id_dataset_key,
+            "ood_datasets": first_run.ood_dataset_keys,
+            "probability_modes": [run.probability_mode for run in probability_runs],
             "metrics": records,
         }
-        n_estimators = run_n_estimators(run)
+        n_estimators = run_n_estimators(first_run)
         if n_estimators is not None:
             run_payload["n_estimators"] = n_estimators
         exported_runs.append(run_payload)
@@ -1424,7 +1390,7 @@ def parse_args() -> argparse.Namespace:
         metavar="RUN_NAME",
         help=(
             "Export numeric OOD metrics for these runs directly from their "
-            "probability manifests, without requiring config files."
+            "perturbed and unperturbed probability directories."
         ),
     )
     parser.add_argument(

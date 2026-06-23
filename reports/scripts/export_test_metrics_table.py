@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+import torch
+
+from distill_ood_detection.distillation.losses import distillation_loss
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -320,36 +323,109 @@ def format_test_metric(metrics: dict[str, Any]) -> str:
 
 
 def export_run_metrics(run_names: Iterable[str], output_path: Path) -> None:
-    """Export saved test metrics for explicitly selected run names to JSON."""
+    """Calculate test metrics from every discovered probability mode."""
 
     exported_runs: list[dict[str, Any]] = []
     for run_name in dict.fromkeys(run_names):
         run_dir = ROOT / "runs" / run_name
-        if not run_dir.is_dir():
-            raise FileNotFoundError(f"Missing run directory for {run_name!r}: {run_dir}")
-
+        config_path = run_dir / "resolved_config.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"Missing resolved config for {run_name!r}: {config_path}")
+        with config_path.open() as file:
+            config = json.load(file)
+        dataset_key = f"{config['dataset']['name']}_test"
         method_metrics: list[dict[str, Any]] = []
-        for path in sorted(run_dir.glob("*/metrics.json")):
-            with path.open() as file:
-                metrics = json.load(file)
-            accuracy = metrics.get("test_accuracy")
-            loss = metrics.get("test_distillation_loss")
-            method_metrics.append(
-                {
-                    "method": path.parent.name,
-                    "test_accuracy": accuracy if isinstance(accuracy, int | float) else None,
-                    "test_distillation_loss": loss if isinstance(loss, int | float) else None,
-                }
-            )
+        probability_modes = probability_mode_dirs(run_dir)
+        for probability_mode, probability_dir in probability_modes:
+            dataset_dir = probability_dir / dataset_key
+            teacher_path = dataset_dir / "teacher.pt"
+            if not teacher_path.exists():
+                continue
+            teacher = torch.load(teacher_path, map_location="cpu")
+            for method, student_path in student_artifact_paths(dataset_dir).items():
+                student = torch.load(student_path, map_location="cpu")
+                accuracy, loss = test_metrics_from_artifacts(method, teacher, student, config)
+                method_metrics.append(
+                    {
+                        "probability_mode": probability_mode,
+                        "method": method,
+                        "test_accuracy": accuracy,
+                        "test_distillation_loss": loss,
+                    }
+                )
 
         if not method_metrics:
-            raise FileNotFoundError(f"Missing method metrics for {run_name!r}: {run_dir}")
-        exported_runs.append({"run_name": run_name, "metrics": method_metrics})
+            raise FileNotFoundError(f"Missing test probability artifacts for {run_name!r}")
+        exported_runs.append(
+            {
+                "run_name": run_name,
+                "probability_modes": [mode for mode, _path in probability_modes],
+                "metrics": method_metrics,
+            }
+        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w") as file:
         json.dump({"version": 1, "runs": exported_runs}, file, indent=2, sort_keys=True)
     print(f"Wrote {output_path}")
+
+
+def probability_mode_dirs(run_dir: Path) -> list[tuple[str, Path]]:
+    """Discover mode-specific directories without reading a manifest."""
+
+    root = run_dir / "probabilities"
+    modes = [
+        (mode, root / mode)
+        for mode in ("unperturbed", "perturbed")
+        if (root / mode).is_dir()
+    ]
+    return modes or ([('unperturbed', root)] if root.is_dir() else [])
+
+
+def student_artifact_paths(dataset_dir: Path) -> dict[str, Path]:
+    """Discover one preferred checkpoint artifact per student method."""
+
+    paths: dict[str, Path] = {}
+    for checkpoint in ("latest", "best"):
+        for path in sorted(dataset_dir.glob(f"student_*_{checkpoint}.pt")):
+            method = path.name[len("student_") : -len(f"_{checkpoint}.pt")]
+            paths[method] = path
+    return paths
+
+
+def test_metrics_from_artifacts(
+    method: str,
+    teacher: dict[str, Any],
+    student: dict[str, Any],
+    config: dict[str, Any],
+) -> tuple[float, float | None]:
+    """Calculate test accuracy and distillation loss from output artifacts."""
+
+    student_logits = torch.as_tensor(student["logits"])
+    teacher_logits = torch.as_tensor(teacher["logits"])
+    labels = torch.as_tensor(student["labels"]).long()
+    prediction_logits = student_logits.mean(dim=1) if student_logits.ndim == 3 else student_logits
+    accuracy = float((prediction_logits.argmax(dim=-1) == labels).float().mean().item())
+    if method not in {"cross_entropy", "kl_divergence", "mse_logits"}:
+        return accuracy, None
+
+    if student_logits.ndim == 3:
+        draws = student_logits.shape[1]
+        student_logits = student_logits.reshape(-1, student_logits.shape[-1])
+        teacher_logits = teacher_logits.reshape(-1, teacher_logits.shape[-1])
+        labels = labels.repeat_interleave(draws)
+    method_config = config.get("training", {}).get("methods", {}).get(method) or {}
+    temperature = method_config.get("temperature") or 1.0
+    alpha = method_config.get("alpha") or 0.5
+    loss = distillation_loss(
+        method,
+        student_logits,
+        teacher_logits,
+        labels=labels,
+        temperature=temperature,
+        alpha=alpha,
+    )
+    return accuracy, float(loss.item())
 
 
 def teacher_test_metric(dataset_name: str) -> str:
