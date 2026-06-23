@@ -21,8 +21,9 @@ mkdir -p slurm
 
 OUTPUT_PATH="${OUTPUT_PATH:-}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
+JSON_OUTPUT="${JSON_OUTPUT:-}"
 
-args=(reports/scripts/export_validation_metrics_table.py)
+args=(reports/scripts/export_test_metrics_table.py)
 
 if [ -n "${OUTPUT_PATH}" ]; then
   args+=(--output "${OUTPUT_PATH}")
@@ -30,6 +31,10 @@ fi
 
 if [ -n "${OUTPUT_DIR}" ]; then
   args+=(--output-dir "${OUTPUT_DIR}")
+fi
+
+if [ -n "${JSON_OUTPUT}" ]; then
+  args+=(--json-output "${JSON_OUTPUT}")
 fi
 
 args+=("$@")

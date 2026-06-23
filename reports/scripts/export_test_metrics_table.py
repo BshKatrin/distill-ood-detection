@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "reports"
 OUTPUT_DIR = REPORTS_DIR / "outputs" / "latex"
 DEFAULT_OUTPUT_PATTERN = "metrics_test_{strategy}.tex"
+DEFAULT_RUN_METRICS_PATH = REPORTS_DIR / "outputs" / "json" / "test_metrics.json"
 
 DEFAULT_CONFIG_PATHS = [
     ROOT / "configs" / "baseline",
@@ -318,6 +319,39 @@ def format_test_metric(metrics: dict[str, Any]) -> str:
     return f"{accuracy:.4f}/{loss:.4f}"
 
 
+def export_run_metrics(run_names: Iterable[str], output_path: Path) -> None:
+    """Export saved test metrics for explicitly selected run names to JSON."""
+
+    exported_runs: list[dict[str, Any]] = []
+    for run_name in dict.fromkeys(run_names):
+        run_dir = ROOT / "runs" / run_name
+        if not run_dir.is_dir():
+            raise FileNotFoundError(f"Missing run directory for {run_name!r}: {run_dir}")
+
+        method_metrics: list[dict[str, Any]] = []
+        for path in sorted(run_dir.glob("*/metrics.json")):
+            with path.open() as file:
+                metrics = json.load(file)
+            accuracy = metrics.get("test_accuracy")
+            loss = metrics.get("test_distillation_loss")
+            method_metrics.append(
+                {
+                    "method": path.parent.name,
+                    "test_accuracy": accuracy if isinstance(accuracy, int | float) else None,
+                    "test_distillation_loss": loss if isinstance(loss, int | float) else None,
+                }
+            )
+
+        if not method_metrics:
+            raise FileNotFoundError(f"Missing method metrics for {run_name!r}: {run_dir}")
+        exported_runs.append({"run_name": run_name, "metrics": method_metrics})
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w") as file:
+        json.dump({"version": 1, "runs": exported_runs}, file, indent=2, sort_keys=True)
+    print(f"Wrote {output_path}")
+
+
 def teacher_test_metric(dataset_name: str) -> str:
     """Format the published teacher test accuracy without a distillation loss."""
 
@@ -496,6 +530,25 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--run-names",
+        nargs="+",
+        default=None,
+        metavar="RUN_NAME",
+        help=(
+            "Export test accuracy and distillation loss for these runs directly "
+            "from their method metrics files, without requiring config files."
+        ),
+    )
+    parser.add_argument(
+        "--json-output",
+        type=Path,
+        default=None,
+        help=(
+            "JSON destination for --run-names; defaults to "
+            "reports/outputs/json/test_metrics.json."
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
@@ -517,6 +570,14 @@ def main() -> None:
     """Generate the report test metrics LaTeX tables."""
 
     args = parse_args()
+    if args.json_output is not None and args.run_names is None:
+        raise ValueError("--json-output requires --run-names.")
+    if args.run_names is not None:
+        export_run_metrics(
+            args.run_names,
+            args.json_output or DEFAULT_RUN_METRICS_PATH,
+        )
+        return
     configs = [experiment_config(path) for path in expand_config_paths(args.configs)]
     configs_by_strategy = grouped_available_configs(configs)
 

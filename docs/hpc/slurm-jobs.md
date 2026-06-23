@@ -139,25 +139,26 @@ The script maps these environment variables to exporter flags:
 - `OUTPUT_PATH`: `export_metrics_table.py --output`.
 - `OUTPUT_DIR`: `export_metrics_table.py --output-dir`.
 
-Use [slurm_scripts/export_validation_metrics_table.sbatch](../../slurm_scripts/export_validation_metrics_table.sbatch)
+Use [slurm_scripts/export_test_metrics_table.sbatch](../../slurm_scripts/export_test_metrics_table.sbatch)
 to compute test metrics tables on the cluster from existing
 `runs/<experiment_name>/<method>/metrics.json` artifacts.
 
 This is also a CPU job and should not request a GPU.
 
 ```bash
-sbatch slurm_scripts/export_validation_metrics_table.sbatch
+sbatch slurm_scripts/export_test_metrics_table.sbatch
 ```
 
 Pass config files or directories after the script to restrict the export:
 
 ```bash
 sbatch \
-  slurm_scripts/export_validation_metrics_table.sbatch \
+  slurm_scripts/export_test_metrics_table.sbatch \
   configs/baseline/cifar_10 configs/perturbation/cifar_10
 ```
 
 The script maps these environment variables to exporter flags:
 
-- `OUTPUT_PATH`: `export_validation_metrics_table.py --output`.
-- `OUTPUT_DIR`: `export_validation_metrics_table.py --output-dir`.
+- `OUTPUT_PATH`: `export_test_metrics_table.py --output`.
+- `OUTPUT_DIR`: `export_test_metrics_table.py --output-dir`.
+- `JSON_OUTPUT`: `export_test_metrics_table.py --json-output`.

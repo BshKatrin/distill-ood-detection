@@ -91,7 +91,7 @@ Its cells use `accuracy/--` because the model cards do not publish a teacher
 distillation loss.
 
 ```bash
-PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_validation_metrics_table.py
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_test_metrics_table.py
 ```
 
 By default, the exporter reads `configs/baseline/` and `configs/perturbation/`
@@ -100,7 +100,7 @@ and writes `metrics_test_baseline.tex` and
 available. Pass config paths to restrict the output, for example:
 
 ```bash
-PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_validation_metrics_table.py configs/baseline/cifar_10 configs/perturbation/cifar_10
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_test_metrics_table.py configs/baseline/cifar_10 configs/perturbation/cifar_10
 ```
 
 Baseline test tables include `Student`, `Features`, and `Training`
@@ -109,13 +109,24 @@ Both strategy tables keep `CIFAR-10 (ID)` and `CIFAR-100 (ID)` columns, leaving
 cells blank when local metrics are missing. Rows with the same displayed
 metadata are merged across ID datasets, matching the OOD metrics table layout.
 
+To export the saved test metrics for explicit run names as JSON, use:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_test_metrics_table.py --run-names <run-name> [<run-name> ...]
+```
+
+This writes `reports/outputs/json/test_metrics.json` by default. Use
+`--json-output <path>` to override it. Each method record contains only
+`test_accuracy` and `test_distillation_loss`; a missing saved value is emitted
+as `null` and is never replaced by a validation metric.
+
 On the GPU cluster, run the test metrics exporter through SLURM with
-`slurm_scripts/export_validation_metrics_table.sbatch`. This job should not
+`slurm_scripts/export_test_metrics_table.sbatch`. This job should not
 allocate a GPU; it reads saved method metrics JSON files and writes generated
 LaTeX files under `reports/outputs/latex/`.
 
 ```bash
-sbatch slurm_scripts/export_validation_metrics_table.sbatch
+sbatch slurm_scripts/export_test_metrics_table.sbatch
 ```
 
 Render the generated LaTeX sources to one PDF per strategy under
