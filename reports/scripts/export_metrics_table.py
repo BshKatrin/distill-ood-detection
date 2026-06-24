@@ -1299,6 +1299,7 @@ def export_run_metrics(
     run_names: Iterable[str],
     output_path: Path,
     metric_cache: MetricCache,
+    score_keys: Iterable[str] = SCORE_ORDER,
 ) -> None:
     """Export numeric OOD metrics for explicitly selected run names to JSON."""
 
@@ -1320,7 +1321,7 @@ def export_run_metrics(
                             f"{ood_dataset_key}"
                         )
                         continue
-                    for score_key in SCORE_ORDER:
+                    for score_key in score_keys:
                         progress(
                             f"exporting {run_name}, {method_key}, {score_key}, "
                             f"{run.id_dataset_key} vs {ood_dataset_key}"
@@ -1363,6 +1364,70 @@ def export_run_metrics(
     print(f"Wrote {output_path}")
 
 
+def export_teacher_run_metrics(
+    run_names: Iterable[str],
+    output_path: Path,
+    metric_cache: MetricCache,
+) -> None:
+    """Export numeric MSP and energy metrics for teacher-only runs to JSON."""
+
+    exported_runs: list[dict[str, Any]] = []
+    for run_name in dict.fromkeys(run_names):
+        run_dir = ROOT / "runs" / run_name
+        probability_dir = run_dir / "teacher_probabilities"
+        if not probability_dir.is_dir():
+            raise FileNotFoundError(f"Missing teacher probability artifacts for {run_name!r}")
+        run = TeacherProbabilityRunArtifacts(run_dir)
+        ood_dataset_keys = [
+            key
+            for key in OOD_DATASET_ORDER_BY_ID[run.id_dataset_key]
+            if (probability_dir / key / "probabilities.pt").exists()
+        ]
+        records: list[dict[str, str | float]] = []
+        for ood_dataset_key in ood_dataset_keys:
+            for score_key in TEACHER_SCORE_ORDER:
+                id_path = run.artifact_path(run.id_dataset_key)
+                ood_path = run.artifact_path(ood_dataset_key)
+                fingerprints = [artifact_fingerprint(id_path), artifact_fingerprint(ood_path)]
+                key = {
+                    "kind": "teacher_baseline",
+                    "run": run.run_name,
+                    "score": score_key,
+                    "id_dataset": run.id_dataset_key,
+                    "ood_dataset": ood_dataset_key,
+                }
+                metrics = metric_cache.get(key, fingerprints)
+                if metrics is None:
+                    metrics = metric_for_scores(
+                        teacher_scores_for_dataset(run, run.id_dataset_key, score_key),
+                        teacher_scores_for_dataset(run, ood_dataset_key, score_key),
+                    )
+                    metric_cache.set(key, fingerprints, metrics)
+                records.append(
+                    {
+                        "ood_score": score_key,
+                        "id_dataset": run.id_dataset_key,
+                        "ood_dataset": ood_dataset_key,
+                        "roc_auc": metrics["roc_auc"],
+                        "fpr_at_95_tpr": metrics["fpr_at_95_tpr"],
+                    }
+                )
+        exported_runs.append(
+            {
+                "run_name": run.run_name,
+                "id_dataset": run.id_dataset_key,
+                "ood_datasets": ood_dataset_keys,
+                "metrics": records,
+            }
+        )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w") as file:
+        json.dump({"version": 1, "runs": exported_runs}, file, indent=2, sort_keys=True)
+    metric_cache.save()
+    print(f"Wrote {output_path}")
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
 
@@ -1392,6 +1457,20 @@ def parse_args() -> argparse.Namespace:
             "Export numeric OOD metrics for these runs directly from their "
             "perturbed and unperturbed probability directories."
         ),
+    )
+    parser.add_argument(
+        "--teacher-run-names",
+        nargs="+",
+        default=None,
+        metavar="RUN_NAME",
+        help="Export numeric MSP and energy metrics for teacher-only runs.",
+    )
+    parser.add_argument(
+        "--scores",
+        nargs="+",
+        choices=SCORE_ORDER,
+        default=None,
+        help="Restrict --run-names output to selected student OOD Scores.",
     )
     parser.add_argument(
         "--json-output",
@@ -1436,12 +1515,24 @@ def main() -> None:
     if args.runs is not None:
         msg = "--runs is deprecated; pass config files or directories instead."
         raise ValueError(msg)
-    if args.json_output is not None and args.run_names is None:
-        raise ValueError("--json-output requires --run-names.")
+    if args.run_names is not None and args.teacher_run_names is not None:
+        raise ValueError("Pass only one of --run-names or --teacher-run-names.")
+    if args.json_output is not None and args.run_names is None and args.teacher_run_names is None:
+        raise ValueError("--json-output requires --run-names or --teacher-run-names.")
     metric_cache = MetricCache(args.cache)
     if args.run_names is not None:
         export_run_metrics(
             args.run_names,
+            args.json_output or DEFAULT_RUN_METRICS_PATH,
+            metric_cache,
+            args.scores or SCORE_ORDER,
+        )
+        return
+    if args.scores is not None:
+        raise ValueError("--scores requires --run-names.")
+    if args.teacher_run_names is not None:
+        export_teacher_run_metrics(
+            args.teacher_run_names,
             args.json_output or DEFAULT_RUN_METRICS_PATH,
             metric_cache,
         )
