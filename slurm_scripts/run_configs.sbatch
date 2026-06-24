@@ -10,6 +10,7 @@
 set -euo pipefail
 export PYTHONUNBUFFERED=1
 export UV_NO_PROGRESS=1
+export PATH="${HOME}/.local/bin:${PATH}"
 PS4='[$(date --iso-8601=seconds)] + '
 set -x
 
