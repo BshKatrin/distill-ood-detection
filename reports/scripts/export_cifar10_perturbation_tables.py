@@ -1,4 +1,4 @@
-"""Export the CIFAR-10 perturbation comparison tables to LaTeX."""
+"""Export the CIFAR-10 and CIFAR-100 perturbation tables to LaTeX."""
 
 from __future__ import annotations
 
@@ -10,12 +10,31 @@ from typing import Any, Literal
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_METRICS_PATH = (
+DEFAULT_CIFAR10_METRICS_PATH = (
     ROOT
     / "reports"
     / "outputs"
     / "json"
     / "perturbation_20260623_ood_metrics_cifar10.json"
+)
+DEFAULT_CIFAR100_METRICS_PATH = (
+    ROOT
+    / "reports"
+    / "outputs"
+    / "json"
+    / "perturbation_20260623_ood_metrics_cifar100.json"
+)
+DEFAULT_TEST_METRICS_PATHS = (
+    ROOT
+    / "reports"
+    / "outputs"
+    / "json"
+    / "perturbation_20260623_test_metrics_cifar10.json",
+    ROOT
+    / "reports"
+    / "outputs"
+    / "json"
+    / "perturbation_20260623_test_metrics_cifar100.json",
 )
 DEFAULT_TEACHERS_PATH = (
     ROOT / "reports" / "outputs" / "json" / "teacher_baselines.json"
@@ -69,6 +88,7 @@ MetricKey = tuple[str, str, str, str, str]
 RunKey = tuple[RunMetadata, str]
 TeacherMetricKey = tuple[str, str, str, str]
 BestMetricKey = tuple[str, str]
+TestMetricKey = tuple[str, str, str]
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -76,6 +96,18 @@ def load_json(path: Path) -> dict[str, Any]:
 
     with path.open(encoding="utf-8") as file:
         return json.load(file)
+
+
+def merge_reports(paths: list[Path] | tuple[Path, ...]) -> dict[str, Any]:
+    """Merge the run lists from multiple JSON reports."""
+
+    return {
+        "runs": [
+            run
+            for path in paths
+            for run in load_json(path).get("runs", [])
+        ]
+    }
 
 
 def parse_run_name(run_name: str) -> RunMetadata:
@@ -184,6 +216,43 @@ def extract_teacher_metrics(data: dict[str, Any]) -> dict[TeacherMetricKey, dict
     return metrics
 
 
+def extract_test_metrics(data: dict[str, Any]) -> dict[TestMetricKey, dict[str, float]]:
+    """Index test accuracy and distillation loss by run, mode, and objective."""
+
+    metrics: dict[TestMetricKey, dict[str, float]] = {}
+    for run in data.get("runs", []):
+        run_name = str(run["run_name"])
+        for metric in run.get("metrics", []):
+            loss = metric.get("test_distillation_loss")
+            metrics[
+                (
+                    run_name,
+                    str(metric["probability_mode"]),
+                    str(metric["method"]),
+                )
+            ] = {
+                "test_accuracy": float(metric["test_accuracy"]),
+                "test_distillation_loss": float(loss) if loss is not None else float("nan"),
+            }
+    return metrics
+
+
+def format_test_accuracy(metric: dict[str, float] | None) -> str:
+    """Format test accuracy for a table cell."""
+
+    if metric is None:
+        return "--"
+    return f"{metric['test_accuracy']:.2f}"
+
+
+def format_distillation_loss(metric: dict[str, float] | None) -> str:
+    """Format an objective-specific test distillation loss."""
+
+    if metric is None:
+        return "--"
+    return f"{metric['test_distillation_loss']:.3g}"
+
+
 def format_metric(
     metric: dict[str, float] | None,
     best: dict[str, float] | None = None,
@@ -210,6 +279,18 @@ def yes_no(value: bool) -> str:
     return "Yes" if value else "No"
 
 
+def result_headers() -> list[str]:
+    """Return test and OOD metric headers for both ID datasets."""
+
+    headers: list[str] = []
+    for id_dataset in ID_DATASETS:
+        headers.extend(["Test acc.", "Distill. loss"])
+        headers.extend(
+            OOD_DATASET_LABELS[dataset] for dataset in OOD_DATASETS[id_dataset]
+        )
+    return headers
+
+
 def teacher_rows(
     teacher_metrics: dict[TeacherMetricKey, dict[str, float]],
     prefix_cells: int,
@@ -222,13 +303,15 @@ def teacher_rows(
             label_cells = [
                 rf"\multicolumn{{{prefix_cells}}}{{l}}{{{model} {OOD_SCORE_LABELS[score]}}}"
             ]
-            values = [
-                format_metric(
-                    teacher_metrics.get((model, id_dataset, score, dataset))
+            values: list[str] = []
+            for id_dataset in ID_DATASETS:
+                values.extend(["--", "--"])
+                values.extend(
+                    format_metric(
+                        teacher_metrics.get((model, id_dataset, score, dataset))
+                    )
+                    for dataset in OOD_DATASETS[id_dataset]
                 )
-                for id_dataset in ID_DATASETS
-                for dataset in OOD_DATASETS[id_dataset]
-            ]
             rows.append(" & ".join(label_cells + values) + r" \\")
     return rows
 
@@ -245,7 +328,8 @@ def latex_document(
     total_columns = len(headers)
     metric_start = metadata_columns + 1
     metric_end = total_columns
-    metric_columns = sum(len(OOD_DATASETS[value]) for value in ID_DATASETS)
+    columns_per_id_dataset = 5
+    metric_columns = columns_per_id_dataset * len(ID_DATASETS)
     column_spec = "l" * metadata_columns + "c" * metric_columns
     header = " & ".join(headers) + r" \\"
     body = "\n".join(rows)
@@ -258,9 +342,8 @@ def latex_document(
 \setlength{{\tabcolsep}}{{4pt}}
 \begin{{tabular}}{{{column_spec}}}
 \multicolumn{{{total_columns}}}{{c}}{{\textbf{{{title}}}}}\\[4pt]
-\multicolumn{{{metadata_columns}}}{{c}}{{}} & \multicolumn{{3}}{{c}}{{CIFAR-10 (ID)}} & \multicolumn{{3}}{{c}}{{CIFAR-100 (ID)}} \\
-\multicolumn{{{metadata_columns}}}{{c}}{{}} & \multicolumn{{6}}{{c}}{{ROC-AUC $\uparrow$ / FPR@95 $\downarrow$}} \\
-\cmidrule(lr){{{metric_start}-{metric_start + 2}}} \cmidrule(lr){{{metric_start + 3}-{metric_end}}}
+\multicolumn{{{metadata_columns}}}{{c}}{{}} & \multicolumn{{5}}{{c}}{{CIFAR-10 (ID)}} & \multicolumn{{5}}{{c}}{{CIFAR-100 (ID)}} \\
+\cmidrule(lr){{{metric_start}-{metric_start + 4}}} \cmidrule(lr){{{metric_start + 5}-{metric_end}}}
 \toprule
 {header}
 \midrule
@@ -274,18 +357,32 @@ def latex_document(
 
 def student_cells(
     metrics: dict[MetricKey, dict[str, float]],
+    test_metrics: dict[TestMetricKey, dict[str, float]],
     runs_by_variant: dict[RunKey, str],
     metadata: RunMetadata,
     mode: str,
     objective: str,
     score: str,
     best_values: dict[BestMetricKey, dict[str, float]],
+    include_test_metrics: bool,
 ) -> list[str]:
     """Return the ordered OOD dataset cells for one student row."""
 
     cells: list[str] = []
     for id_dataset in ID_DATASETS:
         run_name = runs_by_variant.get((metadata, id_dataset))
+        test_metric = None
+        if run_name is not None:
+            test_metric = test_metrics.get((run_name, mode, objective))
+        if include_test_metrics:
+            cells.extend(
+                [
+                    format_test_accuracy(test_metric),
+                    format_distillation_loss(test_metric),
+                ]
+            )
+        else:
+            cells.extend(["", ""])
         for dataset in OOD_DATASETS[id_dataset]:
             key = None
             if run_name is not None:
@@ -333,6 +430,7 @@ def find_best_values(
 
 def build_clipping_table(
     metrics: dict[MetricKey, dict[str, float]],
+    test_metrics: dict[TestMetricKey, dict[str, float]],
     runs_by_variant: dict[RunKey, str],
     teacher_metrics: dict[TeacherMetricKey, dict[str, float]],
     aggressive: bool,
@@ -345,11 +443,7 @@ def build_clipping_table(
         "Inference perturbed?",
         "Objective",
         "OOD Score",
-        *(
-            OOD_DATASET_LABELS[value]
-            for id_value in ID_DATASETS
-            for value in OOD_DATASETS[id_value]
-        ),
+        *result_headers(),
     ]
     rows = teacher_rows(teacher_metrics, prefix_cells=5) + [r"\midrule"]
     variants = {
@@ -386,12 +480,14 @@ def build_clipping_table(
                         labels[2] = ""
                     row = labels + student_cells(
                         metrics,
+                        test_metrics,
                         runs_by_variant,
                         meta,
                         mode,
                         objective,
                         score,
                         best_values,
+                        include_test_metrics=score_index == 0,
                     )
                     rows.append(" & ".join(row) + r" \\")
                     first_run_row = False
@@ -410,6 +506,7 @@ def build_clipping_table(
 
 def build_dropout_table(
     metrics: dict[MetricKey, dict[str, float]],
+    test_metrics: dict[TestMetricKey, dict[str, float]],
     runs_by_variant: dict[RunKey, str],
     teacher_metrics: dict[TeacherMetricKey, dict[str, float]],
 ) -> str:
@@ -420,11 +517,7 @@ def build_dropout_table(
         "Inference perturbed?",
         "Objective",
         "OOD Score",
-        *(
-            OOD_DATASET_LABELS[value]
-            for id_value in ID_DATASETS
-            for value in OOD_DATASETS[id_value]
-        ),
+        *result_headers(),
     ]
     rows = teacher_rows(teacher_metrics, prefix_cells=4) + [r"\midrule"]
     variants = {
@@ -456,12 +549,14 @@ def build_dropout_table(
                         labels[1] = ""
                     row = labels + student_cells(
                         metrics,
+                        test_metrics,
                         runs_by_variant,
                         meta,
                         mode,
                         objective,
                         score,
                         best_values,
+                        include_test_metrics=score_index == 0,
                     )
                     rows.append(" & ".join(row) + r" \\")
                     first_run_row = False
@@ -476,6 +571,7 @@ def build_dropout_table(
 
 def build_pca_table(
     metrics: dict[MetricKey, dict[str, float]],
+    test_metrics: dict[TestMetricKey, dict[str, float]],
     runs_by_variant: dict[RunKey, str],
     teacher_metrics: dict[TeacherMetricKey, dict[str, float]],
 ) -> str:
@@ -484,11 +580,7 @@ def build_pca_table(
     headers = [
         "Objective",
         "OOD Score",
-        *(
-            OOD_DATASET_LABELS[value]
-            for id_value in ID_DATASETS
-            for value in OOD_DATASETS[id_value]
-        ),
+        *result_headers(),
     ]
     rows = teacher_rows(teacher_metrics, prefix_cells=2) + [r"\midrule"]
     variants = {metadata for metadata, _ in runs_by_variant if metadata.family == "pca"}
@@ -506,18 +598,20 @@ def build_pca_table(
                 ]
                 row = labels + student_cells(
                     metrics,
+                    test_metrics,
                     runs_by_variant,
                     meta,
                     "unperturbed",
                     objective,
                     score,
                     best_values,
+                    include_test_metrics=score_index == 0,
                 )
                 rows.append(" & ".join(row) + r" \\")
             if objective != OBJECTIVE_ORDER[-1]:
                 rows.append(r"\addlinespace")
     return latex_document(
-        title="PCA-9 projection --- linear student, ResNet-18 layer4",
+        title="PCA projection --- linear student, ResNet-18 layer4",
         headers=headers,
         rows=rows,
         metadata_columns=2,
@@ -528,7 +622,18 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--metrics", type=Path, default=DEFAULT_METRICS_PATH)
+    parser.add_argument(
+        "--metrics",
+        type=Path,
+        nargs="+",
+        default=[DEFAULT_CIFAR10_METRICS_PATH, DEFAULT_CIFAR100_METRICS_PATH],
+    )
+    parser.add_argument(
+        "--test-metrics",
+        type=Path,
+        nargs="+",
+        default=list(DEFAULT_TEST_METRICS_PATHS),
+    )
     parser.add_argument("--teachers", type=Path, default=DEFAULT_TEACHERS_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     return parser.parse_args()
@@ -538,20 +643,29 @@ def main() -> None:
     """Load JSON metrics and write the perturbation tables."""
 
     args = parse_args()
-    metrics, runs_by_variant = extract_metrics(load_json(args.metrics))
+    metrics, runs_by_variant = extract_metrics(merge_reports(args.metrics))
+    test_metrics = extract_test_metrics(merge_reports(args.test_metrics))
     teacher_metrics = extract_teacher_metrics(load_json(args.teachers))
     outputs = {
         "metrics_perturbation_clipping_non_aggressive_cifar10.tex": build_clipping_table(
-            metrics, runs_by_variant, teacher_metrics, aggressive=False
+            metrics,
+            test_metrics,
+            runs_by_variant,
+            teacher_metrics,
+            aggressive=False,
         ),
         "metrics_perturbation_clipping_aggressive_cifar10.tex": build_clipping_table(
-            metrics, runs_by_variant, teacher_metrics, aggressive=True
+            metrics,
+            test_metrics,
+            runs_by_variant,
+            teacher_metrics,
+            aggressive=True,
         ),
         "metrics_perturbation_dropout_cifar10.tex": build_dropout_table(
-            metrics, runs_by_variant, teacher_metrics
+            metrics, test_metrics, runs_by_variant, teacher_metrics
         ),
         "metrics_perturbation_pca_cifar10.tex": build_pca_table(
-            metrics, runs_by_variant, teacher_metrics
+            metrics, test_metrics, runs_by_variant, teacher_metrics
         ),
     }
     args.output_dir.mkdir(parents=True, exist_ok=True)

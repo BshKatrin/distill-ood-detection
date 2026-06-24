@@ -1,0 +1,136 @@
+\documentclass[border=2pt]{standalone}
+\usepackage{booktabs}
+
+\begin{document}
+
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lllllcccccccccc}
+\multicolumn{15}{c}{\textbf{Non-aggressive clipping $(0.5, 1)$ --- linear student, ResNet-18 layer4}}\\[4pt]
+\multicolumn{5}{c}{} & \multicolumn{5}{c}{CIFAR-10 (ID)} & \multicolumn{5}{c}{CIFAR-100 (ID)} \\
+\cmidrule(lr){6-10} \cmidrule(lr){11-15}
+\toprule
+Clipping level & Teacher perturbed? & Inference perturbed? & Objective & OOD Score & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-100 & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-10 \\
+\midrule
+\multicolumn{5}{l}{ResNet-18 MSP} & -- & -- & 0.92/0.56 & 0.90/0.60 & 0.88/0.62 & -- & -- & 0.70/0.96 & 0.81/0.81 & 0.79/0.79 \\
+\multicolumn{5}{l}{ResNet-18 Energy} & -- & -- & 0.96/0.26 & 0.92/0.41 & 0.88/0.51 & -- & -- & 0.69/0.97 & 0.83/0.77 & 0.80/0.80 \\
+\multicolumn{5}{l}{ResNet-50 MSP} & -- & -- & 0.90/0.62 & 0.89/0.68 & 0.87/0.63 & -- & -- & 0.81/0.82 & 0.76/0.79 & 0.79/0.78 \\
+\multicolumn{5}{l}{ResNet-50 Energy} & -- & -- & 0.93/0.41 & 0.91/0.52 & 0.87/0.52 & -- & -- & 0.88/0.67 & 0.78/0.77 & 0.80/0.77 \\
+\midrule
+Constant & No & No & Cross-entropy & Max probability difference & 0.95 & 17.9 & 0.42/0.69 & 0.49/0.71 & 0.57/0.67 & 0.79 & 56.5 & 0.73/0.88 & 0.74/0.86 & 0.73/0.88 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.57 & 0.88/0.69 & 0.85/0.68 &  &  & 0.73/0.89 & 0.77/0.86 & 0.74/0.88 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.92/0.51 & 0.88/0.64 & 0.86/0.64 &  &  & 0.75/0.90 & 0.77/0.88 & 0.76/0.87 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.0194 & 0.87/0.59 & 0.86/0.60 & 0.82/0.64 & 0.79 & 0.0485 & 0.74/0.88 & 0.74/0.86 & 0.69/0.88 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.60 & 0.90/0.61 & 0.88/0.64 &  &  & 0.74/0.88 & 0.78/0.85 & 0.74/0.88 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.66 & 0.90/0.62 & 0.87/0.64 &  &  & 0.75/0.90 & \textbf{0.81/0.82} & 0.77/0.87 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.377 & 0.43/0.68 & 0.36/0.75 & 0.52/0.67 & 0.79 & 0.226 & 0.37/1.00 & 0.39/1.00 & 0.44/0.98 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.60 & 0.89/0.67 & 0.85/0.69 &  &  & 0.63/0.99 & 0.61/0.96 & 0.56/0.96 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.56 & 0.89/0.64 & 0.86/0.66 &  &  & 0.63/0.99 & 0.64/0.96 & 0.57/0.97 \\
+ &  & Yes & Cross-entropy & Max probability difference & 0.95 & 19.3 & 0.72/0.67 & 0.76/0.64 & 0.69/0.68 & 0.78 & 58.4 & 0.71/0.95 & 0.77/0.82 & \textbf{0.76/0.79} \\
+ &  &  &  & Absolute max probability difference &  &  & 0.53/0.94 & 0.48/0.96 & 0.54/0.91 &  &  & 0.29/1.00 & 0.23/1.00 & 0.24/0.98 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.41/0.99 & 0.34/1.00 & 0.44/0.97 &  &  & 0.27/1.00 & 0.20/1.00 & 0.23/0.99 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.281 & 0.63/0.86 & 0.73/0.81 & 0.66/0.81 & 0.78 & 1.85 & 0.70/0.95 & 0.77/0.81 & \textbf{0.75/0.79} \\
+ &  &  &  & Absolute max probability difference &  &  & 0.47/0.99 & 0.38/1.00 & 0.44/0.99 &  &  & 0.30/1.00 & 0.23/1.00 & 0.25/0.98 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.29/1.00 & 0.21/1.00 & 0.30/1.00 &  &  & 0.28/1.00 & 0.20/1.00 & 0.24/0.99 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 1.99 & 0.76/0.64 & 0.78/0.65 & 0.70/0.70 & 0.78 & 1.14 & 0.68/0.95 & 0.77/0.82 & \textbf{0.76/0.79} \\
+ &  &  &  & Absolute max probability difference &  &  & 0.46/0.98 & 0.42/0.99 & 0.50/0.96 &  &  & 0.32/1.00 & 0.23/1.00 & 0.24/0.99 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.32/1.00 & 0.27/1.00 & 0.37/1.00 &  &  & 0.28/1.00 & 0.20/1.00 & 0.23/0.99 \\
+\addlinespace
+Constant & Yes & No & Cross-entropy & Max probability difference & 0.95 & 17.7 & 0.49/0.68 & 0.40/0.78 & 0.49/0.71 & 0.79 & 56.2 & 0.42/0.89 & 0.64/0.90 & 0.60/0.91 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.59 & 0.87/0.78 & 0.86/0.67 &  &  & 0.74/0.83 & 0.72/0.92 & 0.71/0.92 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.56 & 0.86/0.79 & 0.87/0.65 &  &  & 0.76/0.75 & 0.80/0.88 & 0.76/0.90 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.000551 & 0.16/0.92 & 0.16/0.93 & 0.20/0.90 & 0.79 & 0.00717 & 0.33/0.99 & 0.33/0.97 & 0.33/0.98 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.67 & 0.89/0.71 & 0.87/0.66 &  &  & 0.67/0.99 & 0.67/0.96 & 0.67/0.94 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.89/0.70 & 0.89/0.76 & 0.88/0.64 &  &  & 0.63/0.99 & 0.66/0.96 & 0.67/0.96 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.000636 & 0.43/0.71 & 0.25/0.82 & 0.38/0.74 & 0.79 & 0.00539 & 0.32/0.97 & 0.28/0.97 & 0.35/0.94 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.87/0.75 & 0.90/0.69 & 0.87/0.68 &  &  & 0.68/0.97 & 0.73/0.91 & 0.67/0.94 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.86/0.77 & 0.89/0.70 & 0.86/0.66 &  &  & 0.67/0.98 & 0.73/0.94 & 0.68/0.95 \\
+ &  & Yes & Cross-entropy & Max probability difference & 0.95 & 27.2 & 0.11/1.00 & 0.21/1.00 & 0.26/0.99 & 0.79 & 59.3 & 0.34/1.00 & 0.27/0.98 & 0.24/0.99 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.11/1.00 & 0.21/1.00 & 0.27/0.99 &  &  & 0.35/1.00 & 0.27/0.98 & 0.24/0.99 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.07/1.00 & 0.14/1.00 & 0.21/1.00 &  &  & 0.32/1.00 & 0.24/0.99 & 0.21/1.00 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.000165 & 0.19/0.95 & 0.28/0.90 & 0.33/0.89 & 0.79 & 0.00112 & 0.31/0.98 & 0.36/0.99 & 0.36/0.99 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.87/0.67 & 0.88/0.64 & 0.83/0.67 &  &  & 0.67/0.89 & 0.58/0.93 & 0.58/0.92 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.90/0.62 & 0.92/0.56 & 0.87/0.61 &  &  & 0.72/0.90 & 0.71/0.92 & 0.70/0.91 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.000157 & 0.40/0.93 & 0.47/0.88 & 0.50/0.82 & 0.79 & 0.00104 & 0.24/1.00 & 0.41/0.99 & 0.47/0.97 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.75/0.88 & 0.75/0.84 & 0.79/0.73 &  &  & 0.73/0.79 & 0.53/0.93 & 0.50/0.95 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.76/0.89 & 0.78/0.85 & 0.83/0.68 &  &  & 0.78/0.80 & 0.69/0.90 & 0.68/0.91 \\
+\addlinespace
+Spatial & No & No & Cross-entropy & Max probability difference & 0.95 & 19.4 & 0.69/0.69 & 0.82/0.62 & 0.78/0.63 & 0.79 & 58.4 & 0.73/0.84 & 0.77/0.83 & 0.75/0.84 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.62 & 0.90/0.67 & 0.87/0.65 &  &  & 0.73/0.84 & 0.78/0.83 & 0.77/0.84 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.89/0.61 & 0.89/0.70 & 0.87/0.63 &  &  & 0.77/0.77 & 0.77/0.87 & \textbf{0.78/0.84} \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.0176 & 0.78/0.67 & 0.80/0.64 & 0.76/0.65 & 0.79 & 0.214 & 0.72/0.94 & \textbf{0.81/0.80} & 0.76/0.86 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.67 & 0.90/0.67 & 0.87/0.65 &  &  & 0.72/0.94 & \textbf{0.81/0.80} & 0.77/0.86 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.90/0.70 & 0.89/0.71 & 0.86/0.65 &  &  & 0.73/0.92 & \textbf{0.81/0.81} & 0.76/0.88 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 2.67 & 0.73/0.69 & 0.81/0.64 & 0.76/0.65 & 0.79 & 0.356 & 0.59/0.77 & 0.40/0.89 & 0.46/0.87 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.66 & 0.90/0.68 & 0.87/0.65 &  &  & 0.50/0.96 & 0.64/0.94 & 0.58/0.93 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.89/0.68 & 0.88/0.75 & 0.86/0.63 &  &  & 0.53/0.96 & 0.70/0.95 & 0.69/0.93 \\
+ &  & Yes & Cross-entropy & Max probability difference & 0.95 & 17.9 & 0.54/0.64 & 0.61/0.63 & 0.63/0.64 & 0.77 & 57.8 & 0.73/0.93 & 0.72/0.83 & \textbf{0.72/0.79} \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.69 & 0.88/0.71 & 0.86/0.68 &  &  & 0.27/1.00 & 0.28/1.00 & 0.28/0.97 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.88/0.68 & 0.87/0.71 & 0.85/0.66 &  &  & 0.24/1.00 & 0.28/0.99 & 0.27/0.97 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.0242 & 0.21/0.91 & 0.23/0.92 & 0.26/0.89 & 0.79 & 0.795 & 0.69/0.95 & 0.73/0.81 & \textbf{0.71/0.79} \\
+ &  &  &  & Absolute max probability difference &  &  & 0.87/0.64 & 0.84/0.72 & 0.84/0.68 &  &  & 0.31/1.00 & 0.27/1.00 & 0.29/0.96 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.85/0.72 & 0.81/0.77 & 0.82/0.67 &  &  & 0.27/1.00 & 0.24/1.00 & 0.28/0.96 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.31 & 0.52/0.65 & 0.65/0.58 & 0.61/0.63 & 0.77 & 0.941 & 0.72/0.95 & 0.78/0.82 & \textbf{0.77/0.79} \\
+ &  &  &  & Absolute max probability difference &  &  & 0.89/0.69 & 0.88/0.75 & 0.85/0.69 &  &  & 0.28/1.00 & 0.22/1.00 & 0.23/0.98 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.87/0.69 & 0.86/0.79 & 0.84/0.68 &  &  & 0.25/1.00 & 0.23/1.00 & 0.24/0.98 \\
+\addlinespace
+Spatial & Yes & No & Cross-entropy & Max probability difference & 0.95 & 17.7 & 0.22/0.86 & 0.25/0.84 & 0.29/0.82 & 0.79 & 56.2 & \textbf{0.71/0.71} & 0.43/0.88 & 0.55/0.89 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.88/0.79 & 0.88/0.75 & 0.86/0.68 &  &  & 0.68/0.90 & 0.70/0.92 & 0.67/0.91 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.85/0.85 & 0.86/0.83 & 0.84/0.66 &  &  & 0.69/0.92 & 0.74/0.90 & 0.74/0.89 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.000346 & 0.11/0.96 & 0.13/0.96 & 0.19/0.92 & 0.79 & 0.00854 & 0.32/0.99 & 0.27/0.99 & 0.34/0.98 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.61 & 0.90/0.67 & 0.87/0.68 &  &  & 0.67/0.98 & 0.73/0.87 & 0.66/0.95 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.61 & 0.90/0.70 & 0.88/0.66 &  &  & 0.64/1.00 & 0.72/0.92 & 0.65/0.97 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.00602 & 0.18/0.90 & 0.21/0.87 & 0.24/0.86 & 0.79 & 0.0171 & 0.34/1.00 & 0.28/1.00 & 0.34/0.99 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.71 & 0.90/0.67 & 0.87/0.67 &  &  & 0.66/0.99 & 0.72/0.89 & 0.67/0.93 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.89/0.77 & 0.90/0.65 & 0.87/0.65 &  &  & 0.61/1.00 & 0.70/0.94 & 0.65/0.94 \\
+ &  & Yes & Cross-entropy & Max probability difference & 0.95 & 27.8 & 0.26/1.00 & 0.31/1.00 & 0.39/0.96 & 0.78 & 59.4 & 0.61/0.89 & 0.37/1.00 & 0.37/0.99 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.30/1.00 & 0.36/1.00 & 0.46/0.96 &  &  & 0.58/0.89 & 0.30/1.00 & 0.31/0.99 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.26/1.00 & 0.30/1.00 & 0.41/0.99 &  &  & 0.70/0.89 & 0.38/1.00 & 0.42/0.99 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.000155 & 0.46/0.83 & 0.27/0.90 & 0.35/0.87 & 0.79 & 0.00136 & 0.49/0.97 & 0.47/0.99 & 0.52/0.98 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.77/0.86 & 0.86/0.73 & 0.82/0.73 &  &  & 0.40/0.99 & 0.29/1.00 & 0.26/1.00 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.79/0.87 & 0.91/0.61 & 0.85/0.67 &  &  & 0.58/0.97 & 0.48/0.96 & 0.43/0.97 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.000192 & 0.52/0.82 & 0.54/0.77 & 0.47/0.83 & 0.79 & 0.00195 & 0.63/0.96 & 0.73/0.94 & 0.70/0.93 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.74/0.85 & 0.80/0.77 & 0.79/0.75 &  &  & 0.37/1.00 & 0.23/1.00 & 0.25/1.00 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.75/0.85 & 0.82/0.73 & 0.82/0.68 &  &  & 0.50/1.00 & 0.36/1.00 & 0.34/1.00 \\
+\addlinespace
+Channel & No & No & Cross-entropy & Max probability difference & 0.95 & 17.8 & 0.89/0.48 & 0.84/0.62 & 0.81/0.65 & 0.79 & 56.2 & 0.75/0.85 & 0.77/0.86 & 0.72/0.90 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.92/0.51 & 0.90/0.63 & 0.87/0.64 &  &  & 0.75/0.85 & 0.77/0.86 & 0.72/0.90 \\
+ &  &  &  & Student--teacher KL divergence &  &  & \textbf{0.94/0.35} & 0.90/0.59 & 0.87/0.64 &  &  & 0.79/0.78 & 0.77/0.89 & 0.73/0.90 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.000622 & 0.71/0.69 & 0.53/0.74 & 0.58/0.72 & 0.79 & 0.00222 & 0.65/0.84 & 0.61/0.88 & 0.57/0.91 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.73 & 0.86/0.67 & 0.85/0.66 &  &  & 0.74/0.85 & 0.73/0.89 & 0.69/0.92 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.89/0.75 & 0.85/0.64 & 0.83/0.66 &  &  & 0.74/0.84 & 0.80/0.87 & 0.76/0.89 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.0939 & 0.90/0.48 & 0.83/0.63 & 0.82/0.65 & 0.79 & 0.00703 & 0.75/0.84 & 0.77/0.83 & 0.72/0.89 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.92/0.50 & 0.90/0.62 & 0.87/0.64 &  &  & 0.75/0.84 & 0.77/0.83 & 0.73/0.89 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.94/0.36 & 0.90/0.57 & 0.87/0.63 &  &  & \textbf{0.80/0.76} & 0.78/0.85 & 0.73/0.90 \\
+ &  & Yes & Cross-entropy & Max probability difference & 0.95 & 17.7 & 0.30/0.81 & 0.51/0.73 & 0.61/0.69 & 0.79 & 56.1 & 0.45/0.95 & 0.55/0.90 & 0.53/0.90 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.63 & 0.88/0.73 & 0.87/0.67 &  &  & 0.72/0.94 & 0.74/0.94 & 0.72/0.92 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.62 & 0.87/0.77 & 0.87/0.67 &  &  & 0.72/0.93 & 0.75/0.94 & 0.76/0.89 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.000639 & 0.12/0.93 & 0.17/0.89 & 0.26/0.84 & 0.79 & 0.0036 & 0.31/0.93 & 0.31/0.92 & 0.33/0.92 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.94/0.48 & 0.92/0.61 & 0.88/0.65 &  &  & 0.73/0.87 & 0.74/0.88 & 0.71/0.90 \\
+ &  &  &  & Student--teacher KL divergence &  &  & \textbf{0.95/0.36} & 0.92/0.52 & 0.88/0.61 &  &  & 0.77/0.78 & 0.79/0.86 & 0.76/0.89 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.0058 & 0.34/0.78 & 0.54/0.71 & 0.63/0.68 & 0.79 & 0.0026 & 0.42/0.94 & 0.54/0.93 & 0.54/0.90 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.65 & 0.88/0.72 & 0.87/0.68 &  &  & 0.73/0.91 & 0.73/0.95 & 0.72/0.93 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.64 & 0.87/0.75 & 0.86/0.68 &  &  & 0.74/0.90 & 0.74/0.95 & 0.76/0.90 \\
+\addlinespace
+Channel & Yes & No & Cross-entropy & Max probability difference & 0.95 & 17.7 & 0.70/0.60 & 0.72/0.62 & 0.60/0.69 & 0.79 & 56.1 & 0.68/0.84 & 0.62/0.90 & 0.55/0.91 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.61 & 0.89/0.67 & 0.86/0.66 &  &  & 0.73/0.87 & 0.72/0.92 & 0.70/0.91 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.58 & 0.89/0.65 & 0.85/0.65 &  &  & 0.74/0.90 & 0.76/0.93 & 0.76/0.88 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.000401 & 0.30/0.81 & 0.26/0.81 & 0.34/0.77 & 0.79 & 0.00214 & 0.44/0.89 & 0.37/0.92 & 0.39/0.92 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.64 & 0.91/0.60 & 0.87/0.64 &  &  & 0.68/0.89 & 0.73/0.90 & 0.71/0.91 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.89/0.65 & 0.92/0.55 & 0.88/0.61 &  &  & 0.72/0.85 & 0.79/0.88 & 0.77/0.89 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.000273 & 0.70/0.58 & 0.49/0.70 & 0.57/0.69 & 0.79 & 0.00143 & 0.71/0.83 & 0.59/0.92 & 0.56/0.90 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.64 & 0.88/0.66 & 0.86/0.66 &  &  & 0.74/0.87 & 0.71/0.93 & 0.71/0.91 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.62 & 0.86/0.66 & 0.85/0.65 &  &  & 0.75/0.88 & 0.76/0.93 & 0.77/0.88 \\
+ &  & Yes & Cross-entropy & Max probability difference & 0.95 & 19.3 & 0.69/0.55 & 0.49/0.71 & 0.48/0.72 & 0.79 & 56.6 & 0.49/0.89 & 0.48/0.90 & 0.43/0.91 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.92/0.61 & 0.89/0.70 & 0.87/0.65 &  &  & 0.71/0.92 & 0.72/0.94 & 0.72/0.91 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.92/0.58 & 0.89/0.70 & 0.87/0.63 &  &  & 0.70/0.93 & 0.76/0.93 & 0.77/0.87 \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.000397 & 0.15/0.91 & 0.17/0.88 & 0.24/0.85 & 0.79 & 0.00252 & 0.35/0.91 & 0.33/0.92 & 0.35/0.92 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.92/0.55 & 0.92/0.56 & 0.88/0.64 &  &  & 0.70/0.89 & 0.72/0.90 & 0.70/0.91 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.92/0.49 & \textbf{0.93/0.47} & \textbf{0.89/0.59} &  &  & 0.74/0.81 & 0.79/0.87 & 0.76/0.90 \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.000195 & 0.67/0.55 & 0.38/0.74 & 0.49/0.71 & 0.79 & 0.0012 & 0.47/0.89 & 0.39/0.93 & 0.41/0.90 \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.67 & 0.90/0.68 & 0.87/0.65 &  &  & 0.69/0.95 & 0.72/0.93 & 0.72/0.91 \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.91/0.66 & 0.89/0.68 & 0.87/0.64 &  &  & 0.69/0.95 & 0.75/0.94 & 0.77/0.88 \\
+\bottomrule
+\end{tabular}
+
+\end{document}

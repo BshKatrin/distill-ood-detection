@@ -51,6 +51,13 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
   is a mismatch score, so it is negated before computing OOD metrics.
   - `sign: -1`
 
+- Student MSP : Maximum softmax probability of the
+  **student** model (similar to teacher's baseline MSP OOD score). For perturbation OOD strategies, the MSP should be averaged.
+  - `sign: +1`
+
+- Student energy : Student-only energy. Defined as `T * logsumexp(logits / T)` (similar to teacher's baseline energy OOD score)
+  - `sign: +1`
+
 ## Implementation
 
 - OOD Score functions are implemented in [ood_scores.py](../../src/distill_ood_detection/evaluation/ood_scores.py).

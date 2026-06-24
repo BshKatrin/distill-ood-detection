@@ -85,20 +85,20 @@ PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks
 
 Each record contains the OOD Score, ID and OOD datasets, ROC-AUC, and FPR@95.
 
-## CIFAR-10 perturbation comparison tables
+## Perturbation comparison tables
 
-After exporting the selected CIFAR-10 perturbation runs and teacher baselines
-to JSON, generate separate aggressive-clipping, non-aggressive-clipping,
-Monte-Carlo-dropout, and PCA tables:
+After exporting the selected CIFAR-10 and CIFAR-100 perturbation runs, test
+metrics, and teacher baselines to JSON, generate separate aggressive-clipping,
+non-aggressive-clipping, Monte-Carlo-dropout, and PCA tables:
 
 ```bash
 uv run --project envs/notebooks --no-sync python \
   reports/scripts/export_cifar10_perturbation_tables.py
 ```
 
-The tables report each cell as `ROC-AUC/FPR@95`. They include ResNet-18 and
-ResNet-50 MSP and energy baselines for both ID datasets. CIFAR-100 student cells
-remain `--` until matching run metrics are added.
+The tables report OOD cells as `ROC-AUC/FPR@95` and include test accuracy and
+test distillation loss once per objective and inference mode. They include
+ResNet-18 and ResNet-50 MSP and energy baselines for both ID datasets.
 
 Clipping tables separate clipping level, teacher target, and inference mode.
 The dropout table separates dropout level and inference mode. The PCA table
