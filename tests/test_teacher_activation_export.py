@@ -48,6 +48,7 @@ class TeacherActivationExportTests(unittest.TestCase):
         config = parse_teacher_activation_config(
             {
                 "experiment_name": "teacher_acts",
+                "run_dir": "runs/tests/teacher_acts",
                 "layers": ["layer3", "layer4"],
                 "dataset": {
                     "name": "cifar10",
@@ -63,6 +64,7 @@ class TeacherActivationExportTests(unittest.TestCase):
         config = parse_teacher_probability_config(
             {
                 "experiment_name": "teacher_probs",
+                "run_dir": "runs/tests/teacher_probs",
                 "dataset": {
                     "name": "cifar10",
                     "ood_datasets": [{"name": "svhn", "split": "test"}],

@@ -1,0 +1,706 @@
+{
+  "runs": [
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7914999723434448,
+          "test_distillation_loss": 56.15025329589844
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7914000153541565,
+          "test_distillation_loss": 0.002221968024969101
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.792900025844574,
+          "test_distillation_loss": 0.007027648389339447
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7918999791145325,
+          "test_distillation_loss": 56.13384246826172
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7914000153541565,
+          "test_distillation_loss": 0.0035958620719611645
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.792900025844574,
+          "test_distillation_loss": 0.002597021171823144
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_channel"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7921000123023987,
+          "test_distillation_loss": 56.8646125793457
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7908999919891357,
+          "test_distillation_loss": 0.02193838730454445
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7900999784469604,
+          "test_distillation_loss": 0.15473508834838867
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7904999852180481,
+          "test_distillation_loss": 56.15794372558594
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.791100025177002,
+          "test_distillation_loss": 0.0551876462996006
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7886999845504761,
+          "test_distillation_loss": 0.05671599879860878
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_channel_aggressive"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7912999987602234,
+          "test_distillation_loss": 56.135623931884766
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7912999987602234,
+          "test_distillation_loss": 0.0015281265368685126
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7904999852180481,
+          "test_distillation_loss": 0.004356002435088158
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7893999814987183,
+          "test_distillation_loss": 58.00404739379883
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7907000184059143,
+          "test_distillation_loss": 0.0009177697938866913
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7900999784469604,
+          "test_distillation_loss": 0.0007716966210864484
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_channel_aggressive_perturbed"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7918000221252441,
+          "test_distillation_loss": 56.1334342956543
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7915999889373779,
+          "test_distillation_loss": 0.002141973003745079
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.792900025844574,
+          "test_distillation_loss": 0.0014275956200435758
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7925000190734863,
+          "test_distillation_loss": 56.605613708496094
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7915999889373779,
+          "test_distillation_loss": 0.0025221165269613266
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7929999828338623,
+          "test_distillation_loss": 0.0012039568973705173
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_channel_perturbed"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7874000072479248,
+          "test_distillation_loss": 56.539608001708984
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7878999710083008,
+          "test_distillation_loss": 0.04852127656340599
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7860000133514404,
+          "test_distillation_loss": 0.2255183607339859
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7785000205039978,
+          "test_distillation_loss": 58.418052673339844
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7813000082969666,
+          "test_distillation_loss": 1.84807288646698
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7757999897003174,
+          "test_distillation_loss": 1.1367348432540894
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_constant"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.03610000014305115,
+          "test_distillation_loss": 59.83536911010742
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.02370000071823597,
+          "test_distillation_loss": 3.6634445190429688
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.02759999968111515,
+          "test_distillation_loss": 1.782565951347351
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.011099999770522118,
+          "test_distillation_loss": 59.863826751708984
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.019500000402331352,
+          "test_distillation_loss": 3.6670775413513184
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.010400000028312206,
+          "test_distillation_loss": 1.7441601753234863
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_constant_aggressive"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.04129999876022339,
+          "test_distillation_loss": 59.782814025878906
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.008899999782443047,
+          "test_distillation_loss": 3.6863105297088623
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.009499999694526196,
+          "test_distillation_loss": 1.7694149017333984
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.02070000022649765,
+          "test_distillation_loss": 59.866477966308594
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.011300000362098217,
+          "test_distillation_loss": 0.0003420736757107079
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.011800000444054604,
+          "test_distillation_loss": 0.0006386908353306353
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_constant_aggressive_perturbed"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7879999876022339,
+          "test_distillation_loss": 56.169219970703125
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.791100025177002,
+          "test_distillation_loss": 0.007171481382101774
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7922000288963318,
+          "test_distillation_loss": 0.005385642405599356
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7867000102996826,
+          "test_distillation_loss": 59.29642868041992
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7871999740600586,
+          "test_distillation_loss": 0.0011156570399180055
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7871000170707703,
+          "test_distillation_loss": 0.0010427286615595222
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_constant_perturbed"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.786300003528595,
+          "test_distillation_loss": 58.41069793701172
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7894999980926514,
+          "test_distillation_loss": 0.21361196041107178
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7856000065803528,
+          "test_distillation_loss": 0.35600021481513977
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7746000289916992,
+          "test_distillation_loss": 57.753379821777344
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7878999710083008,
+          "test_distillation_loss": 0.7954162359237671
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7748000025749207,
+          "test_distillation_loss": 0.9413206577301025
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_spatial"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.05260000005364418,
+          "test_distillation_loss": 59.857177734375
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.039900001138448715,
+          "test_distillation_loss": 3.5779922008514404
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.009600000455975533,
+          "test_distillation_loss": 1.7890207767486572
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.010200000368058681,
+          "test_distillation_loss": 59.862422943115234
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.021700000390410423,
+          "test_distillation_loss": 3.6648097038269043
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.009999999776482582,
+          "test_distillation_loss": 1.7445014715194702
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_spatial_aggressive"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.0575999990105629,
+          "test_distillation_loss": 59.78378677368164
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.016200000420212746,
+          "test_distillation_loss": 3.6757984161376953
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.004999999888241291,
+          "test_distillation_loss": 1.7839494943618774
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.025100000202655792,
+          "test_distillation_loss": 59.86602783203125
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.010300000198185444,
+          "test_distillation_loss": 0.00015562816406600177
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.011099999770522118,
+          "test_distillation_loss": 0.0003140706685371697
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_spatial_aggressive_perturbed"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7897999882698059,
+          "test_distillation_loss": 56.19191360473633
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.791700005531311,
+          "test_distillation_loss": 0.008536381646990776
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7915999889373779,
+          "test_distillation_loss": 0.01705632172524929
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7831000089645386,
+          "test_distillation_loss": 59.401126861572266
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.786300003528595,
+          "test_distillation_loss": 0.001355363056063652
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7864999771118164,
+          "test_distillation_loss": 0.0019529636483639479
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_clip_spatial_perturbed"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.791700005531311,
+          "test_distillation_loss": 56.13364791870117
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7914999723434448,
+          "test_distillation_loss": 0.0020441636443138123
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7918999791145325,
+          "test_distillation_loss": 0.002478579059243202
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7907999753952026,
+          "test_distillation_loss": 56.184566497802734
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7907000184059143,
+          "test_distillation_loss": 0.031431738287210464
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7914000153541565,
+          "test_distillation_loss": 0.050217024981975555
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_mc_dropout"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7900000214576721,
+          "test_distillation_loss": 56.155887603759766
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7912999987602234,
+          "test_distillation_loss": 0.007965294644236565
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7900999784469604,
+          "test_distillation_loss": 0.04082300141453743
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7893000245094299,
+          "test_distillation_loss": 56.37843322753906
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7897999882698059,
+          "test_distillation_loss": 0.1326492428779602
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7901999950408936,
+          "test_distillation_loss": 0.23136171698570251
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_mc_dropout_channel"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7906000018119812,
+          "test_distillation_loss": 56.182884216308594
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7914000153541565,
+          "test_distillation_loss": 0.012513085268437862
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7914999723434448,
+          "test_distillation_loss": 0.007979704067111015
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7903000116348267,
+          "test_distillation_loss": 56.4491081237793
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.791700005531311,
+          "test_distillation_loss": 0.10643450170755386
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.791700005531311,
+          "test_distillation_loss": 0.11447308212518692
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_mc_dropout_spatial"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7922999858856201,
+          "test_distillation_loss": 56.132850646972656
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7847999930381775,
+          "test_distillation_loss": 0.06192232668399811
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.7919999957084656,
+          "test_distillation_loss": 0.0005007580621168017
+        }
+      ],
+      "probability_modes": [
+        "unperturbed"
+      ],
+      "run_name": "perturbation_linear_layer4_student_resnet18_cifar100_pca100"
+    }
+  ],
+  "version": 1
+}

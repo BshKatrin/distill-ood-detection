@@ -1,128 +1,92 @@
-# Configs directory structure
+# Experiment Configs and Run Directories
 
-The [configs](../configs/) directory contains `.yaml` configuration files for
-experiments.
+Experiment configs are organized by artifact owner and experimental identity.
+Every config declares an explicit `run_dir`; code must not derive storage from
+`experiment_name`.
 
-Configs are organized by the experiment identity, from broad strategy to
-specific training dataset:
+## Directory structure
 
 ```text
 configs/
-  <ood_distillation_strategy>/
-    <id_dataset>/
-      <experiment_config>.yaml
   teachers/
-    <teacher_export_config>.yaml
+    <id_dataset>/
+      <teacher_architecture>.yaml
+  students/
+    baseline/
+      <id_dataset>/
+        <teacher_architecture>/
+          <student_variant>.yaml
+    perturbation/
+      <perturbation_level>/
+        <perturbation_method>/
+          <id_dataset>/
+            <teacher_architecture>/
+              <student_variant>.yaml
 ```
 
-## First-level directory: OOD distillation strategy
-
-The first-level directory names the OOD distillation strategy used by the
-experiment.
-
-Each strategy must be documented in [docs/strategies](strategies/). For example:
-
-- [baseline](../configs/baseline/) corresponds to
-  [docs/strategies/baseline.md](strategies/baseline.md).
-- [perturbation](../configs/perturbation/) corresponds to
-  [docs/strategies/perturbation.md](strategies/perturbation.md).
-
-When adding a new first-level directory under `configs/`, also add or update the
-matching strategy documentation in `docs/strategies/`.
-
-## Second-level directory: ID training dataset
-
-The second-level directory names the ID dataset used to train the student model.
-
-Use the dataset name as it appears in the codebase and existing configs. Keep
-names stable across strategies so experiments are easy to compare.
+Current perturbation levels are `embedding` and the planned `pixel`. Embedding
+methods currently include `clipping`, `dropout`, and `pca`.
 
 Examples:
 
-- [configs/baseline/cifar_10](../configs/baseline/cifar_10/) contains baseline
-  configs where CIFAR-10 is the ID training dataset.
-- [configs/baseline/cifar_100](../configs/baseline/cifar_100/) contains baseline
-  configs where CIFAR-100 is the ID training dataset.
-- [configs/perturbation/cifar_10](../configs/perturbation/cifar_10/) contains
-  perturbation configs where CIFAR-10 is the ID training dataset.
+- `configs/teachers/cifar_10/resnet18.yaml`
+- `configs/students/baseline/cifar_10/resnet18/linear.yaml`
+- `configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_channel.yaml`
 
-## Config file names
+When adding a new strategy, perturbation level, or method, update the matching
+[strategy documentation](strategies/README.md).
 
-Individual `.yaml` files describe concrete experiment variants within a
-strategy and ID dataset.
+## Run directory mapping
 
-Name config files after the student model, feature source, or important variant
-that distinguishes the experiment. For example:
+The `run_dir` value mirrors the config path under `runs/`, without the `.yaml`
+suffix:
 
-- `linear.yaml`
-- `mlp.yaml`
-- `random_forest.yaml`
-- `feature_linear_layer3.yaml`
-- `linear_layer3.yaml`
-
-When a strategy needs a stronger or alternate sampling regime, keep the
-original file and add a sibling with a suffix that names the variant, such as
-`_aggressive`, `_mc_dropout`, `_mc_dropout_channel`,
-`_mc_dropout_spatial`, `_pca128`, or `_pca512`.
-
-Prefer short, descriptive names that make related configs easy to scan.
-
-## Teacher artifact configs
-
-The [configs/teachers](../configs/teachers/) directory contains teacher-only
-artifact export configs. These are not student training experiments; they define
-which teacher checkpoint, datasets, and teacher layers should be used for
-inference artifacts such as raw activations.
-
-Teacher activation configs use a top-level `layers` list. Each requested layer
-is saved to its own `.pt` file under:
-
-```text
-runs/<experiment_name>/teacher_activations/<dataset_name>/<layer>.pt
+```yaml
+experiment_name: perturbation_linear_layer4_student_resnet18_cifar10_clip_channel
+run_dir: runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_channel
 ```
 
-The matching manifest is saved at:
+`experiment_name` is a globally unique display and tracking label used by
+MLflow and manifests. `run_dir` is the authoritative artifact location. Do not
+construct paths by combining `runs/` with `experiment_name`.
+
+## Teacher artifacts
+
+Teacher configs can export activations and probabilities into the same teacher
+run directory:
 
 ```text
-runs/<experiment_name>/teacher_activations/manifest.json
+runs/teachers/<id_dataset>/<teacher_architecture>/
+  teacher_activations/
+    manifest.json
+    <dataset_name>/<layer>.pt
+  teacher_probabilities/
+    manifest.json
+    <dataset_name>/probabilities.pt
 ```
 
-Teacher probability configs omit `layers` and export deterministic raw-image
-teacher logits and probabilities for the ID test split and configured OOD
-datasets. Each dataset artifact is saved at:
+Activation configs include a top-level `layers` list. Probability export uses
+the same config and ignores `layers`.
+
+## Student artifacts
+
+Student training and inference share the configured run directory:
 
 ```text
-runs/<experiment_name>/teacher_probabilities/<dataset_name>/probabilities.pt
+<run_dir>/
+  resolved_config.json
+  summary.json
+  <distillation_method>/
+  probabilities/
 ```
 
-The matching manifest is saved at:
+Perturbation inference separates deterministic and stochastic modes:
 
 ```text
-runs/<experiment_name>/teacher_probabilities/manifest.json
+<run_dir>/probabilities/unperturbed/
+<run_dir>/probabilities/perturbed/
 ```
 
-## Student probability artifacts
-
-`distill-ood infer-probabilities` writes student and teacher probability
-artifacts under:
-
-```text
-runs/<experiment_name>/probabilities/
-```
-
-For perturbation-strategy experiments, inference can be run with or without
-stochastic perturbations. These modes are separated to avoid overwriting:
-
-```text
-runs/<experiment_name>/probabilities/unperturbed/
-runs/<experiment_name>/probabilities/perturbed/
-```
-
-Clipping perturbation configs use student input shapes that include both the
-flattened feature tensor and the perturbation code. Monte-Carlo dropout configs
-use only the flattened feature tensor because the dropout mask is not provided
-to the student. PCA projection configs use `student.input_shape` equal to the
-configured number of PCA components and require
-`strategy.perturbation.pca_activation_path` to point at the exported complete
-ID training-split teacher activation artifact. The fitted projector is then
-reused unchanged for ID and OOD test inference.
+PCA configs set `student.input_shape` to the component count and point
+`strategy.perturbation.pca_activation_path` to a complete ID training-split
+teacher activation under `runs/teachers/`.

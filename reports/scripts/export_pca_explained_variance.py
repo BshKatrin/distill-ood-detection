@@ -13,7 +13,7 @@ from sklearn.decomposition import PCA
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ACTIVATION_PATH = Path(
-    "runs/teacher_resnet18_cifar10/teacher_activations/cifar10_train/layer4.pt"
+    "runs/teachers/cifar_10/resnet18/teacher_activations/cifar10_train/layer4.pt"
 )
 NOTEBOOK_TEMPLATE_PATH = (
     ROOT / "reports" / "templates" / "notebooks" / "pca_explained_variance.ipynb"

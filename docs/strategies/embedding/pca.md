@@ -14,7 +14,7 @@ The PCA basis is fitted from a previously exported ID teacher-activation
 artifact. Export teacher activations first, for example:
 
 ```bash
-PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli export-teacher-activations --config configs/teachers/resnet18_cifar10.yaml
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli export-teacher-activations --config configs/teachers/cifar_10/resnet18.yaml
 ```
 
 Then reference the ID training artifact in the student config:
@@ -26,7 +26,7 @@ strategy:
     method: pca_projection
     teacher_target: clean
     pca_components: 9
-    pca_activation_path: runs/teacher_resnet18_cifar10/teacher_activations/cifar10_train/layer4.pt
+    pca_activation_path: runs/teachers/cifar_10/resnet18/teacher_activations/cifar10_train/layer4.pt
 ```
 
 Teacher-activation export includes the complete official ID training split as
@@ -34,7 +34,7 @@ well as the ID and OOD test splits. Training fits the projector once from
 `pca_activation_path` and saves it as:
 
 ```text
-runs/<experiment_name>/pca_projector.pt
+<run_dir>/pca_projector.pt
 ```
 
 ## Student input and teacher target
@@ -50,8 +50,8 @@ ID training-split activation artifact. See the
 
 Current examples are:
 
-- [`cifar_10/linear_layer4_pca9.yaml`](../../../configs/perturbation/cifar_10/linear_layer4_pca9.yaml)
-- [`cifar_100/linear_layer4_pca100.yaml`](../../../configs/perturbation/cifar_100/linear_layer4_pca100.yaml)
+- [`cifar_10/linear_layer4_pca9.yaml`](../../../configs/students/perturbation/embedding/pca/cifar_10/resnet18/linear_layer4_pca9.yaml)
+- [`cifar_100/linear_layer4_pca100.yaml`](../../../configs/students/perturbation/embedding/pca/cifar_100/resnet18/linear_layer4_pca100.yaml)
 
 ## Probability inference
 

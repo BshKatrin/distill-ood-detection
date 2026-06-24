@@ -61,7 +61,7 @@ def run_probability_inference(
     training_defaults = config.training.defaults
     set_seed(training_defaults.seed)
     device = resolve_device(training_defaults.device)
-    experiment_dir = Path(config.output_dir) / config.experiment_name
+    experiment_dir = Path(config.run_dir)
     output_dir = _probability_output_dir(experiment_dir, config, apply_perturbation)
     output_dir.mkdir(parents=True, exist_ok=True)
 

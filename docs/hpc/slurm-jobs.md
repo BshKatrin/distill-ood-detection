@@ -11,9 +11,9 @@ sbatch \
   --job-name=cifar10_perturb \
   --gres=gpu:2 \
   slurm_scripts/run_configs.sbatch \
-  configs/perturbation/cifar_10/linear_layer3_clip_constant.yaml \
-  configs/perturbation/cifar_10/linear_layer3_clip_channel.yaml \
-  configs/perturbation/cifar_10/linear_layer3_clip_spatial.yaml
+  configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_clip_constant.yaml \
+  configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_clip_channel.yaml \
+  configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_clip_spatial.yaml
 ```
 
 By default, each config runs a train-then-infer pipeline. Configs whose path
@@ -34,13 +34,13 @@ Examples:
 ```bash
 sbatch --gres=gpu:1 --export=ALL,MODE=infer \
   slurm_scripts/run_configs.sbatch \
-  configs/baseline/cifar_100/linear.yaml
+  configs/students/baseline/cifar_100/resnet18/linear.yaml
 ```
 
 ```bash
 sbatch --gres=gpu:1 --export=ALL,MODE=train \
   slurm_scripts/run_configs.sbatch \
-  configs/baseline/cifar_10/feature_random_forest_layer3.yaml
+  configs/students/baseline/cifar_10/resnet18/feature_random_forest_layer3.yaml
 ```
 
 ## Parallelism
@@ -52,7 +52,7 @@ GPU or set `PARALLEL=1`:
 ```bash
 sbatch --gres=gpu:1 --export=ALL,MODE=infer,PARALLEL=1 \
   slurm_scripts/run_configs.sbatch \
-  configs/perturbation/cifar_10/linear_layer3_clip_constant.yaml
+  configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_clip_constant.yaml
 ```
 
 ## Config list files
@@ -94,8 +94,8 @@ them sequentially in one GPU job:
 sbatch \
   --gres=gpu:1 \
   slurm_scripts/export_teacher_probabilities.sbatch \
-  configs/teachers/resnet50_cifar10_probabilities.yaml \
-  configs/teachers/resnet50_cifar100_probabilities.yaml
+  configs/teachers/cifar_10/resnet50.yaml \
+  configs/teachers/cifar_100/resnet50.yaml
 ```
 
 For longer config lists, set `CONFIG_LIST` to a newline-delimited file, using
@@ -104,14 +104,14 @@ the same format supported by `run_configs.sbatch`.
 Teacher logit/probability artifacts are written under:
 
 ```text
-runs/<experiment_name>/teacher_probabilities/
+<run_dir>/teacher_probabilities/
 ```
 
 ## Report tables
 
 Use [slurm_scripts/export_metrics_table.sbatch](../../slurm_scripts/export_metrics_table.sbatch)
 to compute OOD metrics tables on the cluster from existing
-`runs/*/probabilities/` artifacts.
+student `run_dir` probability artifacts.
 
 This is a CPU and disk-I/O job. Do not request `--gres=gpu:*` for this script.
 Increase `--mem` if the job is killed while loading probability artifacts.
@@ -130,7 +130,8 @@ Pass config files or directories after the script to restrict the export:
 sbatch \
   --mem=32G \
   slurm_scripts/export_metrics_table.sbatch \
-  configs/baseline/cifar_10 configs/perturbation/cifar_10
+  configs/students/baseline/cifar_10 \
+  configs/students/perturbation/embedding
 ```
 
 The script maps these environment variables to exporter flags:
@@ -141,7 +142,7 @@ The script maps these environment variables to exporter flags:
 
 Use [slurm_scripts/export_test_metrics_table.sbatch](../../slurm_scripts/export_test_metrics_table.sbatch)
 to compute test metrics tables on the cluster from existing
-`runs/<experiment_name>/<method>/metrics.json` artifacts.
+`<run_dir>/<method>/metrics.json` artifacts.
 
 This is also a CPU job and should not request a GPU.
 
@@ -154,7 +155,8 @@ Pass config files or directories after the script to restrict the export:
 ```bash
 sbatch \
   slurm_scripts/export_test_metrics_table.sbatch \
-  configs/baseline/cifar_10 configs/perturbation/cifar_10
+  configs/students/baseline/cifar_10 \
+  configs/students/perturbation/embedding
 ```
 
 The script maps these environment variables to exporter flags:

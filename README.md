@@ -81,9 +81,9 @@ After training, save teacher and student logits/probabilities for the ID and OOD
 uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli infer-probabilities --config <CONFIG_PATH> [--checkpoint {latest,checkpoint}] [--include-train] [--include-validation]
 ```
 
-Artifacts are written under
-`runs/<experiment_name>/probabilities/`, with one `.pt` file per dataset/model
-and a `manifest.json` for notebook discovery.
+Artifacts are written under the config's explicit `run_dir`, with probability
+artifacts below `<run_dir>/probabilities/`. See
+[`docs/configs.md`](docs/configs.md) for the run hierarchy.
 
 <!-- ## CIFAR-100 ID Experiments
 

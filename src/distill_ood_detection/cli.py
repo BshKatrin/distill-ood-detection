@@ -21,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/baseline/cifar_10/linear.yaml"),
+        default=Path("configs/students/baseline/cifar_10/resnet18/linear.yaml"),
         help="Path to a YAML experiment config.",
     )
     train_parser.add_argument(
@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     tree_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/baseline/cifar_10/random_forest.yaml"),
+        default=Path("configs/students/baseline/cifar_10/resnet18/random_forest.yaml"),
         help="Path to a YAML tree experiment config.",
     )
     tree_parser.add_argument(
@@ -47,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     infer_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/baseline/cifar_10/linear.yaml"),
+        default=Path("configs/students/baseline/cifar_10/resnet18/linear.yaml"),
         help="Path to a YAML experiment config.",
     )
     infer_parser.add_argument(
@@ -90,14 +90,14 @@ def build_parser() -> argparse.ArgumentParser:
     activations_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/teachers/resnet18_cifar10_layers.yaml"),
+        default=Path("configs/teachers/cifar_10/resnet18.yaml"),
         help="Path to a YAML teacher activation export config.",
     )
     probabilities_parser = subparsers.add_parser("export-teacher-probabilities")
     probabilities_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/teachers/resnet50_cifar10_probabilities.yaml"),
+        default=Path("configs/teachers/cifar_10/resnet50.yaml"),
         help="Path to a YAML teacher probability export config.",
     )
     return parser

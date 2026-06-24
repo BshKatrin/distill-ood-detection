@@ -13,7 +13,7 @@ class ProbabilityInferenceTests(unittest.TestCase):
     """Validate probability artifact path choices."""
 
     def test_baseline_probability_output_dir_keeps_legacy_path(self) -> None:
-        config = parse_config({"experiment_name": "baseline_config"})
+        config = parse_config({"experiment_name": "baseline_config", "run_dir": "runs/tests/baseline_config"})
 
         output_dir = _probability_output_dir(Path("runs/baseline_config"), config, False)
 
@@ -23,6 +23,7 @@ class ProbabilityInferenceTests(unittest.TestCase):
         config = parse_config(
             {
                 "experiment_name": "perturbation_config",
+                "run_dir": "runs/tests/perturbation_config",
                 "student": {
                     "kind": "linear",
                     "feature_layer": "layer3",
@@ -57,6 +58,7 @@ class ProbabilityInferenceTests(unittest.TestCase):
         config = parse_config(
             {
                 "experiment_name": "perturbation_config",
+                "run_dir": "runs/tests/perturbation_config",
                 "student": {
                     "kind": "linear",
                     "feature_layer": "layer3",
@@ -80,6 +82,7 @@ class ProbabilityInferenceTests(unittest.TestCase):
         config = parse_config(
             {
                 "experiment_name": "mc_dropout_config",
+                "run_dir": "runs/tests/mc_dropout_config",
                 "student": {
                     "kind": "linear",
                     "feature_layer": "layer4",
@@ -107,6 +110,7 @@ class ProbabilityInferenceTests(unittest.TestCase):
         config = parse_config(
             {
                 "experiment_name": "pca_config",
+                "run_dir": "runs/tests/pca_config",
                 "student": {
                     "kind": "linear",
                     "feature_layer": "layer4",

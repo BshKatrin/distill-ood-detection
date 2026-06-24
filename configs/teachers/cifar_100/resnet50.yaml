@@ -1,0 +1,23 @@
+experiment_name: teacher_resnet50_cifar100
+run_dir: runs/teachers/cifar_100/resnet50
+device: auto
+seed: 42
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar10
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet50_cifar100
+  revision: main
+  num_classes: 100

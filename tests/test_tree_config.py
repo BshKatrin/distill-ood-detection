@@ -13,7 +13,7 @@ class TreeConfigTests(unittest.TestCase):
     """Validate random-forest student configuration parsing."""
 
     def test_loads_random_forest_config(self) -> None:
-        config = load_config(Path("configs/baseline/cifar_10/random_forest.yaml"))
+        config = load_config(Path("configs/students/baseline/cifar_10/resnet18/random_forest.yaml"))
 
         self.assertEqual(config.student.kind, "random_forest")
         self.assertEqual(config.training.enabled_methods(), ())
@@ -21,7 +21,7 @@ class TreeConfigTests(unittest.TestCase):
         self.assertEqual(config.tree.random_forest.n_estimators, 200)
 
     def test_loads_cifar100_random_forest_config(self) -> None:
-        config = load_config(Path("configs/baseline/cifar_100/random_forest.yaml"))
+        config = load_config(Path("configs/students/baseline/cifar_100/resnet18/random_forest.yaml"))
 
         self.assertEqual(config.dataset.name, "cifar100")
         self.assertEqual(config.teacher.hf_model_id, "edadaltocg/resnet18_cifar100")
@@ -35,6 +35,7 @@ class TreeConfigTests(unittest.TestCase):
     def test_rejects_cross_entropy_mode(self) -> None:
         raw = {
             "experiment_name": "bad_tree_config",
+            "run_dir": "runs/tests/bad_tree_config",
             "student": {"kind": "random_forest"},
             "tree": {
                 "methods": {
@@ -49,6 +50,7 @@ class TreeConfigTests(unittest.TestCase):
     def test_rejects_legacy_softmax_mode(self) -> None:
         raw = {
             "experiment_name": "bad_tree_config",
+            "run_dir": "runs/tests/bad_tree_config",
             "student": {"kind": "random_forest"},
             "tree": {
                 "methods": {
@@ -63,6 +65,7 @@ class TreeConfigTests(unittest.TestCase):
     def test_rejects_temperature_for_logits_mode(self) -> None:
         raw = {
             "experiment_name": "bad_tree_config",
+            "run_dir": "runs/tests/bad_tree_config",
             "tree": {
                 "methods": {
                     "logits": {"temperature": 2.0},
@@ -76,6 +79,7 @@ class TreeConfigTests(unittest.TestCase):
     def test_dataset_dir_can_be_overridden_from_environment(self) -> None:
         raw = {
             "experiment_name": "shared_data_dir",
+            "run_dir": "runs/tests/shared_data_dir",
             "dataset": {"data_dir": "data"},
         }
 

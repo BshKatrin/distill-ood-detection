@@ -63,8 +63,8 @@ unperturbed behavior is method-specific and documented on each method page.
 
 The two inference modes use separate artifact directories:
 
-- `runs/<experiment_name>/probabilities/unperturbed/`
-- `runs/<experiment_name>/probabilities/perturbed/`
+- `<run_dir>/probabilities/unperturbed/`
+- `<run_dir>/probabilities/perturbed/`
 
 ## Implementation
 
@@ -79,4 +79,4 @@ Raw, pre-perturbation teacher activations can be exported with
 `distill-ood export-teacher-activations`. The export contains the complete
 official ID training split, the ID test split, and configured OOD splits. Each
 selected layer is saved separately under
-`runs/<experiment_name>/teacher_activations/<dataset_name>/`.
+`runs/teachers/<id_dataset>/<teacher_architecture>/teacher_activations/<dataset_name>/`.

@@ -38,7 +38,7 @@ if [ -n "${CONFIG_LIST:-}" ]; then
 fi
 
 if [ "${#configs[@]}" -eq 0 ]; then
-  configs=("configs/teachers/resnet50_cifar10_probabilities.yaml")
+  configs=("configs/teachers/cifar_10/resnet50.yaml")
 fi
 
 echo "[$(date --iso-8601=seconds)] Syncing uv GPU environment"

@@ -58,6 +58,8 @@ class ExportRunMetricsTests(unittest.TestCase):
                         student_path,
                     )
             resolved_config = {
+                "experiment_name": run_name,
+                "run_dir": str(run_dir),
                 "dataset": {
                     "name": "cifar10",
                     "ood_datasets": [{"name": "mnist", "split": "test"}],

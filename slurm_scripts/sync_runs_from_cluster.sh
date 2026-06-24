@@ -27,7 +27,7 @@ Options:
   --delete                   Delete local files in selected run folders that no longer exist remotely.
   -h, --help                 Show this help text.
 
-Only top-level run directories named as positional arguments are transferred.
+Run directories are paths relative to runs/ and may contain nested components.
 EOF
 }
 
@@ -140,11 +140,12 @@ rsync_args=(
 remote_runs="${remote_repo%/}/runs"
 
 for run_dir in "${run_dirs[@]}"; do
-  if [[ "$run_dir" == /* || "$run_dir" == *".."* || "$run_dir" == *"/"* ]]; then
-    echo "error: run directory must be a top-level folder name under runs/: $run_dir" >&2
+  if [[ "$run_dir" == /* || "$run_dir" == .* || "$run_dir" == *"/."* || "$run_dir" == *".."* || "$run_dir" =~ ^[[:space:]] || "$run_dir" =~ [[:space:]]$ ]]; then
+    echo "error: run directory must be a safe relative path under runs/: $run_dir" >&2
     exit 2
   fi
 
+  mkdir -p "${local_runs%/}/$(dirname "$run_dir")"
   echo "Syncing ${host}:${remote_runs}/${run_dir}/ -> ${local_runs%/}/${run_dir}/"
   rsync "${rsync_args[@]}" \
     "${host}:${remote_runs}/${run_dir}/" \

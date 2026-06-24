@@ -67,7 +67,7 @@ strategy:
 ```
 
 See the clipping configs under
-[`configs/perturbation/`](../../../configs/perturbation/).
+[`configs/students/perturbation/embedding/clipping/`](../../../configs/students/perturbation/embedding/clipping/).
 
 ## Implementation
 

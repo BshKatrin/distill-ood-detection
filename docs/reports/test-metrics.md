@@ -1,8 +1,7 @@
 # Test Metric Reports
 
 Test reports contain test accuracy and distillation loss. Their LaTeX tables
-use saved method metrics under
-`runs/<experiment_name>/<method>/metrics.json` together with experiment
+use saved method metrics under `<run_dir>/<method>/metrics.json` together with experiment
 metadata from `configs/`.
 
 Each ID-dataset cell is formatted as
@@ -16,8 +15,8 @@ validation distillation loss.
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_test_metrics_table.py
 ```
 
-By default, the exporter reads `configs/baseline/` and
-`configs/perturbation/`. It writes `metrics_test_baseline.tex` and
+By default, the exporter reads `configs/students/baseline/` and
+`configs/students/perturbation/`. It writes `metrics_test_baseline.tex` and
 `metrics_test_perturbation.tex` under `reports/outputs/latex/` when matching
 metrics exist.
 
@@ -26,7 +25,8 @@ Pass config files or directories to restrict the report:
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
   python reports/scripts/export_test_metrics_table.py \
-  configs/baseline/cifar_10 configs/perturbation/cifar_10
+  configs/students/baseline/cifar_10 \
+  configs/students/perturbation/embedding
 ```
 
 Baseline tables include `Student`, `Features`, and `Training` columns.
@@ -44,12 +44,12 @@ Because those model cards do not publish distillation loss, teacher cells use
 
 ## Numeric metrics for explicit runs
 
-Use `--run-names` to export test metrics for selected experiments:
+Use `--run-names` to export test metrics for paths relative to `runs/`:
 
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
   python reports/scripts/export_test_metrics_table.py \
-  --run-names <run-name> [<run-name> ...]
+  --run-names <relative-run-dir> [<relative-run-dir> ...]
 ```
 
 This mode computes test accuracy and distillation loss directly from each

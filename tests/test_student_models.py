@@ -15,7 +15,7 @@ class StudentModelTests(unittest.TestCase):
     """Validate configurable PyTorch student models."""
 
     def test_loads_mlp_config(self) -> None:
-        config = load_config(Path("configs/baseline/cifar_10/mlp.yaml"))
+        config = load_config(Path("configs/students/baseline/cifar_10/resnet18/mlp.yaml"))
 
         self.assertEqual(config.student.kind, "mlp")
         self.assertEqual(config.student.hidden_channels, (1024, 512, 256))
@@ -25,7 +25,7 @@ class StudentModelTests(unittest.TestCase):
         )
 
     def test_loads_feature_linear_config(self) -> None:
-        config = load_config(Path("configs/baseline/cifar_10/feature_linear_layer3.yaml"))
+        config = load_config(Path("configs/students/baseline/cifar_10/resnet18/feature_linear_layer3.yaml"))
 
         self.assertEqual(config.student.kind, "linear")
         self.assertEqual(config.student.feature_layer, "layer3")
@@ -49,6 +49,7 @@ class StudentModelTests(unittest.TestCase):
     def test_rejects_mlp_without_hidden_channels(self) -> None:
         raw = {
             "experiment_name": "bad_mlp_config",
+            "run_dir": "runs/tests/bad_mlp_config",
             "student": {
                 "kind": "mlp",
                 "input_shape": [3, 32, 32],
@@ -62,6 +63,7 @@ class StudentModelTests(unittest.TestCase):
     def test_accepts_feature_layer_for_random_forest(self) -> None:
         raw = {
             "experiment_name": "feature_tree_config",
+            "run_dir": "runs/tests/feature_tree_config",
             "student": {
                 "kind": "random_forest",
                 "feature_layer": "layer3",
@@ -78,6 +80,7 @@ class StudentModelTests(unittest.TestCase):
     def test_parses_kl_divergence_and_perturbation_strategy(self) -> None:
         raw = {
             "experiment_name": "perturbation_config",
+            "run_dir": "runs/tests/perturbation_config",
             "student": {
                 "kind": "linear",
                 "feature_layer": "layer3",
@@ -111,6 +114,7 @@ class StudentModelTests(unittest.TestCase):
     def test_rejects_perturbation_strategy_without_feature_layer(self) -> None:
         raw = {
             "experiment_name": "bad_perturbation_config",
+            "run_dir": "runs/tests/bad_perturbation_config",
             "strategy": {"name": "perturbation"},
         }
 

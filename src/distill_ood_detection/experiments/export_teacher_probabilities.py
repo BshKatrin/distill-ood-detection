@@ -26,7 +26,7 @@ def run_teacher_probability_export(
 
     set_seed(config.seed)
     device = resolve_device(config.device)
-    output_dir = Path(config.output_dir) / config.experiment_name / "teacher_probabilities"
+    output_dir = Path(config.run_dir) / "teacher_probabilities"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     loaders = [

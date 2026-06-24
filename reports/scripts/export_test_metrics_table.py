@@ -23,8 +23,8 @@ DEFAULT_OUTPUT_PATTERN = "metrics_test_{strategy}.tex"
 DEFAULT_RUN_METRICS_PATH = REPORTS_DIR / "outputs" / "json" / "test_metrics.json"
 
 DEFAULT_CONFIG_PATHS = [
-    ROOT / "configs" / "baseline",
-    ROOT / "configs" / "perturbation",
+    ROOT / "configs" / "students" / "baseline",
+    ROOT / "configs" / "students" / "perturbation",
 ]
 
 DATASET_LABELS = {
@@ -156,7 +156,6 @@ def experiment_config(path: Path) -> ExperimentConfig:
     student = config["student"]
     dataset = config["dataset"]
     strategy = config_strategy(path, config)
-    output_dir = ROOT / config.get("output_dir", "runs")
     feature_layer = student.get("feature_layer")
     perturbation = (
         config.get("strategy", {})
@@ -172,7 +171,7 @@ def experiment_config(path: Path) -> ExperimentConfig:
         feature_source=feature_source_label(feature_layer),
         perturbation=perturbation_label(perturbation) if perturbation is not None else None,
         method_keys=method_keys_from_config(config),
-        run_dir=output_dir / config["experiment_name"],
+        run_dir=ROOT / config["run_dir"],
     )
 
 

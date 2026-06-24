@@ -28,7 +28,7 @@ cluster. Run project code by putting `src/` on `PYTHONPATH`.
 
 ```bash
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
-uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config configs/baseline/cifar_100/linear.yaml
+uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config configs/students/baseline/cifar_100/resnet18/linear.yaml
 uv run --project envs/tests --no-sync pytest
 ```
 
@@ -58,7 +58,7 @@ For a GPU-cluster training run from the repository root:
 
 ```bash
 uv sync --project envs/gpu --locked
-PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config configs/perturbation/cifar_10/linear_layer3_clip_constant.yaml
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_clip_constant.yaml
 ```
 
 For submitted jobs, keep the sync step in a setup phase or at the start of the

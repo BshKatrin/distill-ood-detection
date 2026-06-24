@@ -54,7 +54,7 @@ strategy:
 
 The unsuffixed Monte-Carlo dropout configs use `element`; `_channel` and
 `_spatial` variants use structured dropout. See the configs under
-[`configs/perturbation/`](../../../configs/perturbation/).
+[`configs/students/perturbation/embedding/dropout/`](../../../configs/students/perturbation/embedding/dropout/).
 
 ## Implementation
 

@@ -11,7 +11,6 @@ import nbformat
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT / "reports"
-RUNS_DIR = ROOT / "runs"
 NOTEBOOK_TEMPLATE = (
     REPORTS_DIR / "templates" / "notebooks" / "probability_artifact_analysis.ipynb"
 )
@@ -120,17 +119,21 @@ def next_notebook_number(output_dir: Path = NOTEBOOK_OUTPUT_DIR) -> int:
 
 def render_notebook_template(
     *,
-    experiment_name: str,
+    run_dir: Path,
     output_path: Path,
     notebook_title: str | None = None,
     template_path: Path | None = None,
 ) -> None:
     """Render a probability-artifact notebook from the notebook template."""
 
-    manifest_path = RUNS_DIR / experiment_name / "probabilities" / "manifest.json"
+    manifest_path = run_dir / "probabilities" / "manifest.json"
     if not manifest_path.exists():
         msg = f"Missing probability manifest: {manifest_path}"
         raise FileNotFoundError(msg)
+    with manifest_path.open() as file:
+        manifest = json.load(file)
+    experiment_name = manifest["experiment_name"]
+    relative_run_dir = run_dir.relative_to(ROOT)
 
     title = notebook_title or experiment_title(experiment_name)
     selected_template = template_path or template_for_experiment(experiment_name)
@@ -138,6 +141,7 @@ def render_notebook_template(
     for cell in notebook.cells:
         if isinstance(cell.source, str):
             cell.source = cell.source.replace("{{ experiment_name }}", experiment_name)
+            cell.source = cell.source.replace("{{ run_dir }}", str(relative_run_dir))
             cell.source = cell.source.replace("{{ notebook_title }}", title)
         if cell.cell_type == "code":
             cell.outputs = []
@@ -148,6 +152,7 @@ def render_notebook_template(
         {
             "generated_from": str(selected_template.relative_to(ROOT)),
             "experiment_name": experiment_name,
+            "run_dir": str(relative_run_dir),
         },
     )
 
@@ -164,9 +169,8 @@ def render_teacher_activation_notebook_template(
 ) -> None:
     """Render a teacher activation analysis notebook from the notebook template."""
 
-    manifest_path = (
-        RUNS_DIR / config.experiment_name / "teacher_activations" / "manifest.json"
-    )
+    run_dir = ROOT / config.run_dir
+    manifest_path = run_dir / "teacher_activations" / "manifest.json"
     if not manifest_path.exists():
         msg = f"Missing teacher activation manifest: {manifest_path}"
         raise FileNotFoundError(msg)
@@ -178,6 +182,7 @@ def render_teacher_activation_notebook_template(
     notebook = nbformat.read(template_path, as_version=4)
     replacements = {
         "{{ experiment_name }}": config.experiment_name,
+        "{{ run_dir }}": str(run_dir.relative_to(ROOT)),
         "{{ notebook_title }}": title,
         "{{ id_dataset }}": id_dataset,
         "{{ dataset_labels }}": json.dumps(dataset_labels, indent=4),
@@ -196,6 +201,7 @@ def render_teacher_activation_notebook_template(
         {
             "generated_from": str(template_path.relative_to(ROOT)),
             "experiment_name": config.experiment_name,
+            "run_dir": str(run_dir.relative_to(ROOT)),
             "config_kind": "teacher_activation",
         },
     )

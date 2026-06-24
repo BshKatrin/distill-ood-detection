@@ -57,7 +57,7 @@ def run_tree_experiment(
     set_seed(training_defaults.seed)
     device = resolve_device(training_defaults.device)
     modes = (mode,) if mode else config.tree.enabled_modes()
-    experiment_dir = Path(config.output_dir) / config.experiment_name
+    experiment_dir = Path(config.run_dir)
     experiment_dir.mkdir(parents=True, exist_ok=True)
     write_json(experiment_dir / "resolved_config.json", asdict(config))
     if config.mlflow.enabled:

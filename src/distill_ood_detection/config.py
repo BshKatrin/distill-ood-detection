@@ -274,7 +274,7 @@ class ExperimentConfig:
     """Complete experiment configuration."""
 
     experiment_name: str
-    output_dir: str = "runs"
+    run_dir: str
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     teacher: TeacherConfig = field(default_factory=TeacherConfig)
     student: StudentConfig = field(default_factory=StudentConfig)
@@ -290,7 +290,7 @@ class TeacherActivationConfig:
     """Configuration for exporting raw teacher activations."""
 
     experiment_name: str
-    output_dir: str = "runs"
+    run_dir: str
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     teacher: TeacherConfig = field(default_factory=TeacherConfig)
     layers: tuple[str, ...] = ("layer3",)
@@ -303,7 +303,7 @@ class TeacherProbabilityConfig:
     """Configuration for exporting deterministic teacher probabilities."""
 
     experiment_name: str
-    output_dir: str = "runs"
+    run_dir: str
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     teacher: TeacherConfig = field(default_factory=TeacherConfig)
     device: str = "auto"
@@ -342,7 +342,7 @@ def parse_teacher_activation_config(raw: dict[str, Any]) -> TeacherActivationCon
     layers = tuple(raw.get("layers", ("layer3",)))
     config = TeacherActivationConfig(
         experiment_name=raw["experiment_name"],
-        output_dir=raw.get("output_dir", "runs"),
+        run_dir=raw["run_dir"],
         dataset=dataset,
         teacher=teacher,
         layers=layers,
@@ -365,7 +365,7 @@ def parse_teacher_probability_config(raw: dict[str, Any]) -> TeacherProbabilityC
     teacher = TeacherConfig(**raw.get("teacher", {}))
     config = TeacherProbabilityConfig(
         experiment_name=raw["experiment_name"],
-        output_dir=raw.get("output_dir", "runs"),
+        run_dir=raw["run_dir"],
         dataset=dataset,
         teacher=teacher,
         device=raw.get("device", "auto"),
@@ -402,7 +402,7 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
 
     return ExperimentConfig(
         experiment_name=raw["experiment_name"],
-        output_dir=raw.get("output_dir", "runs"),
+        run_dir=raw["run_dir"],
         dataset=dataset,
         teacher=teacher,
         student=student,

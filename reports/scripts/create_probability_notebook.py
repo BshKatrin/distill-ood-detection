@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -23,8 +24,9 @@ def parse_args() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "experiment_name",
-        help="Run artifact name under runs/<experiment_name>/probabilities/.",
+        "run_dir",
+        type=Path,
+        help="Experiment run directory containing probabilities/.",
     )
     parser.add_argument(
         "--title",
@@ -53,17 +55,20 @@ def main() -> None:
     """Generate a notebook from the probability-artifact template."""
 
     args = parse_args()
+    run_dir = args.run_dir if args.run_dir.is_absolute() else ROOT / args.run_dir
+    with (run_dir / "resolved_config.json").open() as file:
+        experiment_name = json.load(file)["experiment_name"]
     notebook_number = args.number or next_notebook_number(args.output_dir)
     output_path = (
         args.output_dir
-        / f"{notebook_number:02d}_{filename_slug(args.experiment_name)}.ipynb"
+        / f"{notebook_number:02d}_{filename_slug(experiment_name)}.ipynb"
     )
     if output_path.exists() and not args.overwrite:
         msg = f"Output notebook already exists: {output_path}"
         raise FileExistsError(msg)
 
     render_notebook_template(
-        experiment_name=args.experiment_name,
+        run_dir=run_dir,
         notebook_title=args.title,
         output_path=output_path,
     )

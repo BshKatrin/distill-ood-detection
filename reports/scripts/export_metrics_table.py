@@ -42,8 +42,8 @@ DEFAULT_RUN_METRICS_PATH = REPORTS_DIR / "outputs" / "json" / "ood_metrics.json"
 DEFAULT_OUTPUT_PATTERN = "metrics_{strategy}.tex"
 
 DEFAULT_CONFIG_PATHS = [
-    ROOT / "configs" / "baseline",
-    ROOT / "configs" / "perturbation",
+    ROOT / "configs" / "students" / "baseline",
+    ROOT / "configs" / "students" / "perturbation",
 ]
 
 DATASET_LABELS = {
@@ -276,7 +276,6 @@ def experiment_config(path: Path) -> ExperimentConfig:
     dataset = config["dataset"]
     strategy = config_strategy(path, config)
     experiment_name = config["experiment_name"]
-    output_dir = ROOT / config.get("output_dir", "runs")
     feature_layer = student.get("feature_layer")
     teacher_hf_model_id = config["teacher"]["hf_model_id"]
     perturbation_config = config.get("strategy", {}).get("perturbation", {})
@@ -299,7 +298,7 @@ def experiment_config(path: Path) -> ExperimentConfig:
             perturbation_label(perturbation) if perturbation is not None else None
         ),
         method_keys=method_keys_from_config(config),
-        run_dir=output_dir / experiment_name,
+        run_dir=ROOT / config["run_dir"],
     )
 
 
@@ -406,7 +405,9 @@ def teacher_reference_runs() -> dict[tuple[str, str], TeacherProbabilityRunArtif
     """Load all teacher-only probability artifacts keyed by ID dataset and teacher label."""
 
     references: dict[tuple[str, str], TeacherProbabilityRunArtifacts] = {}
-    for probability_dir in sorted((ROOT / "runs").glob("*/teacher_probabilities")):
+    for probability_dir in sorted(
+        (ROOT / "runs" / "teachers").glob("*/*/teacher_probabilities")
+    ):
         run_dir = probability_dir.parent
         run = TeacherProbabilityRunArtifacts(run_dir)
         references.setdefault((run.id_dataset_key, run.teacher_label), run)
@@ -543,10 +544,10 @@ class RunArtifacts:
 
     def __init__(self, run_dir: Path, probability_mode: str, probability_dir: Path) -> None:
         self.run_dir = run_dir
-        self.run_name = run_dir.name
         self.probability_mode = probability_mode
         self.probability_dir = probability_dir
         self.resolved_config = self._load_resolved_config()
+        self.run_name = self.resolved_config["experiment_name"]
         dataset = self.resolved_config["dataset"]
         self.id_dataset_key = f"{dataset['name']}_test"
         self.ood_dataset_keys = [
@@ -619,16 +620,17 @@ class TeacherProbabilityRunArtifacts:
 
     def __init__(self, run_dir: Path) -> None:
         self.run_dir = run_dir
-        self.run_name = run_dir.name
-        self.id_dataset_key = self._id_dataset_key()
-        self.teacher_label = teacher_name_label(self.run_name)
+        self.manifest = self._manifest()
+        self.run_name = self.manifest["experiment_name"]
+        self.id_dataset_key = f"{self.manifest['dataset']['name']}_test"
+        self.teacher_label = teacher_name_label(
+            self.manifest["teacher"]["hf_model_id"]
+        )
         self._artifact_paths = self._paths()
 
-    def _id_dataset_key(self) -> str:
-        for dataset_name in ("cifar100", "cifar10"):
-            if dataset_name in self.run_name.lower():
-                return f"{dataset_name}_test"
-        raise ValueError(f"Cannot infer teacher ID dataset from run name: {self.run_name}")
+    def _manifest(self) -> dict[str, Any]:
+        with (self.run_dir / "teacher_probabilities" / "manifest.json").open() as file:
+            return json.load(file)
 
     def _paths(self) -> dict[str, Path]:
         probability_dir = self.run_dir / "teacher_probabilities"

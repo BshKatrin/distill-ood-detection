@@ -29,7 +29,7 @@ class PerturbationTests(unittest.TestCase):
             "layer4": (512, 4, 4),
         }
 
-        for path in sorted(Path("configs/perturbation").glob("cifar_*/*.yaml")):
+        for path in sorted(Path("configs/students/perturbation").rglob("*.yaml")):
             with self.subTest(path=str(path)):
                 config = load_config(path)
                 feature_layer = config.student.feature_layer

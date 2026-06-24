@@ -1,7 +1,7 @@
 # OOD Metric Reports
 
 The OOD metric exporter computes ROC-AUC and FPR@95 from saved probability
-artifacts under `runs/*/probabilities/`. It uses experiment configs for report
+artifacts under student `run_dir` paths. It uses experiment configs for report
 metadata and writes one LaTeX report per strategy.
 
 ## Strategy tables
@@ -12,7 +12,8 @@ Run the exporter with its default config directories:
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_metrics_table.py
 ```
 
-By default, it reads `configs/baseline/` and `configs/perturbation/` and writes
+By default, it reads `configs/students/baseline/` and
+`configs/students/perturbation/` and writes
 `metrics_baseline.tex` and `metrics_perturbation.tex` under
 `reports/outputs/latex/` when matching run artifacts exist.
 
@@ -21,7 +22,8 @@ Pass config files or directories to restrict the report:
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
   python reports/scripts/export_metrics_table.py \
-  configs/baseline/cifar_10 configs/perturbation/cifar_10
+  configs/students/baseline/cifar_10 \
+  configs/students/perturbation/embedding
 ```
 
 Baseline tables include a `Features` column derived from
@@ -42,13 +44,13 @@ times match. Use `--cache <path>` to select another cache file.
 
 ## Numeric metrics for explicit runs
 
-Use `--run-names` to export numeric metrics for an explicit set of experiments:
+Use `--run-names` to export numeric metrics for run paths relative to `runs/`:
 
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
   python reports/scripts/export_metrics_table.py \
-  --run-names random_forest_student_resnet18_cifar10_n50 \
-              random_forest_student_resnet18_cifar10_n200 \
+  --run-names students/baseline/cifar_10/resnet18/random_forest_n50 \
+              students/baseline/cifar_10/resnet18/random_forest_n200 \
   --json-output reports/outputs/json/random_forest_n_estimators.json
 ```
 
@@ -77,7 +79,7 @@ teacher artifacts:
 ```bash
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
   python reports/scripts/export_metrics_table.py \
-  --teacher-run-names teacher_resnet18_cifar10 teacher_resnet50_cifar10 \
+  --teacher-run-names teachers/cifar_10/resnet18 teachers/cifar_10/resnet50 \
   --json-output reports/outputs/json/teacher_baselines.json
 ```
 

@@ -21,7 +21,7 @@ cd "${PROJECT_DIR}"
 
 mkdir -p slurm
 
-CONFIG_PATH="${1:-configs/teachers/resnet18_cifar10_layers.yaml}"
+CONFIG_PATH="${1:-configs/teachers/cifar_10/resnet18.yaml}"
 
 echo "[$(date --iso-8601=seconds)] Syncing uv GPU environment"
 uv --version
