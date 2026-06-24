@@ -1,0 +1,137 @@
+# OOD Metric Reports
+
+The OOD metric exporter computes ROC-AUC and FPR@95 from saved probability
+artifacts under `runs/*/probabilities/`. It uses experiment configs for report
+metadata and writes one LaTeX report per strategy.
+
+## Strategy tables
+
+Run the exporter with its default config directories:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync python reports/scripts/export_metrics_table.py
+```
+
+By default, it reads `configs/baseline/` and `configs/perturbation/` and writes
+`metrics_baseline.tex` and `metrics_perturbation.tex` under
+`reports/outputs/latex/` when matching run artifacts exist.
+
+Pass config files or directories to restrict the report:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
+  python reports/scripts/export_metrics_table.py \
+  configs/baseline/cifar_10 configs/perturbation/cifar_10
+```
+
+Baseline tables include a `Features` column derived from
+`student.feature_layer`; a missing layer is displayed as `Raw Pixels`.
+Perturbation tables also include the configured perturbation. Rows with the
+same displayed metadata are merged across ID datasets so matching CIFAR-10 and
+CIFAR-100 experiments fill the same row block.
+
+The Teacher MSP row always uses raw-image teacher probability artifacts from
+baseline runs, including in perturbation reports. OOD Score display names are
+report-specific pretty names.
+
+## Metric cache
+
+Computed metrics are cached at `reports/outputs/cache/ood_metrics.json`. A
+cached value is reused when its source artifact paths, sizes, and modification
+times match. Use `--cache <path>` to select another cache file.
+
+## Numeric metrics for explicit runs
+
+Use `--run-names` to export numeric metrics for an explicit set of experiments:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
+  python reports/scripts/export_metrics_table.py \
+  --run-names random_forest_student_resnet18_cifar10_n50 \
+              random_forest_student_resnet18_cifar10_n200 \
+  --json-output reports/outputs/json/random_forest_n_estimators.json
+```
+
+Without `--json-output`, this mode writes
+`reports/outputs/json/ood_metrics.json`. It discovers artifacts directly under
+`probabilities/unperturbed/` and `probabilities/perturbed/`; it does not depend
+on a probability manifest that may represent only the latest partial inference
+run. Legacy artifacts directly under `probabilities/` are treated as
+`unperturbed`.
+
+Dataset metadata comes from `resolved_config.json`. The output contains run
+metadata under `probability_modes` and a `probability_mode` field on every
+metric record.
+
+Use `--scores` with `--run-names` to limit expensive calculations:
+
+```bash
+--scores max_probability_difference absolute_max_probability_difference student_teacher_kl_divergence
+```
+
+## Teacher baselines
+
+Use `--teacher-run-names` to export MSP and energy metrics from raw-image
+teacher artifacts:
+
+```bash
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/notebooks --no-sync \
+  python reports/scripts/export_metrics_table.py \
+  --teacher-run-names teacher_resnet18_cifar10 teacher_resnet50_cifar10 \
+  --json-output reports/outputs/json/teacher_baselines.json
+```
+
+Each record contains the OOD Score, ID and OOD datasets, ROC-AUC, and FPR@95.
+
+## CIFAR-10 perturbation comparison tables
+
+After exporting the selected CIFAR-10 perturbation runs and teacher baselines
+to JSON, generate separate aggressive-clipping, non-aggressive-clipping,
+Monte-Carlo-dropout, and PCA tables:
+
+```bash
+uv run --project envs/notebooks --no-sync python \
+  reports/scripts/export_cifar10_perturbation_tables.py
+```
+
+The tables report each cell as `ROC-AUC/FPR@95`. They include ResNet-18 and
+ResNet-50 MSP and energy baselines for both ID datasets. CIFAR-100 student cells
+remain `--` until matching run metrics are added.
+
+Clipping tables separate clipping level, teacher target, and inference mode.
+The dropout table separates dropout level and inference mode. The PCA table
+omits those inapplicable columns. Every table retains the training objective
+because each OOD Score is available for multiple objectives. Within an OOD
+dataset, a complete metric pair is bold when it contains the highest student
+ROC-AUC or lowest student FPR@95.
+
+## Random-forest estimator sweep
+
+The random-forest sweep scripts consume the fixed numeric export
+`reports/outputs/json/random_forest_sweep.json`. Generate its LaTeX table with:
+
+```bash
+uv run --project envs/notebooks --no-sync python reports/scripts/export_random_forest_sweep_table.py
+```
+
+Generate the ROC-AUC and FPR@95 sweep plots with:
+
+```bash
+uv run --project envs/notebooks --no-sync python reports/scripts/plot_random_forest_sweep.py
+```
+
+The table is written under `reports/outputs/latex/`; plot files are written
+under `reports/outputs/plots/`. These scripts select layer-4 random-forest runs
+from the JSON and use their built-in estimator ordering and teacher baselines.
+
+## SLURM
+
+On the GPU cluster, submit the general exporter through its CPU-only SLURM job:
+
+```bash
+sbatch --mem=32G slurm_scripts/export_metrics_table.sbatch
+```
+
+The job reads saved probability artifacts and writes LaTeX files under
+`reports/outputs/latex/`; it should not allocate a GPU. Read the
+[HPC documentation](../hpc/README.md) before using cluster commands.

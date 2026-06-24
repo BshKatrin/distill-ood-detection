@@ -3,7 +3,9 @@
 This directory contains different distillation (student-training) strategies.
 
 - [Baseline](baseline.md): Baseline strategy.
-- [Perturbation](perturbation.md): Perturbation-based strategy.
+- [Perturbation](perturbation.md): Perturbation-based strategy, including
+  [embedding-space](embedding/README.md) and
+  [pixel-space](pixel/README.md) perturbations.
 
 ## Implementation Links
 
