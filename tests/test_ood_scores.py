@@ -13,6 +13,8 @@ from distill_ood_detection.evaluation import (
     energy_gap,
     logit_l2_distance,
     max_probability_difference,
+    student_energy,
+    student_msp,
     student_teacher_kl_divergence,
 )
 from distill_ood_detection.evaluation.ood_scores import SIGNS
@@ -89,6 +91,13 @@ class OODScoreTests(unittest.TestCase):
             np.abs(energy(teacher) - energy(student)),
         )
 
+    def test_student_only_scores(self) -> None:
+        probabilities = np.array([[0.7, 0.3], [0.1, 0.9]])
+        logits = np.array([[1.0, 2.0], [0.0, 4.0]])
+
+        np.testing.assert_allclose(student_msp(probabilities), [0.7, 0.9])
+        np.testing.assert_allclose(student_energy(logits), energy(logits))
+
     def test_signed_scores_follow_id_positive_convention(self) -> None:
         teacher = np.array([[0.7, 0.3], [0.1, 0.9]])
         student = np.array([[0.4, 0.6], [0.2, 0.8]])
@@ -135,6 +144,8 @@ class OODScoreTests(unittest.TestCase):
                 "logit_l2_distance",
                 "max_probability_difference",
                 "student_teacher_kl_divergence",
+                "student_msp",
+                "student_energy",
             },
         )
 

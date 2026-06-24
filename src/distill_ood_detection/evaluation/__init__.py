@@ -9,6 +9,8 @@ from distill_ood_detection.evaluation.ood_scores import (
     energy_gap,
     logit_l2_distance,
     max_probability_difference,
+    student_energy,
+    student_msp,
     student_teacher_kl_divergence,
 )
 
@@ -21,5 +23,7 @@ __all__ = [
     "logit_l2_distance",
     "max_probability_difference",
     "ood_detection_metrics",
+    "student_energy",
+    "student_msp",
     "student_teacher_kl_divergence",
 ]

@@ -14,6 +14,8 @@ LOGIT_L2_DISTANCE = "logit_l2_distance"
 ENERGY = "energy"
 ENERGY_GAP = "energy_gap"
 ABSOLUTE_ENERGY_GAP = "absolute_energy_gap"
+STUDENT_MSP = "student_msp"
+STUDENT_ENERGY = "student_energy"
 
 # Signs convert raw scores to the repository convention used by OOD metrics:
 # ID is the positive class, so larger signed scores are more ID-like.
@@ -25,6 +27,8 @@ SIGNS: Mapping[str, int] = {
     ENERGY: +1,
     ENERGY_GAP: +1,
     ABSOLUTE_ENERGY_GAP: -1,
+    STUDENT_MSP: +1,
+    STUDENT_ENERGY: +1,
 }
 
 
@@ -326,6 +330,33 @@ def energy(
     scores = temperature * _logsumexp(outputs / temperature, axis=-1)
     scores = _maybe_average_draws(scores, average_draws)
     return _maybe_signed(scores, ENERGY, signed)
+
+
+def student_msp(
+    probabilities: ArrayLike,
+    signed: bool = False,
+    average_draws: bool = True,
+) -> NDArray[np.float64]:
+    """Compute the student Maximum Softmax Probability for each sample."""
+
+    outputs = _as_probability_matrix(probabilities, "student_probabilities")
+    scores = _maybe_average_draws(outputs.max(axis=-1), average_draws)
+    return _maybe_signed(scores, STUDENT_MSP, signed)
+
+
+def student_energy(
+    logits: ArrayLike,
+    temperature: float = 1.0,
+    signed: bool = False,
+    average_draws: bool = True,
+) -> NDArray[np.float64]:
+    """Compute the student-only energy OOD Score for each sample."""
+
+    temperature = _validate_temperature(temperature)
+    outputs = _as_output_matrix(logits, "student_logits")
+    scores = temperature * _logsumexp(outputs / temperature, axis=-1)
+    scores = _maybe_average_draws(scores, average_draws)
+    return _maybe_signed(scores, STUDENT_ENERGY, signed)
 
 
 def energy_gap(

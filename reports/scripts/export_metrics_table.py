@@ -24,6 +24,8 @@ from distill_ood_detection.evaluation.ood_scores import (
     LOGIT_L2_DISTANCE,
     MAX_PROBABILITY_DIFFERENCE,
     STUDENT_TEACHER_KL_DIVERGENCE,
+    STUDENT_ENERGY,
+    STUDENT_MSP,
     absolute_energy_gap,
     absolute_max_probability_difference,
     energy,
@@ -31,6 +33,8 @@ from distill_ood_detection.evaluation.ood_scores import (
     logit_l2_distance,
     max_probability_difference,
     student_teacher_kl_divergence,
+    student_energy,
+    student_msp,
 )
 
 
@@ -91,6 +95,8 @@ OOD_SCORE_LABELS = {
     ENERGY: "Energy",
     ENERGY_GAP: "Energy Gap",
     ABSOLUTE_ENERGY_GAP: "Abs. Energy Gap",
+    STUDENT_MSP: "Student MSP",
+    STUDENT_ENERGY: "Student Energy",
 }
 
 TEACHER_SCORE_LABELS = {
@@ -102,7 +108,10 @@ LOGIT_SCORE_KEYS = {
     LOGIT_L2_DISTANCE,
     ENERGY_GAP,
     ABSOLUTE_ENERGY_GAP,
+    STUDENT_ENERGY,
 }
+
+STUDENT_ONLY_SCORE_KEYS = {STUDENT_MSP, STUDENT_ENERGY}
 
 PROBABILITY_SCORE_FUNCTIONS: dict[
     str,
@@ -134,6 +143,8 @@ SCORE_ORDER = [
     LOGIT_L2_DISTANCE,
     ENERGY_GAP,
     ABSOLUTE_ENERGY_GAP,
+    STUDENT_MSP,
+    STUDENT_ENERGY,
 ]
 
 TEACHER_SCORE_ORDER = [
@@ -788,12 +799,22 @@ def student_scores_for_dataset(
     """Compute student-teacher OOD scores for one dataset artifact pair."""
 
     artifact_key = "logits" if score_key in LOGIT_SCORE_KEYS else "probabilities"
-    teacher_values = load_artifact_array(
-        run.teacher_artifact_path(dataset_key),
-        artifact_key,
-    )
     student_values = load_artifact_array(
         run.student_artifact_path(dataset_key, method_key),
+        artifact_key,
+    )
+    if score_key == STUDENT_MSP:
+        try:
+            return student_msp(student_values, signed=True)
+        finally:
+            del student_values
+    if score_key == STUDENT_ENERGY:
+        try:
+            return student_energy(student_values, signed=True)
+        finally:
+            del student_values
+    teacher_values = load_artifact_array(
+        run.teacher_artifact_path(dataset_key),
         artifact_key,
     )
     try:
@@ -820,16 +841,21 @@ def student_metric_values(
 
     id_dataset_key = run.id_dataset_key
     artifact_key = "logits" if score_key in LOGIT_SCORE_KEYS else "probabilities"
-    id_teacher_path = run.teacher_artifact_path(id_dataset_key)
     id_student_path = run.student_artifact_path(id_dataset_key, method_key)
-    ood_teacher_path = run.teacher_artifact_path(ood_dataset_key)
     ood_student_path = run.student_artifact_path(ood_dataset_key, method_key)
     fingerprints = [
-        artifact_fingerprint(id_teacher_path),
         artifact_fingerprint(id_student_path),
-        artifact_fingerprint(ood_teacher_path),
         artifact_fingerprint(ood_student_path),
     ]
+    if score_key not in STUDENT_ONLY_SCORE_KEYS:
+        id_teacher_path = run.teacher_artifact_path(id_dataset_key)
+        ood_teacher_path = run.teacher_artifact_path(ood_dataset_key)
+        fingerprints = [
+            artifact_fingerprint(id_teacher_path),
+            *fingerprints[:1],
+            artifact_fingerprint(ood_teacher_path),
+            *fingerprints[1:],
+        ]
     key = {
         "kind": "student",
         "run": run.run_name,

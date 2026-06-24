@@ -22,7 +22,6 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
   In different OOD strategy reports, the Teacher MSP row must still use the raw-pixel
   teacher probability artifacts from the matching baseline run.
   - `sign: +1`
-  - **Status**: Not implemented in `ood_scores.py`.
 
 - Energy: Teacher-only energy baseline from
   [Energy-based Out-of-distribution Detection](https://arxiv.org/pdf/2010.03759).

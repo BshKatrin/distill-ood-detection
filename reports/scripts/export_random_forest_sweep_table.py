@@ -25,6 +25,8 @@ OOD_SCORE_LABELS = {
     "logit_l2_distance": "Logit L2",
     "energy_gap": "Energy Gap",
     "absolute_energy_gap": "Abs. Energy Gap",
+    "student_msp": "Student MSP",
+    "student_energy": "Student Energy",
 }
 
 ID_DATASET_ORDER = ["cifar10_test", "cifar100_test"]
@@ -41,9 +43,11 @@ OOD_SCORE_ORDER = [
     "logit_l2_distance",
     "energy_gap",
     "absolute_energy_gap",
+    "student_msp",
+    "student_energy",
 ]
 
-ESTIMATORS_ORDER = [20, 50, 100, 200, 300]
+ESTIMATORS_ORDER = [20, 50, 100, 200, 300, 500, 1000]
 
 TEACHER_MSP = {
     ("cifar10_test", "mnist_test"): "0.92/0.56",

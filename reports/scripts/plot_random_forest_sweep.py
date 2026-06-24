@@ -40,6 +40,8 @@ OOD_SCORE_LABELS = {
     "logit_l2_distance": "Logit L2",
     "energy_gap": "Energy Gap",
     "absolute_energy_gap": "Abs. Energy Gap",
+    "student_msp": "Student MSP",
+    "student_energy": "Student Energy",
 }
 
 # Teacher MSP baselines (from metrics_baseline.tex)
@@ -119,6 +121,8 @@ def plot_overlay(df: pd.DataFrame) -> None:
         "logit_l2_distance",
         "energy_gap",
         "absolute_energy_gap",
+        "student_msp",
+        "student_energy",
     ]
     palette = sns.color_palette("Set2", len(scores))
     color_map = dict(zip(scores, palette))
