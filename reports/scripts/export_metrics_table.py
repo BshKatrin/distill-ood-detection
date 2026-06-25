@@ -1316,6 +1316,13 @@ def run_n_estimators(run: RunArtifacts) -> int | dict[str, int] | None:
         if isinstance(value, int):
             values[method_key] = value
     if not values:
+        tree = run.resolved_config.get("tree", {})
+        if isinstance(tree, dict):
+            random_forest = tree.get("random_forest", {})
+            if isinstance(random_forest, dict):
+                value = random_forest.get("n_estimators")
+                if isinstance(value, int):
+                    return value
         return None
     unique_values = set(values.values())
     if len(unique_values) == 1:

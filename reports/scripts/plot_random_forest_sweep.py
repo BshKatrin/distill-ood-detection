@@ -218,6 +218,91 @@ def plot_overlay(df: pd.DataFrame) -> None:
     print(f"Saved overlay plots to:\n  - {png_path}\n  - {pdf_path}")
 
 
+def plot_single_metric(
+    df: pd.DataFrame,
+    metric_key: str,
+    title: str,
+    ylabel: str,
+    output_stem: str,
+) -> None:
+    """Generate and save one Random Forest sweep plot for a single metric."""
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharex=True, sharey=True)
+    scores = [
+        "max_probability_difference",
+        "absolute_max_probability_difference",
+        "student_teacher_kl_divergence",
+        "logit_l2_distance",
+        "energy_gap",
+        "absolute_energy_gap",
+        "student_msp",
+        "student_energy",
+    ]
+    palette = sns.color_palette("Set2", len(scores))
+    color_map = dict(zip(scores, palette))
+
+    legend_handles = []
+    legend_labels = []
+
+    for row_idx, id_dataset, ood_dataset, col_idx in GRID_CONFIG:
+        ax = axes[row_idx, col_idx]
+        sub_df = df[(df["id_dataset"] == id_dataset) & (df["ood_dataset"] == ood_dataset)]
+
+        for score in scores:
+            score_data = sub_df[sub_df["ood_score"] == score].sort_values("n_estimators")
+            if score_data.empty:
+                continue
+            line, = ax.plot(
+                score_data["n_estimators"],
+                score_data[metric_key],
+                marker="o",
+                linestyle="-",
+                linewidth=2,
+                color=color_map[score],
+            )
+            if row_idx == 0 and col_idx == 0:
+                legend_handles.append(line)
+                legend_labels.append(OOD_SCORE_LABELS.get(score, score))
+
+        teacher_metric = TEACHER_MSP if metric_key == "roc_auc" else TEACHER_MSP_FPR
+        teacher_value = teacher_metric.get((id_dataset, ood_dataset))
+        if teacher_value is not None:
+            ax.axhline(teacher_value, color="gray", linestyle="--", linewidth=1.5)
+            if row_idx == 0 and col_idx == 0:
+                legend_handles.append(
+                    Line2D([0], [0], color="gray", linestyle="--", linewidth=1.5)
+                )
+                legend_labels.append("Teacher MSP")
+
+        id_lbl = DATASET_LABELS.get(id_dataset, id_dataset)
+        ood_lbl = DATASET_LABELS.get(ood_dataset, ood_dataset)
+        ax.set_title(f"ID: {id_lbl} vs OOD: {ood_lbl}")
+        ax.set_ylim(-0.05, 1.05)
+        if row_idx == 1:
+            ax.set_xlabel("n_estimators")
+        if col_idx == 0:
+            ax.set_ylabel(ylabel)
+
+    fig.legend(
+        legend_handles,
+        legend_labels,
+        loc="lower center",
+        ncol=4,
+        bbox_to_anchor=(0.5, 0.02),
+        frameon=True,
+    )
+    plt.suptitle(title, y=0.96)
+    plt.tight_layout(rect=[0, 0.08, 1, 0.94])
+
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    png_path = PLOTS_DIR / f"{output_stem}.png"
+    pdf_path = PLOTS_DIR / f"{output_stem}.pdf"
+    plt.savefig(png_path, dpi=300)
+    plt.savefig(pdf_path)
+    plt.close()
+    print(f"Saved {metric_key} plots to:\n  - {png_path}\n  - {pdf_path}")
+
+
 def main() -> None:
     """Load data and generate overlay plots."""
     print(f"Loading data from {JSON_PATH}...")
@@ -225,6 +310,22 @@ def main() -> None:
 
     print("Generating overlay plot...")
     plot_overlay(df)
+    print("Generating ROC AUC plot...")
+    plot_single_metric(
+        df,
+        "roc_auc",
+        r"Random Forest (layer4) Sweep: ROC AUC ($\uparrow$)",
+        "ROC AUC",
+        "random_forest_roc_auc_sweep",
+    )
+    print("Generating FPR@95 plot...")
+    plot_single_metric(
+        df,
+        "fpr_at_95_tpr",
+        r"Random Forest (layer4) Sweep: FPR@95 ($\downarrow$)",
+        "FPR@95",
+        "random_forest_fpr_at_95_tpr_sweep",
+    )
 
 
 if __name__ == "__main__":

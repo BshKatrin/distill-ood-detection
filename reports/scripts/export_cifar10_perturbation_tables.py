@@ -62,11 +62,15 @@ OOD_SCORE_ORDER = (
     "max_probability_difference",
     "absolute_max_probability_difference",
     "student_teacher_kl_divergence",
+    "student_msp",
+    "student_energy",
 )
 OOD_SCORE_LABELS = {
     "max_probability_difference": "Max probability difference",
     "absolute_max_probability_difference": "Absolute max probability difference",
     "student_teacher_kl_divergence": "Student--teacher KL divergence",
+    "student_msp": "Student MSP",
+    "student_energy": "Student Energy",
     "msp": "MSP",
     "energy": "Energy",
 }

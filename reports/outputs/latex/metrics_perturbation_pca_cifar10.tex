@@ -18,16 +18,22 @@ Objective & OOD Score & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-100 & T
 \multicolumn{2}{l}{ResNet-50 Energy} & -- & -- & 0.93/0.41 & 0.91/0.52 & 0.87/0.52 & -- & -- & 0.88/0.67 & 0.78/0.77 & 0.80/0.77 \\
 \midrule
 Cross-entropy & Max probability difference & 0.95 & 17.7 & 0.39/0.77 & 0.23/0.84 & 0.38/0.75 & 0.79 & 56.1 & 0.56/0.86 & 0.45/0.89 & 0.40/0.91 \\
- & Absolute max probability difference &  &  & 0.88/0.74 & \textbf{0.91/0.64} & \textbf{0.87/0.65} &  &  & 0.67/0.93 & 0.70/0.94 & 0.72/0.92 \\
- & Student--teacher KL divergence &  &  & 0.85/0.83 & \textbf{0.91/0.62} & \textbf{0.87/0.64} &  &  & 0.69/0.92 & 0.76/0.92 & 0.76/0.91 \\
+ & Absolute max probability difference &  &  & 0.88/0.74 & 0.91/0.64 & 0.87/0.65 &  &  & 0.67/0.93 & 0.70/0.94 & 0.72/0.92 \\
+ & Student--teacher KL divergence &  &  & 0.85/0.83 & 0.91/0.62 & 0.87/0.64 &  &  & 0.69/0.92 & 0.76/0.92 & 0.76/0.91 \\
+ & Student MSP &  &  & 0.92/0.56 & 0.91/0.58 & 0.88/0.62 &  &  & -- & -- & -- \\
+ & Student Energy &  &  & 0.95/0.30 & 0.91/0.43 & \textbf{0.89/0.50} &  &  & -- & -- & -- \\
 \addlinespace
 KL divergence & Max probability difference & 0.95 & 0.0078 & 0.50/0.68 & 0.53/0.68 & 0.58/0.68 & 0.78 & 0.0619 & 0.52/0.86 & 0.40/0.91 & 0.50/0.90 \\
- & Absolute max probability difference &  &  & 0.91/0.56 & 0.88/0.64 & \textbf{0.87/0.65} &  &  & 0.71/0.84 & 0.74/0.89 & 0.72/0.90 \\
- & Student--teacher KL divergence &  &  & \textbf{0.94/0.45} & 0.88/0.66 & \textbf{0.87/0.62} &  &  & \textbf{0.77/0.71} & \textbf{0.80/0.84} & \textbf{0.78/0.86} \\
+ & Absolute max probability difference &  &  & 0.91/0.56 & 0.88/0.64 & 0.87/0.65 &  &  & 0.71/0.84 & 0.74/0.89 & 0.72/0.90 \\
+ & Student--teacher KL divergence &  &  & 0.94/0.45 & 0.88/0.66 & 0.87/0.62 &  &  & \textbf{0.77/0.71} & \textbf{0.80/0.84} & \textbf{0.78/0.86} \\
+ & Student MSP &  &  & 0.92/0.56 & 0.91/0.60 & 0.87/0.64 &  &  & -- & -- & -- \\
+ & Student Energy &  &  & 0.93/0.38 & 0.95/0.34 & 0.87/0.57 &  &  & -- & -- & -- \\
 \addlinespace
 Logit MSE & Max probability difference & 0.95 & 0.0238 & 0.42/0.76 & 0.25/0.83 & 0.39/0.75 & 0.79 & 0.000501 & 0.54/0.86 & 0.43/0.92 & 0.38/0.91 \\
- & Absolute max probability difference &  &  & 0.88/0.76 & 0.90/0.66 & \textbf{0.87/0.66} &  &  & 0.67/0.94 & 0.68/0.97 & 0.71/0.93 \\
- & Student--teacher KL divergence &  &  & 0.86/0.82 & \textbf{0.91/0.63} & 0.86/0.64 &  &  & 0.67/0.92 & 0.70/0.97 & 0.75/0.92 \\
+ & Absolute max probability difference &  &  & 0.88/0.76 & 0.90/0.66 & 0.87/0.66 &  &  & 0.67/0.94 & 0.68/0.97 & 0.71/0.93 \\
+ & Student--teacher KL divergence &  &  & 0.86/0.82 & 0.91/0.63 & 0.86/0.64 &  &  & 0.67/0.92 & 0.70/0.97 & 0.75/0.92 \\
+ & Student MSP &  &  & 0.92/0.56 & 0.91/0.58 & 0.88/0.62 &  &  & -- & -- & -- \\
+ & Student Energy &  &  & \textbf{0.98/0.16} & \textbf{0.96/0.24} & \textbf{0.89/0.51} &  &  & -- & -- & -- \\
 \bottomrule
 \end{tabular}
 
