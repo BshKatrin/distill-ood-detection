@@ -53,11 +53,57 @@ Current examples are:
 - [`cifar_10/linear_layer4_pca9.yaml`](../../../configs/students/perturbation/embedding/pca/cifar_10/resnet18/linear_layer4_pca9.yaml)
 - [`cifar_100/linear_layer4_pca100.yaml`](../../../configs/students/perturbation/embedding/pca/cifar_100/resnet18/linear_layer4_pca100.yaml)
 
+## Masked PCA projection
+
+Masked PCA projection uses the same fitted top-k PCA components, then samples a
+binary keep mask over those components for each sample:
+
+`m_j ~ Bernoulli(1 - p)`
+
+where `p = strategy.perturbation.pca_mask_probability` is the probability that
+a component is masked. The mask uses `1` for a kept component and `0` for a
+masked component.
+
+Conceptually, the sampled mask is applied to the PCA component matrix before
+projecting the centered embedding. If `Q` is the top-k component matrix and
+`x = flatten(z) - mean`, the masked projection is:
+
+`z_masked_pca = (Q * m)^T x`
+
+The implementation computes the ordinary PCA coefficients first and then
+multiplies them by the same keep mask:
+
+`z_masked_pca = (x @ Q) * m`
+
+This is equivalent because each mask value zeros or keeps one complete PCA
+component. The student receives the masked projection and the keep mask:
+
+`concat(z_masked_pca, m)`
+
+Masked PCA projection supports only `teacher_target: clean`; the teacher
+continues from the original embedding `z`.
+
+Example:
+
+```yaml
+strategy:
+  name: perturbation
+  perturbation:
+    method: pca_masked_projection
+    teacher_target: clean
+    pca_components: 9
+    pca_mask_probability: 0.3
+    pca_activation_path: runs/teachers/cifar_10/resnet18/teacher_activations/cifar10_train/layer4.pt
+```
+
 ## Probability inference
 
 Probability inference reloads the saved projector for every ID and OOD test
 split. It never fits or updates PCA from evaluation activations. PCA projection
 is applied to `flatten(z)` in both perturbed and unperturbed inference modes.
+For masked PCA projection, unperturbed inference uses an all-ones keep mask,
+while perturbed inference samples `strategy.perturbation.evaluation_draws`
+independent masks.
 
 ## Implementation
 

@@ -80,7 +80,8 @@ def run_probability_inference(
     pca_projector = None
     if (
         config.strategy.name == "perturbation"
-        and config.strategy.perturbation.method == "pca_projection"
+        and config.strategy.perturbation.method
+        in {"pca_projection", "pca_masked_projection"}
     ):
         pca_projector = load_pca_projector(pca_projector_path(experiment_dir), device)
     perturbation_forwarder = (

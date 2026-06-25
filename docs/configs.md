@@ -90,3 +90,6 @@ Perturbation inference separates deterministic and stochastic modes:
 PCA configs set `student.input_shape` to the component count and point
 `strategy.perturbation.pca_activation_path` to a complete ID training-split
 teacher activation under `runs/teachers/`.
+Masked PCA configs set `student.input_shape` to twice the component count
+because the student receives both the masked PCA projection and the binary
+component keep mask.

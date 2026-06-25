@@ -24,7 +24,12 @@ DistillationMethod = Literal[
 TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
 StrategyName = Literal["baseline", "perturbation"]
-PerturbationMethod = Literal["clipping", "mc_dropout", "pca_projection"]
+PerturbationMethod = Literal[
+    "clipping",
+    "mc_dropout",
+    "pca_projection",
+    "pca_masked_projection",
+]
 TeacherTarget = Literal["clean", "perturbed"]
 ClippingMode = Literal["constant", "spatial_dependent", "channel_dependent"]
 DropoutMode = Literal["element", "channel", "spatial"]
@@ -98,6 +103,7 @@ class PerturbationConfig:
     dropout_probability: float = 0.5
     dropout_mode: DropoutMode = "element"
     pca_components: int = 128
+    pca_mask_probability: float = 0.3
     pca_activation_path: str | None = None
     evaluation_draws: int = 1
 
@@ -468,7 +474,12 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(f"Unsupported strategy config fields: {unknown}")
     if strategy.name not in {"baseline", "perturbation"}:
         raise ValueError(f"Unsupported strategy: {strategy.name}")
-    if perturbation.method not in {"clipping", "mc_dropout", "pca_projection"}:
+    if perturbation.method not in {
+        "clipping",
+        "mc_dropout",
+        "pca_projection",
+        "pca_masked_projection",
+    }:
         raise ValueError(f"Unsupported perturbation method: {perturbation.method}")
     if perturbation.clipping_mode not in {
         "constant",
@@ -486,6 +497,17 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(f"Unsupported dropout mode: {perturbation.dropout_mode}")
     if perturbation.pca_components <= 0:
         raise ValueError("strategy.perturbation.pca_components must be positive")
+    if not 0.0 <= perturbation.pca_mask_probability < 1.0:
+        raise ValueError(
+            "strategy.perturbation.pca_mask_probability requires 0 <= p < 1"
+        )
+    if (
+        perturbation.method == "pca_masked_projection"
+        and perturbation.teacher_target != "clean"
+    ):
+        raise ValueError(
+            "pca_masked_projection only supports strategy.perturbation.teacher_target=clean"
+        )
     if perturbation.evaluation_draws <= 0:
         raise ValueError("strategy.perturbation.evaluation_draws must be positive")
     return strategy

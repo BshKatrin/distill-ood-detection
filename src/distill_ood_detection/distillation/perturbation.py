@@ -103,6 +103,10 @@ def sample_perturbation(
         if pca_projector is None:
             raise ValueError("pca_projector is required for PCA projection")
         return build_pca_projection_batch(features, pca_projector)
+    if config.method == "pca_masked_projection":
+        if pca_projector is None:
+            raise ValueError("pca_projector is required for masked PCA projection")
+        return sample_pca_masked_projection_batch(features, config, pca_projector)
     raise ValueError(f"Unsupported perturbation method: {config.method}")
 
 
@@ -146,6 +150,10 @@ def build_unperturbed_perturbation_batch(
         if pca_projector is None:
             raise ValueError("pca_projector is required for PCA projection")
         return build_pca_projection_batch(features, pca_projector)
+    if config.method == "pca_masked_projection":
+        if pca_projector is None:
+            raise ValueError("pca_projector is required for masked PCA projection")
+        return build_unperturbed_pca_masked_projection_batch(features, pca_projector)
     if features.ndim != 4:
         raise ValueError(
             "unperturbed perturbation inputs expect convolutional features with shape "
@@ -217,6 +225,27 @@ def build_pca_projection_batch(
     )
 
 
+def sample_pca_masked_projection_batch(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+    projector: PcaProjector,
+) -> PerturbationBatch:
+    """Project features after sampling a per-sample PCA component keep mask."""
+
+    keep_mask = _sample_pca_keep_mask(features, config, projector)
+    return _build_pca_masked_projection_batch(features, projector, keep_mask)
+
+
+def build_unperturbed_pca_masked_projection_batch(
+    features: torch.Tensor,
+    projector: PcaProjector,
+) -> PerturbationBatch:
+    """Build masked-PCA-shaped inputs with every PCA component kept."""
+
+    keep_mask = features.new_ones((features.shape[0], projector.components.shape[0]))
+    return _build_pca_masked_projection_batch(features, projector, keep_mask)
+
+
 def teacher_target_features(
     batch: PerturbationBatch,
     config: PerturbationConfig,
@@ -225,6 +254,8 @@ def teacher_target_features(
 
     if config.teacher_target == "clean":
         return batch.original_features
+    if config.method == "pca_masked_projection":
+        raise ValueError("pca_masked_projection only supports clean teacher targets")
     if config.teacher_target == "perturbed":
         return batch.perturbed_features
     raise ValueError(f"Unsupported teacher target: {config.teacher_target}")
@@ -303,6 +334,50 @@ def pca_projector_path(experiment_dir: Path) -> Path:
     """Return the standard PCA projector artifact path for an experiment."""
 
     return experiment_dir / "pca_projector.pt"
+
+
+def _build_pca_masked_projection_batch(
+    features: torch.Tensor,
+    projector: PcaProjector,
+    keep_mask: torch.Tensor,
+) -> PerturbationBatch:
+    if features.ndim != 4:
+        raise ValueError(
+            "masked PCA projection expects convolutional features with shape "
+            "(batch, channels, height, width)"
+        )
+    projected = projector.transform(features)
+    if keep_mask.shape != projected.shape:
+        raise ValueError(
+            "PCA keep mask must have shape "
+            f"{tuple(projected.shape)}; got {tuple(keep_mask.shape)}"
+        )
+    masked_projected = projected * keep_mask
+    reconstructed = projector.inverse_transform(
+        masked_projected,
+        tuple(features.shape[1:]),
+    )
+    student_inputs = torch.cat([masked_projected, keep_mask], dim=1)
+    return PerturbationBatch(
+        student_inputs=student_inputs,
+        original_features=features,
+        perturbations=keep_mask,
+        perturbed_features=reconstructed,
+        percentiles=keep_mask,
+    )
+
+
+def _sample_pca_keep_mask(
+    features: torch.Tensor,
+    config: PerturbationConfig,
+    projector: PcaProjector,
+) -> torch.Tensor:
+    keep_probability = 1.0 - config.pca_mask_probability
+    return torch.empty(
+        (features.shape[0], projector.components.shape[0]),
+        device=features.device,
+        dtype=features.dtype,
+    ).bernoulli_(keep_probability)
 
 
 def _sample_dropout_mask(

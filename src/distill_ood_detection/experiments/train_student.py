@@ -46,7 +46,11 @@ def run_experiment(
     loaders = build_id_loaders(config.dataset, seed=training_defaults.seed)
     teacher = load_teacher(config.teacher, device)
     pca_projector = None
-    if config.strategy.name == "perturbation" and config.strategy.perturbation.method == "pca_projection":
+    if (
+        config.strategy.name == "perturbation"
+        and config.strategy.perturbation.method
+        in {"pca_projection", "pca_masked_projection"}
+    ):
         activation_path = config.strategy.perturbation.pca_activation_path
         if activation_path is None:
             raise ValueError(
@@ -63,6 +67,7 @@ def run_experiment(
             {
                 "activation_path": activation_path,
                 "pca_components": config.strategy.perturbation.pca_components,
+                "pca_mask_probability": config.strategy.perturbation.pca_mask_probability,
                 "feature_layer": config.student.feature_layer,
             },
         )

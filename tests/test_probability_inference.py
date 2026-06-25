@@ -135,6 +135,57 @@ class ProbabilityInferenceTests(unittest.TestCase):
             "runs/teacher/teacher_activations/cifar10_train/layer4.pt",
         )
 
+    def test_masked_pca_projection_config_parses_mask_probability(self) -> None:
+        config = parse_config(
+            {
+                "experiment_name": "masked_pca_config",
+                "run_dir": "runs/tests/masked_pca_config",
+                "student": {
+                    "kind": "linear",
+                    "feature_layer": "layer4",
+                    "input_shape": [256],
+                    "num_classes": 10,
+                },
+                "strategy": {
+                    "name": "perturbation",
+                    "perturbation": {
+                        "method": "pca_masked_projection",
+                        "teacher_target": "clean",
+                        "pca_components": 128,
+                        "pca_mask_probability": 0.3,
+                        "pca_activation_path": "runs/teacher/teacher_activations/cifar10_train/layer4.pt",
+                    },
+                },
+            }
+        )
+
+        self.assertEqual(config.strategy.perturbation.method, "pca_masked_projection")
+        self.assertEqual(config.strategy.perturbation.pca_components, 128)
+        self.assertEqual(config.strategy.perturbation.pca_mask_probability, 0.3)
+
+    def test_masked_pca_projection_rejects_perturbed_teacher_target(self) -> None:
+        with self.assertRaisesRegex(ValueError, "only supports"):
+            parse_config(
+                {
+                    "experiment_name": "masked_pca_config",
+                    "run_dir": "runs/tests/masked_pca_config",
+                    "student": {
+                        "kind": "linear",
+                        "feature_layer": "layer4",
+                        "input_shape": [256],
+                        "num_classes": 10,
+                    },
+                    "strategy": {
+                        "name": "perturbation",
+                        "perturbation": {
+                            "method": "pca_masked_projection",
+                            "teacher_target": "perturbed",
+                            "pca_components": 128,
+                        },
+                    },
+                }
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

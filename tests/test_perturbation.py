@@ -43,6 +43,8 @@ class PerturbationTests(unittest.TestCase):
                     expected_shape = (feature_dim + perturbation_dim,)
                 elif perturbation.method == "pca_projection":
                     expected_shape = (perturbation.pca_components,)
+                elif perturbation.method == "pca_masked_projection":
+                    expected_shape = (2 * perturbation.pca_components,)
                 elif perturbation.clipping_mode == "constant":
                     perturbation_dim = 1
                     expected_shape = (feature_dim + perturbation_dim,)
@@ -206,6 +208,126 @@ class PerturbationTests(unittest.TestCase):
 
         self.assertEqual(tuple(batch.student_inputs.shape), (2, 3))
         self.assertEqual(tuple(batch.perturbed_features.shape), (2, 2, 2, 2))
+
+    def test_masked_pca_projection_concatenates_projection_and_keep_mask(self) -> None:
+        activations = torch.arange(5 * 2 * 2 * 2, dtype=torch.float32).reshape(5, 2, 2, 2)
+
+        with tempfile.TemporaryDirectory() as directory:
+            activation_path = Path(directory) / "layer4.pt"
+            torch.save(
+                {
+                    "dataset": "cifar10_train",
+                    "split": "train",
+                    "activations": activations,
+                },
+                activation_path,
+            )
+            projector = fit_pca_projector_from_activations(
+                activation_path,
+                n_components=3,
+                expected_dataset="cifar10_train",
+            )
+
+        config = PerturbationConfig(
+            method="pca_masked_projection",
+            pca_components=3,
+            pca_mask_probability=0.5,
+        )
+        torch.manual_seed(123)
+        batch = sample_perturbation(
+            activations[:2],
+            config,
+            pca_projector=projector,
+        )
+
+        expected_projection = projector.transform(activations[:2]) * batch.perturbations
+        self.assertEqual(tuple(batch.perturbations.shape), (2, 3))
+        self.assertEqual(tuple(batch.student_inputs.shape), (2, 6))
+        self.assertTrue(torch.all((batch.perturbations == 0.0) | (batch.perturbations == 1.0)))
+        torch.testing.assert_close(batch.student_inputs[:, :3], expected_projection)
+        torch.testing.assert_close(batch.student_inputs[:, 3:], batch.perturbations)
+
+    def test_masked_pca_projection_matches_explicit_component_masking(self) -> None:
+        features = torch.arange(2 * 2 * 2 * 2, dtype=torch.float32).reshape(2, 2, 2, 2)
+        activations = torch.arange(5 * 2 * 2 * 2, dtype=torch.float32).reshape(5, 2, 2, 2)
+
+        with tempfile.TemporaryDirectory() as directory:
+            activation_path = Path(directory) / "layer4.pt"
+            torch.save(
+                {
+                    "dataset": "cifar10_train",
+                    "split": "train",
+                    "activations": activations,
+                },
+                activation_path,
+            )
+            projector = fit_pca_projector_from_activations(
+                activation_path,
+                n_components=3,
+                expected_dataset="cifar10_train",
+            )
+
+        config = PerturbationConfig(
+            method="pca_masked_projection",
+            pca_components=3,
+            pca_mask_probability=0.5,
+        )
+        torch.manual_seed(123)
+        batch = sample_perturbation(features, config, pca_projector=projector)
+
+        centered = torch.flatten(features, start_dim=1) - projector.mean
+        explicit_rows = []
+        for row, keep_mask in zip(centered, batch.perturbations, strict=True):
+            masked_components = projector.components * keep_mask[:, None]
+            explicit_rows.append(row @ masked_components.T)
+        explicit_projection = torch.stack(explicit_rows)
+
+        torch.testing.assert_close(batch.student_inputs[:, :3], explicit_projection)
+
+    def test_unperturbed_masked_pca_keeps_all_components(self) -> None:
+        features = torch.arange(2 * 2 * 2 * 2, dtype=torch.float32).reshape(2, 2, 2, 2)
+        activations = torch.arange(5 * 2 * 2 * 2, dtype=torch.float32).reshape(5, 2, 2, 2)
+
+        with tempfile.TemporaryDirectory() as directory:
+            activation_path = Path(directory) / "layer4.pt"
+            torch.save(
+                {
+                    "dataset": "cifar10_train",
+                    "split": "train",
+                    "activations": activations,
+                },
+                activation_path,
+            )
+            projector = fit_pca_projector_from_activations(
+                activation_path,
+                n_components=3,
+                expected_dataset="cifar10_train",
+            )
+
+        batch = build_unperturbed_perturbation_batch(
+            features,
+            PerturbationConfig(method="pca_masked_projection", pca_components=3),
+            pca_projector=projector,
+        )
+
+        torch.testing.assert_close(batch.perturbations, torch.ones(2, 3))
+        torch.testing.assert_close(batch.student_inputs[:, :3], projector.transform(features))
+        torch.testing.assert_close(batch.student_inputs[:, 3:], torch.ones(2, 3))
+
+    def test_masked_pca_rejects_perturbed_teacher_target(self) -> None:
+        batch = sample_mc_dropout_perturbation(
+            torch.ones(2, 3, 4, 4),
+            PerturbationConfig(method="mc_dropout", dropout_probability=0.5),
+        )
+
+        with self.assertRaisesRegex(ValueError, "only supports clean teacher targets"):
+            teacher_target_features(
+                batch,
+                PerturbationConfig(
+                    method="pca_masked_projection",
+                    teacher_target="perturbed",
+                ),
+            )
 
     def test_teacher_target_selects_clean_or_perturbed_features(self) -> None:
         features = torch.ones(2, 3, 4, 4)
