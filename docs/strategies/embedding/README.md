@@ -22,8 +22,8 @@ The implemented methods construct the student input differently:
 - [Monte-Carlo dropout](dropout.md): `flatten(z_tilde)`
 - [PCA projection](pca.md): the reduced PCA representation of `flatten(z)`
 - [Masked PCA projection](pca.md#masked-pca-projection):
-  the reduced PCA representation after masking PCA components, concatenated
-  with the keep mask
+  the reduced PCA representation after masking component-matrix columns,
+  concatenated with the keep mask
 
 ## Teacher target
 
@@ -47,7 +47,7 @@ Set `strategy.perturbation.method` to select a method:
 | [Clipping](clipping.md)           | `clipping` or omitted | Perturbed embedding and sampled percentile |
 | [Monte-Carlo dropout](dropout.md) | `mc_dropout`          | Dropped embedding                          |
 | [PCA projection](pca.md)          | `pca_projection`      | Reduced PCA representation                 |
-| [Masked PCA projection](pca.md#masked-pca-projection) | `pca_masked_projection` | Masked reduced PCA representation and keep mask |
+| [Masked PCA projection](pca.md#masked-pca-projection) | `pca_masked_projection` | Masked reduced PCA representation and component-column keep mask |
 
 Configs that omit `method` use clipping.
 

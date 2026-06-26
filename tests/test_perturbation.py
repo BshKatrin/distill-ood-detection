@@ -25,17 +25,20 @@ class PerturbationTests(unittest.TestCase):
 
     def test_perturbation_configs_match_student_input_shape(self) -> None:
         feature_shapes = {
-            "layer3": (256, 8, 8),
-            "layer4": (512, 4, 4),
+            ("resnet18", "layer3"): (256, 8, 8),
+            ("resnet18", "layer4"): (512, 4, 4),
+            ("resnet50", "layer4"): (2048, 4, 4),
         }
 
         for path in sorted(Path("configs/students/perturbation").rglob("*.yaml")):
             with self.subTest(path=str(path)):
                 config = load_config(path)
                 feature_layer = config.student.feature_layer
-                if feature_layer not in feature_shapes:
+                architecture = "resnet50" if "resnet50" in path.parts else "resnet18"
+                feature_shape = feature_shapes.get((architecture, feature_layer))
+                if feature_shape is None:
                     self.fail(f"Unexpected perturbation feature layer in {path}: {feature_layer}")
-                channels, height, width = feature_shapes[feature_layer]
+                channels, height, width = feature_shape
                 feature_dim = channels * height * width
                 perturbation = config.strategy.perturbation
                 if perturbation.method == "mc_dropout":
@@ -44,7 +47,7 @@ class PerturbationTests(unittest.TestCase):
                 elif perturbation.method == "pca_projection":
                     expected_shape = (perturbation.pca_components,)
                 elif perturbation.method == "pca_masked_projection":
-                    expected_shape = (2 * perturbation.pca_components,)
+                    expected_shape = (feature_dim + perturbation.pca_components,)
                 elif perturbation.clipping_mode == "constant":
                     perturbation_dim = 1
                     expected_shape = (feature_dim + perturbation_dim,)
@@ -209,7 +212,7 @@ class PerturbationTests(unittest.TestCase):
         self.assertEqual(tuple(batch.student_inputs.shape), (2, 3))
         self.assertEqual(tuple(batch.perturbed_features.shape), (2, 2, 2, 2))
 
-    def test_masked_pca_projection_concatenates_projection_and_keep_mask(self) -> None:
+    def test_masked_pca_projection_concatenates_projection_and_column_keep_mask(self) -> None:
         activations = torch.arange(5 * 2 * 2 * 2, dtype=torch.float32).reshape(5, 2, 2, 2)
 
         with tempfile.TemporaryDirectory() as directory:
@@ -240,14 +243,15 @@ class PerturbationTests(unittest.TestCase):
             pca_projector=projector,
         )
 
-        expected_projection = projector.transform(activations[:2]) * batch.perturbations
-        self.assertEqual(tuple(batch.perturbations.shape), (2, 3))
-        self.assertEqual(tuple(batch.student_inputs.shape), (2, 6))
+        flat = torch.flatten(activations[:2], start_dim=1)
+        expected_projection = ((flat - projector.mean) * batch.perturbations) @ projector.components.T
+        self.assertEqual(tuple(batch.perturbations.shape), (2, 8))
+        self.assertEqual(tuple(batch.student_inputs.shape), (2, 11))
         self.assertTrue(torch.all((batch.perturbations == 0.0) | (batch.perturbations == 1.0)))
         torch.testing.assert_close(batch.student_inputs[:, :3], expected_projection)
         torch.testing.assert_close(batch.student_inputs[:, 3:], batch.perturbations)
 
-    def test_masked_pca_projection_matches_explicit_component_masking(self) -> None:
+    def test_masked_pca_projection_matches_explicit_component_column_masking(self) -> None:
         features = torch.arange(2 * 2 * 2 * 2, dtype=torch.float32).reshape(2, 2, 2, 2)
         activations = torch.arange(5 * 2 * 2 * 2, dtype=torch.float32).reshape(5, 2, 2, 2)
 
@@ -278,7 +282,7 @@ class PerturbationTests(unittest.TestCase):
         centered = torch.flatten(features, start_dim=1) - projector.mean
         explicit_rows = []
         for row, keep_mask in zip(centered, batch.perturbations, strict=True):
-            masked_components = projector.components * keep_mask[:, None]
+            masked_components = projector.components * keep_mask[None, :]
             explicit_rows.append(row @ masked_components.T)
         explicit_projection = torch.stack(explicit_rows)
 
@@ -310,9 +314,9 @@ class PerturbationTests(unittest.TestCase):
             pca_projector=projector,
         )
 
-        torch.testing.assert_close(batch.perturbations, torch.ones(2, 3))
+        torch.testing.assert_close(batch.perturbations, torch.ones(2, 8))
         torch.testing.assert_close(batch.student_inputs[:, :3], projector.transform(features))
-        torch.testing.assert_close(batch.student_inputs[:, 3:], torch.ones(2, 3))
+        torch.testing.assert_close(batch.student_inputs[:, 3:], torch.ones(2, 8))
 
     def test_masked_pca_rejects_perturbed_teacher_target(self) -> None:
         batch = sample_mc_dropout_perturbation(

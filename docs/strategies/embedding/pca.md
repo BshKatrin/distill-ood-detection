@@ -56,27 +56,30 @@ Current examples are:
 ## Masked PCA projection
 
 Masked PCA projection uses the same fitted top-k PCA components, then samples a
-binary keep mask over those components for each sample:
+binary keep mask over the columns of the stored component matrix for each
+sample. These columns correspond to flattened teacher-embedding dimensions:
 
 `m_j ~ Bernoulli(1 - p)`
 
 where `p = strategy.perturbation.pca_mask_probability` is the probability that
-a component is masked. The mask uses `1` for a kept component and `0` for a
-masked component.
+a component-matrix column is masked. The mask uses `1` for a kept column and
+`0` for a masked column.
 
-Conceptually, the sampled mask is applied to the PCA component matrix before
-projecting the centered embedding. If `Q` is the top-k component matrix and
-`x = flatten(z) - mean`, the masked projection is:
+Conceptually, the sampled mask is applied to the PCA component matrix before the
+dot product. If `C` is the stored component matrix with shape
+`(pca_components, flattened_embedding_dim)` and `x = flatten(z) - mean`, the
+masked projection is:
 
-`z_masked_pca = (Q * m)^T x`
+`z_masked_pca = x @ (C * m)^T`
 
-The implementation computes the ordinary PCA coefficients first and then
-multiplies them by the same keep mask:
+The implementation computes the equivalent operation without materializing one
+masked component matrix per sample:
 
-`z_masked_pca = (x @ Q) * m`
+`z_masked_pca = (x * m) @ C^T`
 
-This is equivalent because each mask value zeros or keeps one complete PCA
-component. The student receives the masked projection and the keep mask:
+This is equivalent because each mask value zeros or keeps one complete column
+of the component matrix before projection. The student receives the masked
+projection and the keep mask:
 
 `concat(z_masked_pca, m)`
 

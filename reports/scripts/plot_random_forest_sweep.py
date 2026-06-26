@@ -9,9 +9,12 @@ from matplotlib.lines import Line2D
 import pandas as pd
 import seaborn as sns
 
-# Define paths relative to the project root
 ROOT = Path(__file__).resolve().parents[2]
-JSON_PATH = ROOT / "reports" / "outputs" / "json" / "random_forest_sweep.json"
+JSON_DIR = ROOT / "reports" / "outputs" / "json"
+JSON_PATHS = [
+    JSON_DIR / "random_forest_sweep.json",
+    JSON_DIR / "random_forest_sweep_extra.json",
+]
 PLOTS_DIR = ROOT / "reports" / "outputs" / "plots"
 
 # Styling configuration
@@ -75,11 +78,10 @@ GRID_CONFIG = [
 ]
 
 
-def load_sweep_df(path: Path) -> pd.DataFrame:
-    """Load sweep JSON and parse it into a pandas DataFrame."""
-    with path.open("r") as file:
-        data = json.load(file)
+def load_sweep_df(paths: list[Path]) -> pd.DataFrame:
+    """Load sweep JSON files and parse merged layer-4 runs into a DataFrame."""
 
+    data = load_sweep_data(paths)
     records = []
     runs = data.get("runs", [])
     for run in runs:
@@ -107,6 +109,51 @@ def load_sweep_df(path: Path) -> pd.DataFrame:
             })
 
     return pd.DataFrame(records)
+
+
+def load_sweep_data(paths: list[Path]) -> dict[str, object]:
+    """Load and merge random forest sweep JSON data."""
+
+    runs_by_name: dict[str, dict[str, object]] = {}
+    for path in paths:
+        if not path.exists():
+            continue
+        with path.open("r") as file:
+            data = json.load(file)
+
+        for run in data.get("runs", []):
+            run_name = run.get("run_name")
+            if not isinstance(run_name, str):
+                continue
+
+            merged_run = runs_by_name.setdefault(
+                run_name,
+                {key: value for key, value in run.items() if key != "metrics"},
+            )
+            merged_run.update({key: value for key, value in run.items() if key != "metrics"})
+
+            metrics_by_key = {
+                metric_key(metric): metric
+                for metric in merged_run.get("metrics", [])
+                if isinstance(metric, dict)
+            }
+            for metric in run.get("metrics", []):
+                metrics_by_key[metric_key(metric)] = metric
+            merged_run["metrics"] = list(metrics_by_key.values())
+
+    return {"runs": list(runs_by_name.values()), "version": 1}
+
+
+def metric_key(metric: dict[str, object]) -> tuple[object, ...]:
+    """Return the merge key for one metric record."""
+
+    return (
+        metric.get("id_dataset"),
+        metric.get("ood_dataset"),
+        metric.get("ood_score"),
+        metric.get("method"),
+        metric.get("probability_mode"),
+    )
 
 
 def plot_overlay(df: pd.DataFrame) -> None:
@@ -305,8 +352,10 @@ def plot_single_metric(
 
 def main() -> None:
     """Load data and generate overlay plots."""
-    print(f"Loading data from {JSON_PATH}...")
-    df = load_sweep_df(JSON_PATH)
+    print("Loading data from:")
+    for path in JSON_PATHS:
+        print(f"  - {path}")
+    df = load_sweep_df(JSON_PATHS)
 
     print("Generating overlay plot...")
     plot_overlay(df)

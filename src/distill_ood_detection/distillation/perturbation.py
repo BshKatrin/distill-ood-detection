@@ -230,7 +230,7 @@ def sample_pca_masked_projection_batch(
     config: PerturbationConfig,
     projector: PcaProjector,
 ) -> PerturbationBatch:
-    """Project features after sampling a per-sample PCA component keep mask."""
+    """Project features after masking PCA component-matrix columns."""
 
     keep_mask = _sample_pca_keep_mask(features, config, projector)
     return _build_pca_masked_projection_batch(features, projector, keep_mask)
@@ -240,9 +240,9 @@ def build_unperturbed_pca_masked_projection_batch(
     features: torch.Tensor,
     projector: PcaProjector,
 ) -> PerturbationBatch:
-    """Build masked-PCA-shaped inputs with every PCA component kept."""
+    """Build masked-PCA-shaped inputs with every component column kept."""
 
-    keep_mask = features.new_ones((features.shape[0], projector.components.shape[0]))
+    keep_mask = features.new_ones((features.shape[0], projector.components.shape[1]))
     return _build_pca_masked_projection_batch(features, projector, keep_mask)
 
 
@@ -287,18 +287,17 @@ def fit_pca_projector_from_activations(
     activations = artifact.get("activations")
     if not torch.is_tensor(activations):
         raise ValueError(f"Activation artifact is missing tensor 'activations': {activation_path}")
-    values = torch.flatten(activations.float(), start_dim=1)
+    values = torch.flatten(activations, start_dim=1).to(dtype=torch.float32)
     if n_components > values.shape[1]:
         raise ValueError(
             f"pca_components={n_components} exceeds flattened activation dimension "
             f"{values.shape[1]}"
         )
     mean = values.mean(dim=0)
-    centered = values - mean
-    _, _, vh = torch.linalg.svd(centered, full_matrices=False)
+    components = _fit_truncated_pca_components(values, n_components)
     return PcaProjector(
         mean=mean,
-        components=vh[:n_components].contiguous(),
+        components=components,
     )
 
 
@@ -336,6 +335,21 @@ def pca_projector_path(experiment_dir: Path) -> Path:
     return experiment_dir / "pca_projector.pt"
 
 
+def _fit_truncated_pca_components(
+    values: torch.Tensor,
+    n_components: int,
+    oversampling: int = 20,
+    niter: int = 4,
+) -> torch.Tensor:
+    """Fit leading PCA components without computing a full SVD."""
+
+    q = min(n_components + oversampling, min(values.shape))
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(0)
+        _, _, v = torch.pca_lowrank(values, q=q, center=True, niter=niter)
+    return v[:, :n_components].T.contiguous()
+
+
 def _build_pca_masked_projection_batch(
     features: torch.Tensor,
     projector: PcaProjector,
@@ -346,13 +360,14 @@ def _build_pca_masked_projection_batch(
             "masked PCA projection expects convolutional features with shape "
             "(batch, channels, height, width)"
         )
-    projected = projector.transform(features)
-    if keep_mask.shape != projected.shape:
+    flat_features = torch.flatten(features, start_dim=1)
+    centered = flat_features - projector.mean
+    if keep_mask.shape != centered.shape:
         raise ValueError(
             "PCA keep mask must have shape "
-            f"{tuple(projected.shape)}; got {tuple(keep_mask.shape)}"
+            f"{tuple(centered.shape)}; got {tuple(keep_mask.shape)}"
         )
-    masked_projected = projected * keep_mask
+    masked_projected = (centered * keep_mask) @ projector.components.T
     reconstructed = projector.inverse_transform(
         masked_projected,
         tuple(features.shape[1:]),
@@ -374,7 +389,7 @@ def _sample_pca_keep_mask(
 ) -> torch.Tensor:
     keep_probability = 1.0 - config.pca_mask_probability
     return torch.empty(
-        (features.shape[0], projector.components.shape[0]),
+        (features.shape[0], projector.components.shape[1]),
         device=features.device,
         dtype=features.dtype,
     ).bernoulli_(keep_probability)

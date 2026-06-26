@@ -21,3 +21,6 @@ teacher:
   hf_model_id: edadaltocg/resnet50_cifar100
   revision: main
   num_classes: 100
+
+layers:
+  - layer4

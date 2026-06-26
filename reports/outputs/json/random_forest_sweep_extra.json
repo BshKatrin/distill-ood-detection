@@ -1,0 +1,698 @@
+{
+  "runs": [
+    {
+      "id_dataset": "cifar10_test",
+      "metrics": [
+        {
+          "fpr_at_95_tpr": 0.5617,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.853198225
+        },
+        {
+          "fpr_at_95_tpr": 0.5826,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.9191170500000001
+        },
+        {
+          "fpr_at_95_tpr": 0.5091,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.92771209
+        },
+        {
+          "fpr_at_95_tpr": 0.856,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.83604185
+        },
+        {
+          "fpr_at_95_tpr": 0.4823,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8301314799999999
+        },
+        {
+          "fpr_at_95_tpr": 0.5685,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.75004998
+        },
+        {
+          "fpr_at_95_tpr": 0.6121,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8925108749999999
+        },
+        {
+          "fpr_at_95_tpr": 0.4979,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.91362541
+        },
+        {
+          "fpr_at_95_tpr": 0.620659188690842,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8142835663798401
+        },
+        {
+          "fpr_at_95_tpr": 0.6142824216349109,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.9007259699600493
+        },
+        {
+          "fpr_at_95_tpr": 0.5590427166564229,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.902837327135833
+        },
+        {
+          "fpr_at_95_tpr": 0.7912185003073141,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8296881261524277
+        },
+        {
+          "fpr_at_95_tpr": 0.6888829133374309,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7051992278733867
+        },
+        {
+          "fpr_at_95_tpr": 0.7406269207129687,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.6710492432390903
+        },
+        {
+          "fpr_at_95_tpr": 0.6432467732022127,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8970850530116778
+        },
+        {
+          "fpr_at_95_tpr": 0.5577750460971113,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.898521442839582
+        },
+        {
+          "fpr_at_95_tpr": 0.6918,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7576747450000001
+        },
+        {
+          "fpr_at_95_tpr": 0.6703,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8726553300000001
+        },
+        {
+          "fpr_at_95_tpr": 0.6439,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.875370325
+        },
+        {
+          "fpr_at_95_tpr": 0.645,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8607785849999999
+        },
+        {
+          "fpr_at_95_tpr": 0.8469,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.5492858549999999
+        },
+        {
+          "fpr_at_95_tpr": 0.853,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.632894265
+        },
+        {
+          "fpr_at_95_tpr": 0.617,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8761893849999999
+        },
+        {
+          "fpr_at_95_tpr": 0.55,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.871875095
+        }
+      ],
+      "n_estimators": 1000,
+      "ood_datasets": [
+        "mnist_test",
+        "svhn_test",
+        "cifar100_test"
+      ],
+      "probability_modes": [
+        "unperturbed"
+      ],
+      "run_name": "feature_random_forest_layer4_student_resnet18_cifar10_n1000"
+    },
+    {
+      "id_dataset": "cifar10_test",
+      "metrics": [
+        {
+          "fpr_at_95_tpr": 0.5554,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.849224415
+        },
+        {
+          "fpr_at_95_tpr": 0.5724,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.9200108249999999
+        },
+        {
+          "fpr_at_95_tpr": 0.5012,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.9278875799999999
+        },
+        {
+          "fpr_at_95_tpr": 0.8492,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.83792867
+        },
+        {
+          "fpr_at_95_tpr": 0.4806,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8301312399999999
+        },
+        {
+          "fpr_at_95_tpr": 0.5726,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7508624899999999
+        },
+        {
+          "fpr_at_95_tpr": 0.6196,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.892916055
+        },
+        {
+          "fpr_at_95_tpr": 0.4967,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.9139951
+        },
+        {
+          "fpr_at_95_tpr": 0.6150507068223725,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8149166372157345
+        },
+        {
+          "fpr_at_95_tpr": 0.6061770129071912,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.9012989416871543
+        },
+        {
+          "fpr_at_95_tpr": 0.5533958205285802,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.9024962546097112
+        },
+        {
+          "fpr_at_95_tpr": 0.8026659496004918,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8260630531653349
+        },
+        {
+          "fpr_at_95_tpr": 0.6933773816840811,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.704258274431469
+        },
+        {
+          "fpr_at_95_tpr": 0.745159803318992,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.669910049170252
+        },
+        {
+          "fpr_at_95_tpr": 0.6472034419176398,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8974831495851261
+        },
+        {
+          "fpr_at_95_tpr": 0.5535878918254457,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8989035763675476
+        },
+        {
+          "fpr_at_95_tpr": 0.6842,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.75678243
+        },
+        {
+          "fpr_at_95_tpr": 0.6628,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.873571035
+        },
+        {
+          "fpr_at_95_tpr": 0.6361,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.875768195
+        },
+        {
+          "fpr_at_95_tpr": 0.6488,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.860727365
+        },
+        {
+          "fpr_at_95_tpr": 0.8463,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.550516545
+        },
+        {
+          "fpr_at_95_tpr": 0.8547,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.6324844649999999
+        },
+        {
+          "fpr_at_95_tpr": 0.6227,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8760108950000001
+        },
+        {
+          "fpr_at_95_tpr": 0.5509,
+          "id_dataset": "cifar10_test",
+          "method": "logits",
+          "ood_dataset": "cifar100_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.871650675
+        }
+      ],
+      "n_estimators": 500,
+      "ood_datasets": [
+        "mnist_test",
+        "svhn_test",
+        "cifar100_test"
+      ],
+      "probability_modes": [
+        "unperturbed"
+      ],
+      "run_name": "feature_random_forest_layer4_student_resnet18_cifar10_n500"
+    },
+    {
+      "id_dataset": "cifar100_test",
+      "metrics": [
+        {
+          "fpr_at_95_tpr": 0.9643,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.302065175
+        },
+        {
+          "fpr_at_95_tpr": 0.9145,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7447592900000001
+        },
+        {
+          "fpr_at_95_tpr": 0.8879,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.766316685
+        },
+        {
+          "fpr_at_95_tpr": 0.8859,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.714378585
+        },
+        {
+          "fpr_at_95_tpr": 0.9741,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.441445635
+        },
+        {
+          "fpr_at_95_tpr": 0.9841,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.5150026249999999
+        },
+        {
+          "fpr_at_95_tpr": 0.7826,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7935181499999999
+        },
+        {
+          "fpr_at_95_tpr": 0.7975,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7922799749999999
+        },
+        {
+          "fpr_at_95_tpr": 0.9259,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.36787042999999997
+        },
+        {
+          "fpr_at_95_tpr": 0.8513,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7303862000000001
+        },
+        {
+          "fpr_at_95_tpr": 0.7431,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.75894992
+        },
+        {
+          "fpr_at_95_tpr": 0.6346,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8365298000000001
+        },
+        {
+          "fpr_at_95_tpr": 0.9305,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.3967238
+        },
+        {
+          "fpr_at_95_tpr": 0.9412,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.63687532
+        },
+        {
+          "fpr_at_95_tpr": 0.9492,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.70477031
+        },
+        {
+          "fpr_at_95_tpr": 0.9432,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7100966200000001
+        },
+        {
+          "fpr_at_95_tpr": 0.9754532882606023,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.26388192609096495
+        },
+        {
+          "fpr_at_95_tpr": 0.856599569760295,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "absolute_max_probability_difference",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7833229275507069
+        },
+        {
+          "fpr_at_95_tpr": 0.7499231714812539,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_teacher_kl_divergence",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8155443953595575
+        },
+        {
+          "fpr_at_95_tpr": 0.7710125998770744,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "logit_l2_distance",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8028954748002459
+        },
+        {
+          "fpr_at_95_tpr": 0.9602028272894899,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.44665063767670554
+        },
+        {
+          "fpr_at_95_tpr": 0.9897818070067609,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "absolute_energy_gap",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.5239928549477566
+        },
+        {
+          "fpr_at_95_tpr": 0.713160725261217,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8222640308082361
+        },
+        {
+          "fpr_at_95_tpr": 0.6349877074370006,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8367713199139521
+        }
+      ],
+      "n_estimators": 500,
+      "ood_datasets": [
+        "cifar10_test",
+        "mnist_test",
+        "svhn_test"
+      ],
+      "probability_modes": [
+        "unperturbed"
+      ],
+      "run_name": "feature_random_forest_layer4_student_resnet18_cifar100_n500"
+    }
+  ],
+  "version": 1
+}

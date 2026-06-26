@@ -1,0 +1,74 @@
+{
+  "runs": [
+    {
+      "id_dataset": "cifar100_test",
+      "metrics": [
+        {
+          "fpr_at_95_tpr": 0.7826,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7935181499999999
+        },
+        {
+          "fpr_at_95_tpr": 0.7975,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "cifar10_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7922799749999999
+        },
+        {
+          "fpr_at_95_tpr": 0.9492,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.70477031
+        },
+        {
+          "fpr_at_95_tpr": 0.9432,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "mnist_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.7100966200000001
+        },
+        {
+          "fpr_at_95_tpr": 0.713160725261217,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_msp",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8222640308082361
+        },
+        {
+          "fpr_at_95_tpr": 0.6349877074370006,
+          "id_dataset": "cifar100_test",
+          "method": "logits",
+          "ood_dataset": "svhn_test",
+          "ood_score": "student_energy",
+          "probability_mode": "unperturbed",
+          "roc_auc": 0.8367713199139521
+        }
+      ],
+      "n_estimators": 500,
+      "ood_datasets": [
+        "cifar10_test",
+        "mnist_test",
+        "svhn_test"
+      ],
+      "probability_modes": [
+        "unperturbed"
+      ],
+      "run_name": "feature_random_forest_layer4_student_resnet18_cifar100_n500"
+    }
+  ],
+  "version": 1
+}

@@ -109,8 +109,10 @@ ROC-AUC or lowest student FPR@95.
 
 ## Random-forest estimator sweep
 
-The random-forest sweep scripts consume the fixed numeric export
-`reports/outputs/json/random_forest_sweep.json`. Generate its LaTeX table with:
+The random-forest sweep table consumes the fixed numeric export
+`reports/outputs/json/random_forest_sweep.json` plus the supplemental
+`reports/outputs/json/random_forest_sweep_extra.json` file when present.
+Generate its LaTeX tables with:
 
 ```bash
 uv run --project envs/notebooks --no-sync python reports/scripts/export_random_forest_sweep_table.py
@@ -122,9 +124,14 @@ Generate the ROC-AUC and FPR@95 sweep plots with:
 uv run --project envs/notebooks --no-sync python reports/scripts/plot_random_forest_sweep.py
 ```
 
-The table is written under `reports/outputs/latex/`; plot files are written
-under `reports/outputs/plots/`. These scripts select layer-4 random-forest runs
-from the JSON and use their built-in estimator ordering and teacher baselines.
+The script writes the full sweep table and a compact Student MSP/Energy table
+under `reports/outputs/latex/`. The compact table consumes
+`reports/outputs/json/student_msp_energy_cifar10.json` and
+`reports/outputs/json/student_msp_energy_cifar100.json` when present. The plot
+script also consumes `reports/outputs/json/random_forest_sweep_extra.json` when
+present. Plot files are written under `reports/outputs/plots/`. These scripts
+select layer-4 random-forest runs from the JSON and use their built-in estimator
+ordering and teacher baselines.
 
 ## SLURM
 

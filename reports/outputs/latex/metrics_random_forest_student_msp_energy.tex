@@ -1,0 +1,22 @@
+\documentclass[border=2pt]{standalone}
+\usepackage{booktabs}
+
+\begin{document}
+
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{cccccccc}
+\multicolumn{8}{c}{\textbf{Random forest (layer4) Student MSP/Energy ROCAUC $\uparrow$ / FPR@95 $\downarrow$}}\\[4pt]
+\toprule
+ &  & \multicolumn{3}{c}{CIFAR-10 (ID)} & \multicolumn{3}{c}{CIFAR-100 (ID)} \\
+\cmidrule(lr){3-5} \cmidrule(lr){6-8}
+n\_estimators & OOD Score & MNIST & SVHN & CIFAR-100 & MNIST & SVHN & CIFAR-10 \\
+\midrule
+500 & Student MSP & 0.89/0.62 & 0.90/0.65 & 0.88/0.62 & 0.70/0.95 & 0.82/0.71 & 0.79/0.78 \\
+ & Student Energy & 0.91/0.50 & 0.90/0.55 & 0.87/0.55 & 0.71/0.94 & 0.84/0.63 & 0.79/0.80 \\
+\addlinespace
+1000 & Student MSP & 0.89/0.61 & 0.90/0.64 & 0.88/0.62 & - & - & - \\
+ & Student Energy & 0.91/0.50 & 0.90/0.56 & 0.87/0.55 & - & - & - \\
+\bottomrule
+\end{tabular}
+
+\end{document}

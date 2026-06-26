@@ -1,8 +1,8 @@
-experiment_name: perturbation_linear_layer4_student_resnet18_cifar10_pca9_mask_p030
-run_dir: runs/students/perturbation/embedding/pca/cifar_10/resnet18/linear_layer4_pca9_mask_p030
+experiment_name: perturbation_linear_layer4_student_resnet50_cifar100_pca100_mask_p050
+run_dir: runs/students/perturbation/embedding/pca/cifar_100/resnet50/linear_layer4_pca100_mask_p050
 
 dataset:
-  name: cifar10
+  name: cifar100
   data_dir: data
   batch_size: 256
   num_workers: 2
@@ -12,27 +12,28 @@ dataset:
       split: test
     - name: svhn
       split: test
-    - name: cifar100
+    - name: cifar10
       split: test
 
 teacher:
-  hf_model_id: edadaltocg/resnet18_cifar10
+  hf_model_id: edadaltocg/resnet50_cifar100
   revision: main
+  num_classes: 100
 
 student:
   kind: linear
   feature_layer: layer4
-  input_shape: [8201]
-  num_classes: 10
+  input_shape: [32868]
+  num_classes: 100
 
 strategy:
   name: perturbation
   perturbation:
     teacher_target: clean
     method: pca_masked_projection
-    pca_components: 9
-    pca_mask_probability: 0.3
-    pca_activation_path: runs/teachers/cifar_10/resnet18/teacher_activations/cifar10_train/layer4.pt
+    pca_components: 100
+    pca_mask_probability: 0.5
+    pca_activation_path: runs/teachers/cifar_100/resnet50/teacher_activations/cifar100_train/layer4.pt
 
 optimizer:
   mse_logits:

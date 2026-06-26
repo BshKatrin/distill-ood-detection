@@ -1,0 +1,95 @@
+{
+  "runs": [
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.9453999996185303,
+          "test_distillation_loss": 18.50909423828125
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.9438999891281128,
+          "test_distillation_loss": 0.02144015021622181
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.9462000131607056,
+          "test_distillation_loss": 0.1446230411529541
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.8212000131607056,
+          "test_distillation_loss": 19.18418312072754
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.8172000050544739,
+          "test_distillation_loss": 0.38483279943466187
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7795000076293945,
+          "test_distillation_loss": 9.51557731628418
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "students/perturbation/embedding/pca/cifar_10/resnet50/linear_layer4_pca17_mask_p050"
+    },
+    {
+      "metrics": [
+        {
+          "method": "cross_entropy",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.8075000047683716,
+          "test_distillation_loss": 60.564605712890625
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.8054999709129333,
+          "test_distillation_loss": 0.09580346941947937
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "unperturbed",
+          "test_accuracy": 0.8098999857902527,
+          "test_distillation_loss": 0.02330731227993965
+        },
+        {
+          "method": "cross_entropy",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7961999773979187,
+          "test_distillation_loss": 55.745819091796875
+        },
+        {
+          "method": "kl_divergence",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7904000282287598,
+          "test_distillation_loss": 0.25745636224746704
+        },
+        {
+          "method": "mse_logits",
+          "probability_mode": "perturbed",
+          "test_accuracy": 0.7936999797821045,
+          "test_distillation_loss": 1.3642431497573853
+        }
+      ],
+      "probability_modes": [
+        "unperturbed",
+        "perturbed"
+      ],
+      "run_name": "students/perturbation/embedding/pca/cifar_100/resnet50/linear_layer4_pca100_mask_p050"
+    }
+  ],
+  "version": 1
+}

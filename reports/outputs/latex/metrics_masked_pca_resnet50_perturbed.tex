@@ -1,0 +1,44 @@
+\documentclass[border=2pt]{standalone}
+\usepackage{booktabs}
+
+\begin{document}
+
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llcccccccccc}
+\multicolumn{12}{c}{\textbf{Masked PCA projection $(p=0.5)$ --- linear student, ResNet-50 layer4}}\\[4pt]
+\multicolumn{2}{c}{Inference: perturbed} & \multicolumn{5}{c}{CIFAR-10 (ID)} & \multicolumn{5}{c}{CIFAR-100 (ID)} \\
+\cmidrule(lr){3-7} \cmidrule(lr){8-12}
+\toprule
+Objective & OOD Score & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-100 & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-10 \\
+\midrule
+Cross-entropy & Max probability difference & 0.82 & 19.2 & 0.50/0.73 & 0.47/0.78 & 0.50/0.73 & 0.80 & 55.7 & 0.42/0.87 & 0.44/0.88 & 0.42/0.87 \\
+ & Absolute max probability difference &  &  & 0.66/0.95 & 0.66/0.95 & 0.65/0.95 &  &  & 0.72/0.89 & 0.67/0.90 & 0.70/0.90 \\
+ & Student--teacher KL divergence &  &  & 0.71/0.90 & 0.71/0.91 & 0.72/0.87 &  &  & 0.75/0.90 & 0.72/0.85 & 0.75/0.85 \\
+ & Logit L2 distance &  &  & 0.14/1.00 & 0.17/1.00 & 0.26/0.99 &  &  & 0.10/1.00 & 0.33/0.99 & 0.30/0.99 \\
+ & Energy gap &  &  & 0.60/0.99 & 0.56/1.00 & 0.58/0.98 &  &  & 0.63/0.97 & 0.60/0.96 & 0.58/0.97 \\
+ & Absolute energy gap &  &  & 0.31/1.00 & 0.33/1.00 & 0.35/0.99 &  &  & 0.32/1.00 & 0.36/0.99 & 0.36/0.99 \\
+ & Student MSP &  &  & 0.69/0.90 & 0.69/0.90 & 0.68/0.91 &  &  & 0.77/0.82 & 0.72/0.81 & 0.76/0.79 \\
+ & Student Energy &  &  & 0.72/0.89 & 0.72/0.89 & 0.68/0.90 &  &  & 0.81/0.74 & 0.72/0.85 & 0.75/0.82 \\
+\addlinespace
+KL divergence & Max probability difference & 0.82 & 0.385 & 0.50/0.73 & 0.45/0.79 & 0.49/0.75 & 0.79 & 0.257 & 0.34/0.91 & 0.38/0.90 & 0.41/0.87 \\
+ & Absolute max probability difference &  &  & 0.64/0.95 & 0.65/0.95 & 0.64/0.96 &  &  & 0.71/0.88 & 0.67/0.89 & 0.66/0.91 \\
+ & Student--teacher KL divergence &  &  & 0.71/0.89 & 0.71/0.88 & 0.71/0.86 &  &  & 0.74/0.89 & 0.73/0.85 & 0.73/0.86 \\
+ & Logit L2 distance &  &  & 0.17/1.00 & 0.22/1.00 & 0.29/0.99 &  &  & 0.09/1.00 & 0.35/0.99 & 0.30/0.99 \\
+ & Energy gap &  &  & 0.65/0.97 & 0.61/0.99 & 0.61/0.97 &  &  & 0.70/0.97 & 0.64/0.97 & 0.67/0.94 \\
+ & Absolute energy gap &  &  & 0.31/1.00 & 0.33/1.00 & 0.35/0.99 &  &  & 0.28/1.00 & 0.34/0.99 & 0.32/0.99 \\
+ & Student MSP &  &  & 0.68/0.90 & 0.69/0.90 & 0.67/0.91 &  &  & 0.78/0.79 & 0.75/0.80 & 0.75/0.80 \\
+ & Student Energy &  &  & 0.70/0.90 & 0.69/0.90 & 0.68/0.90 &  &  & 0.82/0.70 & 0.74/0.85 & 0.73/0.83 \\
+\addlinespace
+Logit MSE & Max probability difference & 0.78 & 9.52 & 0.48/0.83 & 0.44/0.88 & 0.47/0.84 & 0.79 & 1.36 & 0.38/0.99 & 0.43/0.98 & 0.44/0.98 \\
+ & Absolute max probability difference &  &  & 0.58/0.95 & 0.60/0.95 & 0.59/0.96 &  &  & 0.62/0.93 & 0.57/0.93 & 0.56/0.94 \\
+ & Student--teacher KL divergence &  &  & 0.62/0.96 & 0.63/0.97 & 0.64/0.94 &  &  & 0.67/0.92 & 0.65/0.91 & 0.65/0.91 \\
+ & Logit L2 distance &  &  & 0.24/1.00 & 0.31/1.00 & 0.36/0.99 &  &  & 0.18/1.00 & 0.40/0.99 & 0.37/0.98 \\
+ & Energy gap &  &  & 0.77/0.87 & 0.76/0.87 & 0.73/0.88 &  &  & 0.86/0.72 & 0.76/0.78 & 0.79/0.78 \\
+ & Absolute energy gap &  &  & 0.23/1.00 & 0.24/1.00 & 0.27/1.00 &  &  & 0.14/1.00 & 0.24/1.00 & 0.21/1.00 \\
+ & Student MSP &  &  & 0.66/0.91 & 0.67/0.91 & 0.67/0.91 &  &  & 0.78/0.80 & 0.73/0.81 & 0.75/0.81 \\
+ & Student Energy &  &  & 0.72/0.89 & 0.65/0.93 & 0.67/0.90 &  &  & 0.80/0.74 & 0.71/0.88 & 0.70/0.86 \\
+\bottomrule
+\end{tabular}
+
+\end{document}

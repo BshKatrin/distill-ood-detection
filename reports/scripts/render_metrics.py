@@ -18,6 +18,7 @@ DEFAULT_TEX_GLOB = "metrics_*.tex"
 def compile_latex(tex_file: Path) -> Path:
     """Compile one LaTeX metrics source into a PDF report."""
 
+    tex_file = tex_file.resolve()
     if not tex_file.exists():
         msg = f"Missing LaTeX source: {tex_file}"
         raise FileNotFoundError(msg)
