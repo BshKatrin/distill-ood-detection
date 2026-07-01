@@ -47,6 +47,17 @@ OOD_SCORE_LABELS = {
     "student_energy": "Student Energy",
 }
 
+OOD_SCORE_ORDER = [
+    "max_probability_difference",
+    "absolute_max_probability_difference",
+    "student_teacher_kl_divergence",
+    "logit_l2_distance",
+    "energy_gap",
+    "absolute_energy_gap",
+    "student_msp",
+    "student_energy",
+]
+
 # Teacher MSP baselines (from metrics_baseline.tex)
 TEACHER_MSP = {
     ("cifar10_test", "mnist_test"): 0.92,  # ROC AUC
@@ -161,16 +172,7 @@ def plot_overlay(df: pd.DataFrame) -> None:
     fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharex=True)
 
     # Color palette for OOD scores
-    scores = [
-        "max_probability_difference",
-        "absolute_max_probability_difference",
-        "student_teacher_kl_divergence",
-        "logit_l2_distance",
-        "energy_gap",
-        "absolute_energy_gap",
-        "student_msp",
-        "student_energy",
-    ]
+    scores = OOD_SCORE_ORDER
     palette = sns.color_palette("Set2", len(scores))
     color_map = dict(zip(scores, palette))
 
@@ -275,16 +277,7 @@ def plot_single_metric(
     """Generate and save one Random Forest sweep plot for a single metric."""
 
     fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharex=True, sharey=True)
-    scores = [
-        "max_probability_difference",
-        "absolute_max_probability_difference",
-        "student_teacher_kl_divergence",
-        "logit_l2_distance",
-        "energy_gap",
-        "absolute_energy_gap",
-        "student_msp",
-        "student_energy",
-    ]
+    scores = OOD_SCORE_ORDER
     palette = sns.color_palette("Set2", len(scores))
     color_map = dict(zip(scores, palette))
 
@@ -350,6 +343,116 @@ def plot_single_metric(
     print(f"Saved {metric_key} plots to:\n  - {png_path}\n  - {pdf_path}")
 
 
+def plot_ood_averaged_metrics(df: pd.DataFrame) -> None:
+    """Plot ROC AUC and 1 - FPR@95 averaged across OOD datasets by OOD score."""
+
+    scores = OOD_SCORE_ORDER
+    metric_styles = {
+        "roc_auc": {
+            "label": "ROC AUC",
+            "color": "#1f77b4",
+            "marker": "o",
+            "linestyle": "-",
+        },
+        "fpr_at_95_tpr_complement": {
+            "label": "1 - FPR@95",
+            "color": "#d62728",
+            "marker": "s",
+            "linestyle": "--",
+        },
+    }
+
+    grouped = (
+        df.groupby(["id_dataset", "ood_score", "n_estimators"], as_index=False)
+        .agg(
+            roc_auc=("roc_auc", "mean"),
+            fpr_at_95_tpr=("fpr_at_95_tpr", "mean"),
+            ood_dataset_count=("ood_dataset", "nunique"),
+        )
+        .sort_values(["id_dataset", "ood_score", "n_estimators"])
+    )
+    grouped["fpr_at_95_tpr_complement"] = 1.0 - grouped["fpr_at_95_tpr"]
+
+    for id_dataset in sorted(df["id_dataset"].dropna().unique()):
+        id_df = grouped[grouped["id_dataset"] == id_dataset]
+        if id_df.empty:
+            continue
+
+        estimator_values = sorted(id_df["n_estimators"].dropna().unique())
+        fig, axes = plt.subplots(2, 4, figsize=(16, 7.5), sharex=True, sharey=True)
+        flat_axes = axes.flatten()
+
+        for ax, score in zip(flat_axes, scores):
+            score_df = id_df[id_df["ood_score"] == score].sort_values("n_estimators")
+            if score_df.empty:
+                ax.axis("off")
+                continue
+
+            for metric_key, style in metric_styles.items():
+                ax.plot(
+                    score_df["n_estimators"],
+                    score_df[metric_key],
+                    label=style["label"],
+                    color=style["color"],
+                    marker=style["marker"],
+                    linestyle=style["linestyle"],
+                    linewidth=2,
+                    markersize=5,
+                )
+
+            ax.set_title(OOD_SCORE_LABELS.get(score, score))
+            ax.set_xscale("log")
+            ax.set_xticks(estimator_values)
+            ax.set_xticklabels([str(int(value)) for value in estimator_values])
+            ax.set_ylim(0, 1)
+            ax.grid(True, which="major", axis="both", alpha=0.35)
+
+        for ax in flat_axes[len(scores) :]:
+            ax.axis("off")
+
+        for ax in axes[-1, :]:
+            ax.set_xlabel("n_estimators")
+        for ax in axes[:, 0]:
+            ax.set_ylabel("Mean metric value")
+
+        handles = [
+            Line2D(
+                [0],
+                [0],
+                color=style["color"],
+                marker=style["marker"],
+                linestyle=style["linestyle"],
+                linewidth=2,
+                markersize=5,
+                label=style["label"],
+            )
+            for style in metric_styles.values()
+        ]
+        fig.legend(
+            handles=handles,
+            loc="lower center",
+            ncol=2,
+            bbox_to_anchor=(0.5, 0.02),
+            frameon=True,
+        )
+
+        id_label = DATASET_LABELS.get(id_dataset, id_dataset)
+        fig.suptitle(
+            f"Random Forest (layer4): OOD-averaged detection metrics by n_estimators ({id_label})",
+            y=0.96,
+        )
+        fig.tight_layout(rect=[0, 0.08, 1, 0.93])
+
+        PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+        output_base = PLOTS_DIR / f"random_forest_ood_averaged_metrics_{id_dataset}"
+        png_path = output_base.with_suffix(".png")
+        pdf_path = output_base.with_suffix(".pdf")
+        fig.savefig(png_path, dpi=300)
+        fig.savefig(pdf_path)
+        plt.close(fig)
+        print(f"Saved OOD-averaged plots for {id_dataset} to:\n  - {png_path}\n  - {pdf_path}")
+
+
 def main() -> None:
     """Load data and generate overlay plots."""
     print("Loading data from:")
@@ -375,6 +478,8 @@ def main() -> None:
         "FPR@95",
         "random_forest_fpr_at_95_tpr_sweep",
     )
+    print("Generating OOD-averaged metric plots...")
+    plot_ood_averaged_metrics(df)
 
 
 if __name__ == "__main__":

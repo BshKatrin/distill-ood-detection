@@ -1,17 +1,19 @@
 # Pixel-Space Perturbations
 
-**Not implemented.**
-
 Pixel-space perturbations modify the input image before the teacher extracts an
 embedding. This page will define the shared training and inference behavior
-once the first pixel-space method is specified.
+for raw-pixel augmentation experiments.
 
-Add one page per perturbation method to this directory. Each method page should
-document:
+## Methods
 
-- The transformation and its parameters
-- Whether the teacher receives the clean or perturbed image
-- The student input and teacher target
-- Training and probability-inference behavior
-- Configuration fields and example configs
-- Implementation and artifact locations
+- [Pixel augmentation](pixel_augmentation.md): Mild affine and photometric
+  jitter applied to normalized image tensors by unnormalizing, transforming in
+  pixel space, and re-normalizing before teacher inference.
+
+## Shared behavior
+
+Pixel-space methods run the teacher on perturbed images up to the configured
+student feature layer. The student receives the flattened teacher embedding
+concatenated with method-specific transformation parameters. Probability
+inference can draw multiple perturbations per image and stores one logit and
+probability vector per draw.

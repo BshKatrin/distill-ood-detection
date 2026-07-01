@@ -15,7 +15,10 @@ from torch.utils.data import DataLoader
 from distill_ood_detection.config import PerturbationConfig, TreeDistillationMode
 from distill_ood_detection.distillation.perturbation import (
     PcaProjector,
+    build_pixel_student_inputs,
+    build_unperturbed_pixel_params,
     build_unperturbed_perturbation_batch,
+    sample_pixel_augmentation,
     sample_perturbation,
     teacher_target_features,
 )
@@ -92,6 +95,7 @@ def collect_perturbation_model_outputs(
     device: torch.device,
     apply_perturbation: bool = False,
     pca_projector: PcaProjector | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
 ) -> ModelOutputs:
     """Collect per-draw outputs for a perturbation-aware student."""
 
@@ -102,6 +106,19 @@ def collect_perturbation_model_outputs(
     perturbation_forwarder.eval()
     for images, batch_labels in loader:
         images = images.to(device)
+        if perturbation_config.method == "pixel_augmentation":
+            outputs = _collect_pixel_model_batch_outputs(
+                model,
+                perturbation_forwarder,
+                perturbation_config,
+                images,
+                apply_perturbation=apply_perturbation,
+                image_normalization=image_normalization,
+            )
+            logits_batches.append(outputs[0].cpu())
+            probabilities.append(outputs[1].cpu())
+            labels.append(batch_labels.cpu())
+            continue
         features = perturbation_forwarder.forward_to_features(images)
         draw_logits: list[torch.Tensor] = []
         draw_probabilities: list[torch.Tensor] = []
@@ -137,6 +154,7 @@ def collect_perturbed_teacher_outputs(
     device: torch.device,
     apply_perturbation: bool = False,
     pca_projector: PcaProjector | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
 ) -> ModelOutputs:
     """Collect per-draw perturbed teacher logits and probabilities."""
 
@@ -146,6 +164,18 @@ def collect_perturbed_teacher_outputs(
     perturbation_forwarder.eval()
     for images, batch_labels in loader:
         images = images.to(device)
+        if perturbation_config.method == "pixel_augmentation":
+            outputs = _collect_pixel_teacher_batch_outputs(
+                perturbation_forwarder,
+                perturbation_config,
+                images,
+                apply_perturbation=apply_perturbation,
+                image_normalization=image_normalization,
+            )
+            logits_batches.append(outputs[0].cpu())
+            probabilities.append(outputs[1].cpu())
+            labels.append(batch_labels.cpu())
+            continue
         features = perturbation_forwarder.forward_to_features(images)
         draw_logits: list[torch.Tensor] = []
         draw_probabilities: list[torch.Tensor] = []
@@ -173,6 +203,78 @@ def collect_perturbed_teacher_outputs(
         probabilities=torch.cat(probabilities, dim=0),
         labels=torch.cat(labels, dim=0),
     )
+
+
+def _collect_pixel_model_batch_outputs(
+    model: nn.Module,
+    perturbation_forwarder: nn.Module,
+    config: PerturbationConfig,
+    images: torch.Tensor,
+    apply_perturbation: bool,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    draw_logits: list[torch.Tensor] = []
+    draw_probabilities: list[torch.Tensor] = []
+    batch_size = images.shape[0]
+    evaluation_draws = _evaluation_draws(config, apply_perturbation)
+    for _ in range(evaluation_draws):
+        student_inputs, _ = _pixel_student_inputs_and_teacher_logits(
+            perturbation_forwarder=perturbation_forwarder,
+            config=config,
+            images=images,
+            apply_perturbation=apply_perturbation,
+            image_normalization=image_normalization,
+        )
+        logits = model(student_inputs).reshape(batch_size, 1, -1)
+        draw_logits.append(logits)
+        draw_probabilities.append(F.softmax(logits, dim=-1))
+    return torch.cat(draw_logits, dim=1), torch.cat(draw_probabilities, dim=1)
+
+
+def _collect_pixel_teacher_batch_outputs(
+    perturbation_forwarder: nn.Module,
+    config: PerturbationConfig,
+    images: torch.Tensor,
+    apply_perturbation: bool,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    draw_logits: list[torch.Tensor] = []
+    draw_probabilities: list[torch.Tensor] = []
+    batch_size = images.shape[0]
+    evaluation_draws = _evaluation_draws(config, apply_perturbation)
+    for _ in range(evaluation_draws):
+        _, logits = _pixel_student_inputs_and_teacher_logits(
+            perturbation_forwarder=perturbation_forwarder,
+            config=config,
+            images=images,
+            apply_perturbation=apply_perturbation,
+            image_normalization=image_normalization,
+        )
+        if config.teacher_target == "clean":
+            logits = perturbation_forwarder.teacher(images)
+        logits = logits.reshape(batch_size, 1, -1)
+        draw_logits.append(logits)
+        draw_probabilities.append(F.softmax(logits, dim=-1))
+    return torch.cat(draw_logits, dim=1), torch.cat(draw_probabilities, dim=1)
+
+
+def _pixel_student_inputs_and_teacher_logits(
+    perturbation_forwarder: nn.Module,
+    config: PerturbationConfig,
+    images: torch.Tensor,
+    apply_perturbation: bool,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if apply_perturbation:
+        if image_normalization is None:
+            raise ValueError("image_normalization is required for pixel augmentation")
+        pixel_batch = sample_pixel_augmentation(images, config, image_normalization)
+        logits, features = perturbation_forwarder(pixel_batch.perturbed_images)
+        params = pixel_batch.normalized_transform_params
+    else:
+        logits, features = perturbation_forwarder(images)
+        params = build_unperturbed_pixel_params(images)
+    return build_pixel_student_inputs(features, params), logits
 
 
 def save_model_outputs(
@@ -259,6 +361,8 @@ def collect_perturbation_tree_model_outputs(
 ) -> ModelOutputs:
     """Collect per-draw outputs from a perturbation-aware tree student."""
 
+    if perturbation_config.method == "pixel_augmentation":
+        raise ValueError("pixel_augmentation does not support random-forest inference")
     logits_batches: list[torch.Tensor] = []
     probability_batches: list[torch.Tensor] = []
     label_batches: list[torch.Tensor] = []

@@ -341,6 +341,11 @@ def _collect_tree_dataset(
         feature_extractor.eval()
     if perturbation_forwarder is not None:
         perturbation_forwarder.eval()
+        if (
+            config is not None
+            and config.strategy.perturbation.method == "pixel_augmentation"
+        ):
+            raise ValueError("pixel_augmentation does not support random-forest training")
     for images, labels in loader:
         images = images.to(device)
         if perturbation_forwarder is not None:

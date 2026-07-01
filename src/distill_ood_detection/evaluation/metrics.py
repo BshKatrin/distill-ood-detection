@@ -13,7 +13,10 @@ from distill_ood_detection.config import DistillationMethod, PerturbationConfig
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.distillation.perturbation import (
     PcaProjector,
+    build_pixel_student_inputs,
+    build_unperturbed_pixel_params,
     build_unperturbed_perturbation_batch,
+    sample_pixel_augmentation,
     sample_perturbation,
     teacher_target_features,
 )
@@ -28,6 +31,7 @@ def accuracy(
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,
     pca_projector: PcaProjector | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
     apply_perturbation: bool = False,
 ) -> float:
     """Compute top-1 classification accuracy."""
@@ -45,20 +49,30 @@ def accuracy(
         if perturbation_forwarder is not None:
             if perturbation_config is None:
                 raise ValueError("perturbation_config is required for perturbation accuracy")
-            features = perturbation_forwarder.forward_to_features(images)
-            logits_sum = None
-            draws = perturbation_config.evaluation_draws if apply_perturbation else 1
-            for _ in range(draws):
-                perturbation_batch = _evaluation_perturbation_batch(
-                    features,
+            if perturbation_config.method == "pixel_augmentation":
+                predictions = _pixel_accuracy_predictions(
+                    model,
+                    perturbation_forwarder,
+                    images,
                     perturbation_config,
+                    image_normalization,
                     apply_perturbation=apply_perturbation,
-                    pca_projector=pca_projector,
                 )
-                logits = model(perturbation_batch.student_inputs)
-                logits_sum = logits if logits_sum is None else logits_sum + logits
-            assert logits_sum is not None
-            predictions = (logits_sum / draws).argmax(dim=1)
+            else:
+                features = perturbation_forwarder.forward_to_features(images)
+                logits_sum = None
+                draws = perturbation_config.evaluation_draws if apply_perturbation else 1
+                for _ in range(draws):
+                    perturbation_batch = _evaluation_perturbation_batch(
+                        features,
+                        perturbation_config,
+                        apply_perturbation=apply_perturbation,
+                        pca_projector=pca_projector,
+                    )
+                    logits = model(perturbation_batch.student_inputs)
+                    logits_sum = logits if logits_sum is None else logits_sum + logits
+                assert logits_sum is not None
+                predictions = (logits_sum / draws).argmax(dim=1)
         else:
             inputs = images
             if feature_extractor is not None:
@@ -82,6 +96,7 @@ def distillation_metrics(
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,
     pca_projector: PcaProjector | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
     apply_perturbation: bool = False,
     split: Literal["validation", "test"] = "validation",
 ) -> dict[str, float]:
@@ -105,6 +120,26 @@ def distillation_metrics(
                 raise ValueError(
                     f"perturbation_config is required for perturbation {split} metrics"
                 )
+            if perturbation_config.method == "pixel_augmentation":
+                batch_metrics = _pixel_distillation_batch_metrics(
+                    method=method,
+                    teacher=teacher,
+                    student=student,
+                    perturbation_forwarder=perturbation_forwarder,
+                    images=images,
+                    labels=labels,
+                    perturbation_config=perturbation_config,
+                    image_normalization=image_normalization,
+                    temperature=temperature,
+                    alpha=alpha,
+                    apply_perturbation=apply_perturbation,
+                )
+                batch_size = labels.numel()
+                correct += batch_metrics["correct"]
+                total += batch_size
+                total_kl += batch_metrics["kl_divergence"] * batch_size
+                total_distillation_loss += batch_metrics["distillation_loss"] * batch_size
+                continue
             features = perturbation_forwarder.forward_to_features(images)
             perturbation_batch = _evaluation_perturbation_batch(
                 features,
@@ -152,6 +187,106 @@ def distillation_metrics(
         f"{split}_distillation_loss": total_distillation_loss / total,
         f"{split}_kl_divergence": total_kl / total,
     }
+
+
+def _pixel_accuracy_predictions(
+    model: nn.Module,
+    perturbation_forwarder: nn.Module,
+    images: torch.Tensor,
+    config: PerturbationConfig,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+    apply_perturbation: bool,
+) -> torch.Tensor:
+    logits_sum = None
+    draws = config.evaluation_draws if apply_perturbation else 1
+    for _ in range(draws):
+        student_inputs, _ = _pixel_student_inputs_and_teacher_logits(
+            teacher=None,
+            perturbation_forwarder=perturbation_forwarder,
+            images=images,
+            config=config,
+            image_normalization=image_normalization,
+            apply_perturbation=apply_perturbation,
+        )
+        logits = model(student_inputs)
+        logits_sum = logits if logits_sum is None else logits_sum + logits
+    assert logits_sum is not None
+    return (logits_sum / draws).argmax(dim=1)
+
+
+def _pixel_distillation_batch_metrics(
+    method: DistillationMethod,
+    teacher: nn.Module,
+    student: nn.Module,
+    perturbation_forwarder: nn.Module,
+    images: torch.Tensor,
+    labels: torch.Tensor,
+    perturbation_config: PerturbationConfig,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+    temperature: float,
+    alpha: float,
+    apply_perturbation: bool,
+) -> dict[str, float | int]:
+    logits_sum = None
+    total_kl = 0.0
+    total_loss = 0.0
+    draws = perturbation_config.evaluation_draws if apply_perturbation else 1
+    for _ in range(draws):
+        student_inputs, teacher_logits = _pixel_student_inputs_and_teacher_logits(
+            teacher=teacher,
+            perturbation_forwarder=perturbation_forwarder,
+            images=images,
+            config=perturbation_config,
+            image_normalization=image_normalization,
+            apply_perturbation=apply_perturbation,
+        )
+        student_logits = student(student_inputs)
+        teacher_probabilities = F.softmax(teacher_logits, dim=1)
+        student_log_probabilities = F.log_softmax(student_logits, dim=1)
+        total_kl += F.kl_div(
+            student_log_probabilities,
+            teacher_probabilities,
+            reduction="batchmean",
+        ).item()
+        total_loss += distillation_loss(
+            method,
+            student_logits,
+            teacher_logits,
+            labels=labels,
+            temperature=temperature,
+            alpha=alpha,
+        ).item()
+        logits_sum = student_logits if logits_sum is None else logits_sum + student_logits
+    assert logits_sum is not None
+    predictions = (logits_sum / draws).argmax(dim=1)
+    return {
+        "correct": int((predictions == labels).sum().item()),
+        "kl_divergence": total_kl / draws,
+        "distillation_loss": total_loss / draws,
+    }
+
+
+def _pixel_student_inputs_and_teacher_logits(
+    teacher: nn.Module | None,
+    perturbation_forwarder: nn.Module,
+    images: torch.Tensor,
+    config: PerturbationConfig,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+    apply_perturbation: bool,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if apply_perturbation:
+        if image_normalization is None:
+            raise ValueError("image_normalization is required for pixel augmentation")
+        pixel_batch = sample_pixel_augmentation(images, config, image_normalization)
+        perturbed_logits, features = perturbation_forwarder(pixel_batch.perturbed_images)
+        params = pixel_batch.normalized_transform_params
+    else:
+        perturbed_logits, features = perturbation_forwarder(images)
+        params = build_unperturbed_pixel_params(images)
+    student_inputs = build_pixel_student_inputs(features, params)
+    if teacher is None or config.teacher_target == "perturbed":
+        return student_inputs, perturbed_logits
+    return student_inputs, teacher(images)
 
 
 def _evaluation_perturbation_batch(

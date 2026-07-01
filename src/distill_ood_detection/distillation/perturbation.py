@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import torch
+from torchvision.transforms import InterpolationMode
+from torchvision.transforms import functional as TF
 
 from distill_ood_detection.config import PerturbationConfig
 
@@ -19,6 +21,16 @@ class PerturbationBatch:
     perturbations: torch.Tensor
     perturbed_features: torch.Tensor
     percentiles: torch.Tensor
+
+
+@dataclass(frozen=True)
+class PixelAugmentationBatch:
+    """Pixel-perturbed images and transform parameters for student conditioning."""
+
+    clean_images: torch.Tensor
+    perturbed_images: torch.Tensor
+    transform_params: torch.Tensor
+    normalized_transform_params: torch.Tensor
 
 
 @dataclass(frozen=True)
@@ -40,7 +52,14 @@ class PcaProjector:
         """Project convolutional features onto PCA components."""
 
         flat_features = torch.flatten(features, start_dim=1)
-        return (flat_features - self.mean) @ self.components.T
+        mean, components = self._aligned_tensors(features)
+        return (flat_features - mean) @ components.T
+
+    def projection_matrix(self, reference: torch.Tensor) -> torch.Tensor:
+        """Return PCA eigenvectors as ``Q`` with shape ``(original_dim, pca_dim)``."""
+
+        _, components = self._aligned_tensors(reference)
+        return components.T
 
     def inverse_transform(
         self,
@@ -49,8 +68,15 @@ class PcaProjector:
     ) -> torch.Tensor:
         """Reconstruct projected features in the original feature shape."""
 
-        reconstructed = projected_features @ self.components + self.mean
+        mean, components = self._aligned_tensors(projected_features)
+        reconstructed = projected_features @ components + mean
         return reconstructed.reshape(projected_features.shape[0], *feature_shape)
+
+    def _aligned_tensors(self, reference: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        return (
+            self.mean.to(device=reference.device, dtype=reference.dtype),
+            self.components.to(device=reference.device, dtype=reference.dtype),
+        )
 
 
 def sample_clipping_perturbation(
@@ -108,6 +134,134 @@ def sample_perturbation(
             raise ValueError("pca_projector is required for masked PCA projection")
         return sample_pca_masked_projection_batch(features, config, pca_projector)
     raise ValueError(f"Unsupported perturbation method: {config.method}")
+
+
+def sample_pixel_augmentation(
+    images: torch.Tensor,
+    config: PerturbationConfig,
+    normalization: tuple[tuple[float, float, float], tuple[float, float, float]],
+) -> PixelAugmentationBatch:
+    """Sample and apply a mild pixel-space augmentation to normalized images."""
+
+    if images.ndim != 4:
+        raise ValueError(
+            "pixel augmentation expects images with shape "
+            "(batch, channels, height, width)"
+        )
+    if images.shape[1] != 3:
+        raise ValueError("pixel augmentation expects RGB images with three channels")
+    raw_params, normalized_params = sample_pixel_augmentation_params(images, config)
+    perturbed_images = apply_pixel_augmentation(images, raw_params, normalization)
+    return PixelAugmentationBatch(
+        clean_images=images,
+        perturbed_images=perturbed_images,
+        transform_params=raw_params,
+        normalized_transform_params=normalized_params,
+    )
+
+
+def sample_pixel_augmentation_params(
+    images: torch.Tensor,
+    config: PerturbationConfig,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Sample raw and normalized pixel augmentation parameters for a batch."""
+
+    if images.ndim != 4:
+        raise ValueError(
+            "pixel augmentation parameter sampling expects images with shape "
+            "(batch, channels, height, width)"
+        )
+    batch_size, _, height, width = images.shape
+    device = images.device
+    dtype = images.dtype
+    max_dx = int(round(width * config.translate_fraction))
+    max_dy = int(round(height * config.translate_fraction))
+    angle = images.new_empty(batch_size).uniform_(
+        -config.rotation_degrees,
+        config.rotation_degrees,
+    )
+    dx = _sample_integer_offsets(batch_size, max_dx, device, dtype)
+    dy = _sample_integer_offsets(batch_size, max_dy, device, dtype)
+    scale = images.new_empty(batch_size).uniform_(config.scale_min, config.scale_max)
+    brightness = images.new_empty(batch_size).uniform_(
+        1.0 - config.brightness_delta,
+        1.0 + config.brightness_delta,
+    )
+    contrast = images.new_empty(batch_size).uniform_(
+        1.0 - config.contrast_delta,
+        1.0 + config.contrast_delta,
+    )
+    raw_params = torch.stack([angle, dx, dy, scale, brightness, contrast], dim=1)
+    normalized_params = torch.stack(
+        [
+            _normalize_delta(angle, config.rotation_degrees),
+            _normalize_delta(dx, float(max_dx)),
+            _normalize_delta(dy, float(max_dy)),
+            _normalize_delta(scale - 1.0, _scale_delta(config)),
+            _normalize_delta(brightness - 1.0, config.brightness_delta),
+            _normalize_delta(contrast - 1.0, config.contrast_delta),
+        ],
+        dim=1,
+    )
+    return raw_params, normalized_params
+
+
+def apply_pixel_augmentation(
+    images: torch.Tensor,
+    raw_params: torch.Tensor,
+    normalization: tuple[tuple[float, float, float], tuple[float, float, float]],
+) -> torch.Tensor:
+    """Apply raw pixel augmentation parameters to normalized RGB image tensors."""
+
+    if raw_params.shape != (images.shape[0], 6):
+        raise ValueError("pixel augmentation parameters must have shape (batch, 6)")
+    unnormalized = _unnormalize_images(images, normalization).clamp(0.0, 1.0)
+    augmented = []
+    for image, params in zip(unnormalized, raw_params, strict=True):
+        angle, dx, dy, scale, brightness, contrast = params.tolist()
+        transformed = TF.affine(
+            image,
+            angle=angle,
+            translate=[int(round(dx)), int(round(dy))],
+            scale=scale,
+            shear=[0.0, 0.0],
+            interpolation=InterpolationMode.BILINEAR,
+            fill=[0.0, 0.0, 0.0],
+        )
+        transformed = TF.adjust_brightness(transformed, brightness)
+        transformed = TF.adjust_contrast(transformed, contrast)
+        augmented.append(transformed.clamp(0.0, 1.0))
+    return _normalize_images(torch.stack(augmented, dim=0), normalization)
+
+
+def build_pixel_student_inputs(
+    features: torch.Tensor,
+    normalized_transform_params: torch.Tensor,
+) -> torch.Tensor:
+    """Concatenate flattened teacher features with normalized transform parameters."""
+
+    if features.shape[0] != normalized_transform_params.shape[0]:
+        raise ValueError("features and transform parameters must have the same batch size")
+    if normalized_transform_params.shape[1] != 6:
+        raise ValueError("pixel augmentation expects six normalized transform parameters")
+    return torch.cat(
+        [
+            torch.flatten(features, start_dim=1),
+            normalized_transform_params.to(device=features.device, dtype=features.dtype),
+        ],
+        dim=1,
+    )
+
+
+def build_unperturbed_pixel_params(images: torch.Tensor) -> torch.Tensor:
+    """Return identity normalized transform parameters for clean pixel inputs."""
+
+    if images.ndim != 4:
+        raise ValueError(
+            "unperturbed pixel parameters expect images with shape "
+            "(batch, channels, height, width)"
+        )
+    return images.new_zeros((images.shape[0], 6))
 
 
 def sample_mc_dropout_perturbation(
@@ -230,7 +384,7 @@ def sample_pca_masked_projection_batch(
     config: PerturbationConfig,
     projector: PcaProjector,
 ) -> PerturbationBatch:
-    """Project features after masking PCA component-matrix columns."""
+    """Project features after masking PCA components."""
 
     keep_mask = _sample_pca_keep_mask(features, config, projector)
     return _build_pca_masked_projection_batch(features, projector, keep_mask)
@@ -240,9 +394,9 @@ def build_unperturbed_pca_masked_projection_batch(
     features: torch.Tensor,
     projector: PcaProjector,
 ) -> PerturbationBatch:
-    """Build masked-PCA-shaped inputs with every component column kept."""
+    """Build masked-PCA-shaped inputs with every PCA component kept."""
 
-    keep_mask = features.new_ones((features.shape[0], projector.components.shape[1]))
+    keep_mask = features.new_ones((features.shape[0], projector.components.shape[0]))
     return _build_pca_masked_projection_batch(features, projector, keep_mask)
 
 
@@ -254,8 +408,6 @@ def teacher_target_features(
 
     if config.teacher_target == "clean":
         return batch.original_features
-    if config.method == "pca_masked_projection":
-        raise ValueError("pca_masked_projection only supports clean teacher targets")
     if config.teacher_target == "perturbed":
         return batch.perturbed_features
     raise ValueError(f"Unsupported teacher target: {config.teacher_target}")
@@ -361,13 +513,21 @@ def _build_pca_masked_projection_batch(
             "(batch, channels, height, width)"
         )
     flat_features = torch.flatten(features, start_dim=1)
-    centered = flat_features - projector.mean
-    if keep_mask.shape != centered.shape:
+    mean, _ = projector._aligned_tensors(features)
+    centered = flat_features - mean
+    projection_matrix = projector.projection_matrix(features)
+    expected_mask_shape = (features.shape[0], projection_matrix.shape[1])
+    if keep_mask.shape != expected_mask_shape:
         raise ValueError(
             "PCA keep mask must have shape "
-            f"{tuple(centered.shape)}; got {tuple(keep_mask.shape)}"
+            f"{expected_mask_shape}; got {tuple(keep_mask.shape)}"
         )
-    masked_projected = (centered * keep_mask) @ projector.components.T
+    keep_mask = keep_mask.to(device=features.device, dtype=features.dtype)
+    masked_projection_matrices = projection_matrix.unsqueeze(0) * keep_mask.unsqueeze(1)
+    masked_projected = torch.bmm(
+        centered.unsqueeze(1),
+        masked_projection_matrices,
+    ).squeeze(1)
     reconstructed = projector.inverse_transform(
         masked_projected,
         tuple(features.shape[1:]),
@@ -389,7 +549,7 @@ def _sample_pca_keep_mask(
 ) -> torch.Tensor:
     keep_probability = 1.0 - config.pca_mask_probability
     return torch.empty(
-        (features.shape[0], projector.components.shape[1]),
+        (features.shape[0], projector.components.shape[0]),
         device=features.device,
         dtype=features.dtype,
     ).bernoulli_(keep_probability)
@@ -498,3 +658,55 @@ def _rowwise_quantile(values: torch.Tensor, percentiles: torch.Tensor) -> torch.
     lower_values = sorted_values.gather(1, lower_indices[:, None]).squeeze(1)
     upper_values = sorted_values.gather(1, upper_indices[:, None]).squeeze(1)
     return lower_values + weights * (upper_values - lower_values)
+
+
+def _sample_integer_offsets(
+    batch_size: int,
+    max_offset: int,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    if max_offset == 0:
+        return torch.zeros(batch_size, device=device, dtype=dtype)
+    return torch.randint(
+        low=-max_offset,
+        high=max_offset + 1,
+        size=(batch_size,),
+        device=device,
+    ).to(dtype=dtype)
+
+
+def _normalize_delta(values: torch.Tensor, denominator: float) -> torch.Tensor:
+    if denominator == 0.0:
+        return torch.zeros_like(values)
+    return values / denominator
+
+
+def _scale_delta(config: PerturbationConfig) -> float:
+    return max(abs(1.0 - config.scale_min), abs(config.scale_max - 1.0))
+
+
+def _normalization_tensors(
+    images: torch.Tensor,
+    normalization: tuple[tuple[float, float, float], tuple[float, float, float]],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    mean, std = normalization
+    mean_tensor = torch.tensor(mean, device=images.device, dtype=images.dtype).view(1, 3, 1, 1)
+    std_tensor = torch.tensor(std, device=images.device, dtype=images.dtype).view(1, 3, 1, 1)
+    return mean_tensor, std_tensor
+
+
+def _unnormalize_images(
+    images: torch.Tensor,
+    normalization: tuple[tuple[float, float, float], tuple[float, float, float]],
+) -> torch.Tensor:
+    mean, std = _normalization_tensors(images, normalization)
+    return images * std + mean
+
+
+def _normalize_images(
+    images: torch.Tensor,
+    normalization: tuple[tuple[float, float, float], tuple[float, float, float]],
+) -> torch.Tensor:
+    mean, std = _normalization_tensors(images, normalization)
+    return (images - mean) / std

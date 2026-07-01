@@ -1,0 +1,42 @@
+\documentclass[border=2pt]{standalone}
+\usepackage{booktabs}
+
+\begin{document}
+
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lllcccccccccc}
+\multicolumn{13}{c}{\textbf{Pixel augmentation --- linear student, ResNet-50 layer4}}\\[4pt]
+\multicolumn{3}{c}{Inference: unperturbed} & \multicolumn{5}{c}{CIFAR-10 (ID)} & \multicolumn{5}{c}{CIFAR-100 (ID)} \\
+\cmidrule(lr){4-8} \cmidrule(lr){9-13}
+\toprule
+Teacher target & Objective & OOD Score & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-100 & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-10 \\
+\midrule
+\multicolumn{3}{l}{ResNet-18 MSP} & -- & -- & 0.92/0.56 & 0.90/0.60 & 0.88/0.62 & -- & -- & 0.70/0.96 & 0.81/0.81 & 0.79/0.79 \\
+\multicolumn{3}{l}{ResNet-18 Energy} & -- & -- & 0.96/0.26 & 0.92/0.41 & 0.88/0.51 & -- & -- & 0.69/0.97 & 0.83/0.77 & 0.80/0.80 \\
+\multicolumn{3}{l}{ResNet-50 MSP} & -- & -- & 0.90/0.62 & 0.89/0.68 & 0.87/0.63 & -- & -- & 0.81/0.82 & 0.76/0.79 & 0.79/0.78 \\
+\multicolumn{3}{l}{ResNet-50 Energy} & -- & -- & 0.93/0.41 & 0.91/0.52 & 0.87/0.52 & -- & -- & 0.88/0.67 & 0.78/0.77 & 0.80/0.77 \\
+\midrule
+Perturbed & Cross-entropy & Absolute max probability difference & 0.95 & 15 & 0.88/0.71 & 0.93/0.53 & 0.87/0.65 & 0.81 & 54.7 & 0.72/0.99 & 0.84/0.69 & 0.76/0.88 \\
+ &  & Student--teacher KL divergence &  &  & \textbf{0.87/0.72} & \textbf{0.94/0.40} & \textbf{0.87/0.64} &  &  & 0.71/0.99 & 0.89/0.55 & 0.77/0.88 \\
+ &  & Student MSP &  &  & 0.90/0.62 & 0.90/0.66 & 0.87/0.63 &  &  & 0.81/0.82 & 0.79/0.76 & 0.79/0.78 \\
+ &  & Student Energy &  &  & \textbf{0.93/0.41} & \textbf{0.92/0.48} & \textbf{0.87/0.52} &  &  & 0.88/0.67 & 0.83/0.71 & 0.80/0.78 \\
+\addlinespace
+ & Logit MSE & Absolute max probability difference & 0.95 & 9.23e-05 & 0.88/0.68 & 0.87/0.72 & 0.86/0.64 & 0.81 & 0.00113 & 0.72/0.97 & 0.68/0.95 & 0.76/0.86 \\
+ &  & Student--teacher KL divergence &  &  & 0.83/0.72 & 0.81/0.76 & 0.82/0.64 &  &  & 0.71/0.99 & 0.66/0.97 & 0.78/0.84 \\
+ &  & Student MSP &  &  & 0.90/0.62 & 0.89/0.68 & 0.87/0.63 &  &  & 0.81/0.83 & 0.75/0.80 & 0.79/0.78 \\
+ &  & Student Energy &  &  & \textbf{0.93/0.40} & \textbf{0.91/0.51} & \textbf{0.87/0.51} &  &  & 0.88/0.68 & 0.78/0.77 & 0.80/0.77 \\
+\midrule
+Clean & Cross-entropy & Absolute max probability difference & 0.94 & 15.4 & 0.87/0.79 & 0.93/0.47 & 0.87/0.68 & 0.80 & 54.9 & 0.73/0.99 & 0.80/0.76 & 0.77/0.86 \\
+ &  & Student--teacher KL divergence &  &  & 0.86/0.82 & 0.94/0.42 & 0.87/0.64 &  &  & 0.70/1.00 & 0.81/0.72 & 0.78/0.86 \\
+ &  & Student MSP &  &  & 0.88/0.68 & 0.94/0.47 & 0.86/0.66 &  &  & 0.81/0.81 & 0.83/0.70 & 0.78/0.80 \\
+ &  & Student Energy &  &  & \textbf{0.90/0.55} & \textbf{0.97/0.18} & \textbf{0.85/0.58} &  &  & \textbf{0.89/0.59} & \textbf{0.89/0.53} & \textbf{0.78/0.79} \\
+\addlinespace
+ & Logit MSE & Absolute max probability difference & 0.94 & 0.616 & 0.88/0.72 & 0.92/0.53 & 0.87/0.65 & 0.80 & 0.0827 & 0.72/0.98 & 0.87/0.62 & 0.76/0.88 \\
+ &  & Student--teacher KL divergence &  &  & 0.88/0.76 & 0.91/0.55 & 0.87/0.64 &  &  & 0.68/0.99 & 0.90/0.48 & 0.77/0.88 \\
+ &  & Student MSP &  &  & 0.88/0.67 & 0.93/0.54 & 0.87/0.64 &  &  & 0.81/0.83 & 0.87/0.63 & 0.78/0.80 \\
+ &  & Student Energy &  &  & \textbf{0.91/0.53} & \textbf{0.96/0.25} & \textbf{0.87/0.55} &  &  & 0.87/0.70 & 0.93/0.43 & 0.78/0.80 \\
+\bottomrule
+\end{tabular}
+
+\end{document}

@@ -9,7 +9,7 @@ import mlflow
 import torch
 
 from distill_ood_detection.config import DistillationMethod, ExperimentConfig
-from distill_ood_detection.datasets.inference import build_id_loaders
+from distill_ood_detection.datasets.inference import build_id_loaders, dataset_normalization
 from distill_ood_detection.distillation.train import train_student
 from distill_ood_detection.distillation.perturbation import (
     fit_pca_projector_from_activations,
@@ -44,6 +44,7 @@ def run_experiment(
         mlflow.set_experiment(config.mlflow.experiment_name)
 
     loaders = build_id_loaders(config.dataset, seed=training_defaults.seed)
+    image_normalization = dataset_normalization(config.dataset.name)
     teacher = load_teacher(config.teacher, device)
     pca_projector = None
     if (
@@ -126,6 +127,7 @@ def run_experiment(
                         else None
                     ),
                     pca_projector=pca_projector,
+                    image_normalization=image_normalization,
                 )
                 best_checkpoint_path = Path(str(summary["best_checkpoint_path"]))
                 student.load_state_dict(
@@ -151,6 +153,11 @@ def run_experiment(
                         else None
                     ),
                     pca_projector=pca_projector,
+                    image_normalization=image_normalization,
+                    apply_perturbation=(
+                        config.strategy.name == "perturbation"
+                        and config.strategy.perturbation.method == "pixel_augmentation"
+                    ),
                     split="test",
                 )
                 summary.update(test_metrics)

@@ -14,6 +14,8 @@ that import `distill_ood_detection` directly from `src/` also set `PYTHONPATH`.
 
 - [OOD metric reports](ood-metrics.md): export ROC-AUC and FPR@95 tables or
   numeric JSON from saved probability artifacts.
+- [OOD score tradeoff plots](ood-score-tradeoff-plots.md): plot ROC-AUC versus
+  FPR@95 across explicit hyperparameter sweeps.
 - [Test metric reports](test-metrics.md): export test accuracy and distillation
   loss tables or numeric JSON.
 - [Analysis notebooks](notebooks.md): generate probability, teacher-activation,

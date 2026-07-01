@@ -20,6 +20,7 @@ from distill_ood_detection.datasets.inference import (
     build_in_distribution_train_loader,
     build_in_distribution_validation_loader,
     build_ood_loaders,
+    dataset_normalization,
 )
 from distill_ood_detection.distillation.perturbation import (
     PcaProjector,
@@ -77,6 +78,7 @@ def run_probability_inference(
         ]
     )
     teacher = load_teacher(config.teacher, device)
+    image_normalization = dataset_normalization(config.dataset.name)
     pca_projector = None
     if (
         config.strategy.name == "perturbation"
@@ -98,6 +100,12 @@ def run_probability_inference(
         raise ValueError("--method is only supported for PyTorch students; use --tree-mode instead")
     if config.student.kind != "random_forest" and tree_mode is not None:
         raise ValueError("--tree-mode is only supported for random-forest students")
+    if (
+        config.student.kind == "random_forest"
+        and config.strategy.name == "perturbation"
+        and config.strategy.perturbation.method == "pixel_augmentation"
+    ):
+        raise ValueError("pixel_augmentation does not support random-forest inference")
 
     artifacts: list[dict[str, object]] = []
     for named_loader in loaders:
@@ -125,6 +133,7 @@ def run_probability_inference(
                     device,
                     apply_perturbation=apply_perturbation,
                     pca_projector=pca_projector,
+                    image_normalization=image_normalization,
                 )
                 if perturbation_forwarder is not None
                 else collect_model_outputs(teacher, named_loader.loader, device)
@@ -167,6 +176,7 @@ def run_probability_inference(
                     perturbation_forwarder=perturbation_forwarder,
                     apply_perturbation=apply_perturbation,
                     pca_projector=pca_projector,
+                    image_normalization=image_normalization,
                 )
             )
 
@@ -196,6 +206,7 @@ def _infer_torch_students(
     perturbation_forwarder: ResNetFeatureForwarder | None,
     apply_perturbation: bool,
     pca_projector: PcaProjector | None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]],
 ) -> list[dict[str, object]]:
     artifacts: list[dict[str, object]] = []
     methods = (method,) if method else config.training.enabled_methods()
@@ -239,6 +250,7 @@ def _infer_torch_students(
                         device,
                         apply_perturbation=apply_perturbation,
                         pca_projector=pca_projector,
+                        image_normalization=image_normalization,
                     )
                     if perturbation_forwarder is not None
                     else collect_model_outputs(student, loader, device)

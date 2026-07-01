@@ -22,6 +22,8 @@ from distill_ood_detection.config import (
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.distillation.perturbation import sample_perturbation
 from distill_ood_detection.distillation.perturbation import PcaProjector
+from distill_ood_detection.distillation.perturbation import build_pixel_student_inputs
+from distill_ood_detection.distillation.perturbation import sample_pixel_augmentation
 from distill_ood_detection.distillation.perturbation import teacher_target_features
 from distill_ood_detection.evaluation.metrics import distillation_metrics
 from distill_ood_detection.utils import write_json
@@ -42,6 +44,7 @@ def train_student(
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,
     pca_projector: PcaProjector | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
 ) -> dict[str, float | int | str]:
     """Train a student against teacher predictions and save trace artifacts."""
     student.to(device)
@@ -59,6 +62,7 @@ def train_student(
     best_checkpoint_path = output_dir / "best_student.pt"
     output_dir.mkdir(parents=True, exist_ok=True)
     started_at = time.time()
+    checked_student_input_shape = False
 
     for epoch in range(1, training_config.epochs + 1):
         student.train()
@@ -73,21 +77,47 @@ def train_student(
                 if perturbation_forwarder is not None:
                     if perturbation_config is None:
                         raise ValueError("perturbation_config is required for perturbation training")
-                    features = perturbation_forwarder.forward_to_features(images)
-                    perturbation_batch = sample_perturbation(
-                        features,
-                        perturbation_config,
-                        pca_projector=pca_projector,
-                    )
-                    teacher_logits = perturbation_forwarder.forward_from_features(
-                        teacher_target_features(perturbation_batch, perturbation_config)
-                    )
-                    student_inputs = perturbation_batch.student_inputs
+                    if perturbation_config.method == "pixel_augmentation":
+                        if image_normalization is None:
+                            raise ValueError(
+                                "image_normalization is required for pixel augmentation"
+                            )
+                        pixel_batch = sample_pixel_augmentation(
+                            images,
+                            perturbation_config,
+                            image_normalization,
+                        )
+                        perturbed_logits, perturbed_features = perturbation_forwarder(
+                            pixel_batch.perturbed_images
+                        )
+                        teacher_logits = (
+                            teacher(images)
+                            if perturbation_config.teacher_target == "clean"
+                            else perturbed_logits
+                        )
+                        student_inputs = build_pixel_student_inputs(
+                            perturbed_features,
+                            pixel_batch.normalized_transform_params,
+                        )
+                    else:
+                        features = perturbation_forwarder.forward_to_features(images)
+                        perturbation_batch = sample_perturbation(
+                            features,
+                            perturbation_config,
+                            pca_projector=pca_projector,
+                        )
+                        teacher_logits = perturbation_forwarder.forward_from_features(
+                            teacher_target_features(perturbation_batch, perturbation_config)
+                        )
+                        student_inputs = perturbation_batch.student_inputs
                 elif feature_extractor is None:
                     teacher_logits = teacher(images)
                     student_inputs = images
                 else:
                     teacher_logits, student_inputs = feature_extractor(images)
+            if not checked_student_input_shape:
+                _validate_student_input_shape(student, student_inputs)
+                checked_student_input_shape = True
             student_logits = student(student_inputs)
             loss = distillation_loss(
                 method,
@@ -119,6 +149,11 @@ def train_student(
             perturbation_forwarder=perturbation_forwarder,
             perturbation_config=perturbation_config,
             pca_projector=pca_projector,
+            image_normalization=image_normalization,
+            apply_perturbation=(
+                perturbation_config is not None
+                and perturbation_config.method == "pixel_augmentation"
+            ),
             split="validation",
         )
         validation_accuracy = validation_metrics["validation_accuracy"]
@@ -178,3 +213,16 @@ def build_optimizer(model: nn.Module, config: OptimizerConfig) -> Optimizer:
             weight_decay=config.weight_decay,
         )
     raise ValueError(f"Unsupported optimizer: {config.name}")
+
+
+def _validate_student_input_shape(student: nn.Module, student_inputs: torch.Tensor) -> None:
+    first_parameter = next(student.parameters(), None)
+    if first_parameter is None or first_parameter.ndim < 2:
+        return
+    expected_dim = first_parameter.shape[1]
+    actual_dim = torch.flatten(student_inputs, start_dim=1).shape[1]
+    if actual_dim != expected_dim:
+        raise ValueError(
+            "student.input_shape does not match perturbation inputs: "
+            f"expected flattened dimension {expected_dim}, got {actual_dim}"
+        )

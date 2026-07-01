@@ -4,6 +4,9 @@
 TODO.md
 tmp/
 slurm/
+reports/outputs/plots
+reports/outputs/json
+slurm_scripts/*.txt
 
 # uv
 **/uv.lock

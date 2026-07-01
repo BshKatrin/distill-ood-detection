@@ -211,7 +211,7 @@ def _inference_transform(id_name: str) -> Compose:
     """Return the standard image transform used for inference datasets."""
 
     preprocessing = _id_preprocessing(id_name)
-    mean, std = preprocessing["normalization"]
+    mean, std = dataset_normalization(id_name)
     return Compose(
         [
             Lambda(lambda image: image.convert("RGB")),
@@ -221,6 +221,14 @@ def _inference_transform(id_name: str) -> Compose:
             Normalize(mean, std),
         ]
     )
+
+
+def dataset_normalization(
+    name: str,
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """Return RGB normalization constants for an in-distribution dataset."""
+
+    return _id_preprocessing(name)["normalization"]
 
 
 def _id_preprocessing(name: str) -> IDPreprocessingConfig:

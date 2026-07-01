@@ -152,6 +152,51 @@ class TreeInferenceOutputTests(unittest.TestCase):
         self.assertEqual(tuple(outputs.probabilities.shape), (2, 3, 2))
         self.assertEqual(outputs.labels.tolist(), [0, 1])
 
+    def test_pixel_augmentation_outputs_keep_draw_dimension(self) -> None:
+        loader = _loader()
+        forwarder = _PerturbationForwarder()
+        config = PerturbationConfig(
+            method="pixel_augmentation",
+            teacher_target="perturbed",
+            evaluation_draws=3,
+        )
+        student = _PerturbationStudent()
+
+        outputs = collect_perturbation_model_outputs(
+            student,
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+            apply_perturbation=True,
+            image_normalization=((0.0, 0.0, 0.0), (1.0, 1.0, 1.0)),
+        )
+        teacher_outputs = collect_perturbed_teacher_outputs(
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+            apply_perturbation=True,
+            image_normalization=((0.0, 0.0, 0.0), (1.0, 1.0, 1.0)),
+        )
+
+        self.assertEqual(tuple(outputs.logits.shape), (2, 3, 2))
+        self.assertEqual(tuple(outputs.probabilities.shape), (2, 3, 2))
+        self.assertEqual(tuple(teacher_outputs.logits.shape), (2, 3, 2))
+        self.assertEqual(tuple(teacher_outputs.probabilities.shape), (2, 3, 2))
+
+    def test_pixel_augmentation_rejects_tree_inference(self) -> None:
+        with self.assertRaisesRegex(ValueError, "random-forest"):
+            collect_perturbation_tree_model_outputs(
+                _FeatureShapeModel(),
+                "logits",
+                _PerturbationForwarder(),
+                PerturbationConfig(method="pixel_augmentation", teacher_target="perturbed"),
+                _loader(),
+                torch.device("cpu"),
+                apply_perturbation=True,
+            )
+
 
 def _loader() -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
     images = torch.zeros((2, 3, 32, 32), dtype=torch.float32)
@@ -177,6 +222,10 @@ class _FeatureExtractor(torch.nn.Module):
 
 
 class _PerturbationForwarder(torch.nn.Module):
+    def forward(self, images: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        features = self.forward_to_features(images)
+        return self.forward_from_features(features), features
+
     def forward_to_features(self, images: torch.Tensor) -> torch.Tensor:
         return torch.ones((images.shape[0], 1, 2, 2), dtype=torch.float32)
 

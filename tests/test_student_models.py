@@ -121,6 +121,50 @@ class StudentModelTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_config(raw)
 
+    def test_pixel_augmentation_defaults_to_perturbed_target(self) -> None:
+        raw = {
+            "experiment_name": "pixel_augmentation_config",
+            "run_dir": "runs/tests/pixel_augmentation_config",
+            "student": {
+                "kind": "linear",
+                "feature_layer": "layer4",
+                "input_shape": [32774],
+                "num_classes": 10,
+            },
+            "strategy": {
+                "name": "perturbation",
+                "perturbation": {
+                    "method": "pixel_augmentation",
+                    "evaluation_draws": 16,
+                },
+            },
+        }
+
+        config = parse_config(raw)
+
+        self.assertEqual(config.strategy.perturbation.method, "pixel_augmentation")
+        self.assertEqual(config.strategy.perturbation.teacher_target, "perturbed")
+        self.assertEqual(config.strategy.perturbation.evaluation_draws, 16)
+
+    def test_pixel_augmentation_rejects_random_forest_student(self) -> None:
+        raw = {
+            "experiment_name": "bad_pixel_augmentation_config",
+            "run_dir": "runs/tests/bad_pixel_augmentation_config",
+            "student": {
+                "kind": "random_forest",
+                "feature_layer": "layer4",
+                "input_shape": [32774],
+                "num_classes": 10,
+            },
+            "strategy": {
+                "name": "perturbation",
+                "perturbation": {"method": "pixel_augmentation"},
+            },
+        }
+
+        with self.assertRaisesRegex(ValueError, "linear and MLP"):
+            parse_config(raw)
+
 
 if __name__ == "__main__":
     unittest.main()

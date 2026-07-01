@@ -10,9 +10,16 @@ import torch
 
 from distill_ood_detection.config import PerturbationConfig, load_config
 from distill_ood_detection.distillation.perturbation import (
+    PcaProjector,
+    _build_pca_masked_projection_batch,
     _clip_single_feature_map,
+    apply_pixel_augmentation,
+    build_pixel_student_inputs,
+    build_unperturbed_pixel_params,
     build_unperturbed_perturbation_batch,
     fit_pca_projector_from_activations,
+    sample_pixel_augmentation,
+    sample_pixel_augmentation_params,
     sample_clipping_perturbation,
     sample_mc_dropout_perturbation,
     sample_perturbation,
@@ -44,10 +51,12 @@ class PerturbationTests(unittest.TestCase):
                 if perturbation.method == "mc_dropout":
                     perturbation_dim = 0
                     expected_shape = (feature_dim + perturbation_dim,)
+                elif perturbation.method == "pixel_augmentation":
+                    expected_shape = (feature_dim + 6,)
                 elif perturbation.method == "pca_projection":
                     expected_shape = (perturbation.pca_components,)
                 elif perturbation.method == "pca_masked_projection":
-                    expected_shape = (feature_dim + perturbation.pca_components,)
+                    expected_shape = (2 * perturbation.pca_components,)
                 elif perturbation.clipping_mode == "constant":
                     perturbation_dim = 1
                     expected_shape = (feature_dim + perturbation_dim,)
@@ -95,6 +104,77 @@ class PerturbationTests(unittest.TestCase):
                     batch.student_inputs[:, 48:],
                     batch.perturbations,
                 )
+
+    def test_pixel_augmentation_samples_normalized_parameters(self) -> None:
+        images = torch.zeros(4, 3, 32, 32)
+        config = PerturbationConfig(
+            method="pixel_augmentation",
+            rotation_degrees=10.0,
+            translate_fraction=0.10,
+            scale_min=0.90,
+            scale_max=1.10,
+            brightness_delta=0.10,
+            contrast_delta=0.20,
+        )
+
+        torch.manual_seed(123)
+        raw_params, normalized_params = sample_pixel_augmentation_params(images, config)
+
+        self.assertEqual(tuple(raw_params.shape), (4, 6))
+        self.assertEqual(tuple(normalized_params.shape), (4, 6))
+        self.assertTrue(torch.all(raw_params[:, 0] >= -10.0))
+        self.assertTrue(torch.all(raw_params[:, 0] <= 10.0))
+        self.assertTrue(torch.all(raw_params[:, 1] >= -3.0))
+        self.assertTrue(torch.all(raw_params[:, 1] <= 3.0))
+        self.assertTrue(torch.all(raw_params[:, 2] >= -3.0))
+        self.assertTrue(torch.all(raw_params[:, 2] <= 3.0))
+        self.assertTrue(torch.all(raw_params[:, 3] >= 0.90))
+        self.assertTrue(torch.all(raw_params[:, 3] <= 1.10))
+        self.assertTrue(torch.all(raw_params[:, 4] >= 0.90))
+        self.assertTrue(torch.all(raw_params[:, 4] <= 1.10))
+        self.assertTrue(torch.all(raw_params[:, 5] >= 0.80))
+        self.assertTrue(torch.all(raw_params[:, 5] <= 1.20))
+        self.assertTrue(torch.all(normalized_params >= -1.0))
+        self.assertTrue(torch.all(normalized_params <= 1.0))
+
+    def test_pixel_augmentation_applies_transform_and_renormalizes(self) -> None:
+        normalization = ((0.5, 0.5, 0.5), (0.25, 0.25, 0.25))
+        images = torch.zeros(2, 3, 8, 8)
+        raw_params = torch.tensor(
+            [
+                [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                [5.0, 1.0, -1.0, 1.0, 1.05, 1.1],
+            ],
+            dtype=torch.float32,
+        )
+
+        perturbed = apply_pixel_augmentation(images, raw_params, normalization)
+
+        self.assertEqual(tuple(perturbed.shape), tuple(images.shape))
+        self.assertEqual(perturbed.dtype, images.dtype)
+        torch.testing.assert_close(perturbed[0], images[0])
+        self.assertTrue(torch.any(perturbed[1] != images[1]))
+
+    def test_pixel_augmentation_batch_and_student_inputs(self) -> None:
+        normalization = ((0.5, 0.5, 0.5), (0.25, 0.25, 0.25))
+        images = torch.zeros(2, 3, 8, 8)
+        features = torch.ones(2, 4, 2, 2)
+        config = PerturbationConfig(method="pixel_augmentation")
+
+        torch.manual_seed(123)
+        batch = sample_pixel_augmentation(images, config, normalization)
+        student_inputs = build_pixel_student_inputs(
+            features,
+            batch.normalized_transform_params,
+        )
+
+        self.assertEqual(tuple(batch.perturbed_images.shape), tuple(images.shape))
+        self.assertEqual(tuple(student_inputs.shape), (2, 22))
+        torch.testing.assert_close(student_inputs[:, :16], torch.ones(2, 16))
+        torch.testing.assert_close(
+            build_unperturbed_pixel_params(images),
+            torch.zeros(2, 6),
+        )
 
     def test_rejects_non_convolutional_features(self) -> None:
         config = PerturbationConfig()
@@ -212,7 +292,7 @@ class PerturbationTests(unittest.TestCase):
         self.assertEqual(tuple(batch.student_inputs.shape), (2, 3))
         self.assertEqual(tuple(batch.perturbed_features.shape), (2, 2, 2, 2))
 
-    def test_masked_pca_projection_concatenates_projection_and_column_keep_mask(self) -> None:
+    def test_masked_pca_projection_concatenates_projection_and_component_keep_mask(self) -> None:
         activations = torch.arange(5 * 2 * 2 * 2, dtype=torch.float32).reshape(5, 2, 2, 2)
 
         with tempfile.TemporaryDirectory() as directory:
@@ -244,14 +324,14 @@ class PerturbationTests(unittest.TestCase):
         )
 
         flat = torch.flatten(activations[:2], start_dim=1)
-        expected_projection = ((flat - projector.mean) * batch.perturbations) @ projector.components.T
-        self.assertEqual(tuple(batch.perturbations.shape), (2, 8))
-        self.assertEqual(tuple(batch.student_inputs.shape), (2, 11))
+        expected_projection = ((flat - projector.mean) @ projector.components.T) * batch.perturbations
+        self.assertEqual(tuple(batch.perturbations.shape), (2, 3))
+        self.assertEqual(tuple(batch.student_inputs.shape), (2, 6))
         self.assertTrue(torch.all((batch.perturbations == 0.0) | (batch.perturbations == 1.0)))
         torch.testing.assert_close(batch.student_inputs[:, :3], expected_projection)
         torch.testing.assert_close(batch.student_inputs[:, 3:], batch.perturbations)
 
-    def test_masked_pca_projection_matches_explicit_component_column_masking(self) -> None:
+    def test_masked_pca_projection_matches_explicit_component_masking(self) -> None:
         features = torch.arange(2 * 2 * 2 * 2, dtype=torch.float32).reshape(2, 2, 2, 2)
         activations = torch.arange(5 * 2 * 2 * 2, dtype=torch.float32).reshape(5, 2, 2, 2)
 
@@ -282,11 +362,50 @@ class PerturbationTests(unittest.TestCase):
         centered = torch.flatten(features, start_dim=1) - projector.mean
         explicit_rows = []
         for row, keep_mask in zip(centered, batch.perturbations, strict=True):
-            masked_components = projector.components * keep_mask[None, :]
+            masked_components = projector.components * keep_mask[:, None]
             explicit_rows.append(row @ masked_components.T)
         explicit_projection = torch.stack(explicit_rows)
 
         torch.testing.assert_close(batch.student_inputs[:, :3], explicit_projection)
+
+    def test_masked_pca_projection_masks_q_columns_before_projection(self) -> None:
+        features = torch.tensor(
+            [
+                [[[-1.0, 2.0], [3.0, 4.0]]],
+                [[[5.0, -6.0], [7.0, 8.0]]],
+            ]
+        )
+        projector = PcaProjector(
+            mean=torch.zeros(4),
+            components=torch.tensor(
+                [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 1.0],
+                ]
+            ),
+        )
+        keep_mask = torch.tensor(
+            [
+                [1.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0],
+            ]
+        )
+
+        batch = _build_pca_masked_projection_batch(features, projector, keep_mask)
+
+        flat_features = torch.flatten(features, start_dim=1)
+        q = projector.components.T
+        explicit_projection = torch.stack(
+            [
+                embedding @ (q * mask.unsqueeze(0))
+                for embedding, mask in zip(flat_features, keep_mask, strict=True)
+            ]
+        )
+        self.assertEqual(tuple(q.shape), (4, 3))
+        self.assertEqual(tuple(batch.student_inputs.shape), (2, 6))
+        torch.testing.assert_close(batch.student_inputs[:, :3], explicit_projection)
+        torch.testing.assert_close(batch.student_inputs[:, 3:], keep_mask)
 
     def test_unperturbed_masked_pca_keeps_all_components(self) -> None:
         features = torch.arange(2 * 2 * 2 * 2, dtype=torch.float32).reshape(2, 2, 2, 2)
@@ -314,24 +433,38 @@ class PerturbationTests(unittest.TestCase):
             pca_projector=projector,
         )
 
-        torch.testing.assert_close(batch.perturbations, torch.ones(2, 8))
+        torch.testing.assert_close(batch.perturbations, torch.ones(2, 3))
         torch.testing.assert_close(batch.student_inputs[:, :3], projector.transform(features))
-        torch.testing.assert_close(batch.student_inputs[:, 3:], torch.ones(2, 8))
+        torch.testing.assert_close(batch.student_inputs[:, 3:], torch.ones(2, 3))
 
-    def test_masked_pca_rejects_perturbed_teacher_target(self) -> None:
-        batch = sample_mc_dropout_perturbation(
-            torch.ones(2, 3, 4, 4),
-            PerturbationConfig(method="mc_dropout", dropout_probability=0.5),
+    def test_masked_pca_perturbed_teacher_target_uses_reconstruction(self) -> None:
+        features = torch.arange(2 * 2 * 2 * 2, dtype=torch.float32).reshape(2, 2, 2, 2)
+        projector = PcaProjector(
+            mean=torch.zeros(8),
+            components=torch.eye(3, 8),
+        )
+        keep_mask = torch.tensor(
+            [
+                [1.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0],
+            ]
+        )
+        batch = _build_pca_masked_projection_batch(
+            features,
+            projector,
+            keep_mask,
         )
 
-        with self.assertRaisesRegex(ValueError, "only supports clean teacher targets"):
-            teacher_target_features(
-                batch,
-                PerturbationConfig(
-                    method="pca_masked_projection",
-                    teacher_target="perturbed",
-                ),
-            )
+        perturbed = teacher_target_features(
+            batch,
+            PerturbationConfig(
+                method="pca_masked_projection",
+                teacher_target="perturbed",
+            ),
+        )
+
+        torch.testing.assert_close(perturbed, batch.perturbed_features)
+        self.assertFalse(torch.equal(perturbed, features))
 
     def test_teacher_target_selects_clean_or_perturbed_features(self) -> None:
         features = torch.ones(2, 3, 4, 4)

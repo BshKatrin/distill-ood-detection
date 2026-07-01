@@ -1,0 +1,81 @@
+\documentclass[border=2pt]{standalone}
+\usepackage{booktabs}
+
+\begin{document}
+
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lllllcccccccccc}
+\multicolumn{15}{c}{\textbf{Unmasked PCA projection component sweep --- linear student, ResNet-18 layer4}}\\[4pt]
+\multicolumn{5}{c}{Inference: perturbed} & \multicolumn{5}{c}{CIFAR-10 (ID)} & \multicolumn{5}{c}{CIFAR-100 (ID)} \\
+\cmidrule(lr){6-10} \cmidrule(lr){11-15}
+\toprule
+ID dataset & PCA components & Teacher perturbed? & Objective & OOD Score & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-100 & Test acc. & Distill. loss & MNIST & SVHN & CIFAR-10 \\
+\midrule
+CIFAR-10 (ID) & 17 & No & Cross-entropy & Max probability difference & 0.95 & 17.7 & 0.55/0.66 & 0.29/0.79 & 0.39/0.75 & -- & -- & -- & -- & -- \\
+ &  &  &  & Absolute max probability difference &  &  & 0.87/0.77 & 0.90/0.65 & 0.87/0.67 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.86/0.80 & 0.91/0.61 & 0.87/0.64 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student MSP &  &  & 0.92/0.56 & 0.91/0.59 & 0.88/0.62 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student Energy &  &  & 0.94/0.32 & 0.88/0.52 & 0.86/0.54 & -- & -- & -- & -- & -- \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.00825 & 0.57/0.68 & 0.40/0.74 & 0.54/0.70 & -- & -- & -- & -- & -- \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.65 & 0.89/0.66 & 0.86/0.65 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.90/0.63 & 0.87/0.70 & 0.87/0.62 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student MSP &  &  & 0.91/0.55 & 0.91/0.58 & 0.88/0.63 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student Energy &  &  & 0.93/0.35 & 0.87/0.56 & 0.86/0.54 & -- & -- & -- & -- & -- \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 0.0184 & 0.50/0.70 & 0.29/0.78 & 0.40/0.74 & -- & -- & -- & -- & -- \\
+ &  &  &  & Absolute max probability difference &  &  & 0.88/0.75 & 0.91/0.63 & 0.86/0.66 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.87/0.78 & 0.91/0.59 & 0.86/0.65 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student MSP &  &  & 0.92/0.56 & 0.91/0.59 & 0.88/0.62 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student Energy &  &  & 0.95/0.30 & 0.91/0.44 & 0.87/0.52 & -- & -- & -- & -- & -- \\
+\addlinespace
+CIFAR-10 (ID) & 17 & Yes & Cross-entropy & Max probability difference & 0.95 & 17.7 & 0.43/0.76 & 0.61/0.63 & 0.53/0.71 & -- & -- & -- & -- & -- \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.61 & 0.92/0.50 & 0.87/0.63 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.88/0.44 & 0.88/0.42 & 0.82/0.55 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student MSP &  &  & 0.92/0.56 & 0.91/0.59 & 0.88/0.62 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student Energy &  &  & 0.94/0.32 & 0.88/0.51 & 0.86/0.53 & -- & -- & -- & -- & -- \\
+ &  &  & KL divergence & Max probability difference & 0.95 & 0.00834 & 0.57/0.68 & 0.48/0.72 & 0.57/0.68 & -- & -- & -- & -- & -- \\
+ &  &  &  & Absolute max probability difference &  &  & 0.90/0.65 & 0.88/0.70 & 0.87/0.66 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.89/0.61 & 0.87/0.72 & 0.88/0.61 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student MSP &  &  & 0.91/0.55 & 0.91/0.58 & 0.88/0.63 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student Energy &  &  & 0.93/0.35 & 0.87/0.55 & 0.86/0.54 & -- & -- & -- & -- & -- \\
+ &  &  & Logit MSE & Max probability difference & 0.95 & 1.4e-06 & 0.32/0.79 & 0.57/0.62 & 0.45/0.73 & -- & -- & -- & -- & -- \\
+ &  &  &  & Absolute max probability difference &  &  & 0.91/0.62 & 0.92/0.50 & 0.87/0.64 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student--teacher KL divergence &  &  & 0.75/0.61 & 0.78/0.52 & 0.70/0.69 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student MSP &  &  & 0.92/0.56 & 0.91/0.59 & 0.88/0.62 & -- & -- & -- & -- & -- \\
+ &  &  &  & Student Energy &  &  & 0.95/0.30 & 0.92/0.43 & 0.88/0.52 & -- & -- & -- & -- & -- \\
+\addlinespace
+CIFAR-100 (ID) & 50 & No & Cross-entropy & Max probability difference & -- & -- & -- & -- & -- & 0.79 & 56.2 & 0.51/0.81 & 0.67/0.70 & 0.48/0.87 \\
+ &  &  &  & Absolute max probability difference & -- & -- & -- & -- & -- &  &  & 0.69/0.91 & 0.71/0.90 & 0.69/0.91 \\
+ &  &  &  & Student--teacher KL divergence & -- & -- & -- & -- & -- &  &  & 0.74/0.88 & 0.79/0.87 & 0.77/0.87 \\
+ &  &  &  & Student MSP & -- & -- & -- & -- & -- &  &  & 0.69/0.96 & 0.79/0.84 & 0.79/0.79 \\
+ &  &  &  & Student Energy & -- & -- & -- & -- & -- &  &  & 0.64/0.99 & 0.80/0.86 & 0.80/0.79 \\
+ &  &  & KL divergence & Max probability difference & -- & -- & -- & -- & -- & 0.78 & 0.0919 & 0.58/0.85 & 0.70/0.76 & 0.57/0.87 \\
+ &  &  &  & Absolute max probability difference & -- & -- & -- & -- & -- &  &  & 0.72/0.86 & 0.76/0.85 & 0.72/0.89 \\
+ &  &  &  & Student--teacher KL divergence & -- & -- & -- & -- & -- &  &  & 0.72/0.89 & 0.82/0.79 & 0.79/0.83 \\
+ &  &  &  & Student MSP & -- & -- & -- & -- & -- &  &  & 0.69/0.95 & 0.77/0.86 & 0.79/0.81 \\
+ &  &  &  & Student Energy & -- & -- & -- & -- & -- &  &  & 0.70/0.95 & 0.79/0.85 & 0.78/0.82 \\
+ &  &  & Logit MSE & Max probability difference & -- & -- & -- & -- & -- & 0.79 & 0.153 & 0.28/0.99 & 0.39/0.98 & 0.40/0.98 \\
+ &  &  &  & Absolute max probability difference & -- & -- & -- & -- & -- &  &  & 0.72/0.92 & 0.61/0.96 & 0.61/0.94 \\
+ &  &  &  & Student--teacher KL divergence & -- & -- & -- & -- & -- &  &  & 0.73/0.94 & 0.60/0.97 & 0.63/0.94 \\
+ &  &  &  & Student MSP & -- & -- & -- & -- & -- &  &  & 0.71/0.96 & 0.80/0.83 & 0.79/0.79 \\
+ &  &  &  & Student Energy & -- & -- & -- & -- & -- &  &  & 0.66/0.99 & 0.80/0.89 & 0.79/0.81 \\
+\addlinespace
+CIFAR-100 (ID) & 50 & Yes & Cross-entropy & Max probability difference & -- & -- & -- & -- & -- & 0.79 & 57.6 & 0.67/0.99 & 0.56/0.97 & 0.50/0.97 \\
+ &  &  &  & Absolute max probability difference & -- & -- & -- & -- & -- &  &  & 0.71/0.99 & 0.62/0.97 & 0.57/0.97 \\
+ &  &  &  & Student--teacher KL divergence & -- & -- & -- & -- & -- &  &  & 0.73/1.00 & 0.72/0.98 & 0.66/0.98 \\
+ &  &  &  & Student MSP & -- & -- & -- & -- & -- &  &  & 0.71/0.96 & 0.80/0.83 & 0.79/0.80 \\
+ &  &  &  & Student Energy & -- & -- & -- & -- & -- &  &  & 0.64/1.00 & 0.80/0.87 & 0.79/0.79 \\
+ &  &  & KL divergence & Max probability difference & -- & -- & -- & -- & -- & 0.78 & 0.0231 & 0.57/0.82 & 0.58/0.85 & 0.54/0.91 \\
+ &  &  &  & Absolute max probability difference & -- & -- & -- & -- & -- &  &  & 0.74/0.85 & 0.70/0.88 & 0.66/0.92 \\
+ &  &  &  & Student--teacher KL divergence & -- & -- & -- & -- & -- &  &  & 0.74/0.90 & 0.83/0.82 & 0.78/0.86 \\
+ &  &  &  & Student MSP & -- & -- & -- & -- & -- &  &  & 0.70/0.97 & 0.79/0.84 & 0.79/0.81 \\
+ &  &  &  & Student Energy & -- & -- & -- & -- & -- &  &  & 0.71/0.94 & 0.80/0.83 & 0.78/0.82 \\
+ &  &  & Logit MSE & Max probability difference & -- & -- & -- & -- & -- & 0.79 & 2.12e-05 & 0.26/0.95 & 0.40/0.90 & 0.45/0.91 \\
+ &  &  &  & Absolute max probability difference & -- & -- & -- & -- & -- &  &  & 0.74/0.94 & 0.63/0.94 & 0.56/0.93 \\
+ &  &  &  & Student--teacher KL divergence & -- & -- & -- & -- & -- &  &  & 0.81/0.97 & 0.76/0.92 & 0.67/0.93 \\
+ &  &  &  & Student MSP & -- & -- & -- & -- & -- &  &  & 0.71/0.96 & 0.80/0.83 & 0.79/0.79 \\
+ &  &  &  & Student Energy & -- & -- & -- & -- & -- &  &  & 0.66/0.99 & 0.80/0.89 & 0.79/0.81 \\
+\bottomrule
+\end{tabular}
+
+\end{document}

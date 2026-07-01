@@ -29,6 +29,7 @@ PerturbationMethod = Literal[
     "mc_dropout",
     "pca_projection",
     "pca_masked_projection",
+    "pixel_augmentation",
 ]
 TeacherTarget = Literal["clean", "perturbed"]
 ClippingMode = Literal["constant", "spatial_dependent", "channel_dependent"]
@@ -106,6 +107,12 @@ class PerturbationConfig:
     pca_mask_probability: float = 0.3
     pca_activation_path: str | None = None
     evaluation_draws: int = 1
+    rotation_degrees: float = 10.0
+    translate_fraction: float = 0.10
+    scale_min: float = 0.90
+    scale_max: float = 1.10
+    brightness_delta: float = 0.10
+    contrast_delta: float = 0.20
 
 
 @dataclass(frozen=True)
@@ -398,6 +405,12 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     student = _parse_student_config(student_raw, strategy=strategy)
     if strategy.name == "perturbation" and student.feature_layer is None:
         raise ValueError("student.feature_layer is required for perturbation strategy")
+    if (
+        strategy.name == "perturbation"
+        and strategy.perturbation.method == "pixel_augmentation"
+        and student.kind == "random_forest"
+    ):
+        raise ValueError("pixel_augmentation supports only linear and MLP students")
     optimizer = _parse_optimizer_config(raw.get("optimizer", {}))
     training = _parse_training_config(
         raw.get("training", {}),
@@ -464,7 +477,13 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
     """Parse distillation strategy settings."""
 
     strategy_raw = raw.copy()
-    perturbation = PerturbationConfig(**strategy_raw.pop("perturbation", {}))
+    perturbation_raw = strategy_raw.pop("perturbation", {})
+    if (
+        perturbation_raw.get("method") == "pixel_augmentation"
+        and "teacher_target" not in perturbation_raw
+    ):
+        perturbation_raw["teacher_target"] = "perturbed"
+    perturbation = PerturbationConfig(**perturbation_raw)
     strategy = StrategyConfig(
         name=strategy_raw.pop("name", "baseline"),
         perturbation=perturbation,
@@ -479,6 +498,7 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         "mc_dropout",
         "pca_projection",
         "pca_masked_projection",
+        "pixel_augmentation",
     }:
         raise ValueError(f"Unsupported perturbation method: {perturbation.method}")
     if perturbation.clipping_mode not in {
@@ -501,15 +521,26 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(
             "strategy.perturbation.pca_mask_probability requires 0 <= p < 1"
         )
-    if (
-        perturbation.method == "pca_masked_projection"
-        and perturbation.teacher_target != "clean"
-    ):
-        raise ValueError(
-            "pca_masked_projection only supports strategy.perturbation.teacher_target=clean"
-        )
     if perturbation.evaluation_draws <= 0:
         raise ValueError("strategy.perturbation.evaluation_draws must be positive")
+    if perturbation.rotation_degrees < 0.0:
+        raise ValueError("strategy.perturbation.rotation_degrees must be non-negative")
+    if not 0.0 <= perturbation.translate_fraction <= 1.0:
+        raise ValueError(
+            "strategy.perturbation.translate_fraction requires 0 <= fraction <= 1"
+        )
+    if perturbation.scale_min <= 0.0 or perturbation.scale_min > perturbation.scale_max:
+        raise ValueError(
+            "strategy.perturbation requires 0 < scale_min <= scale_max"
+        )
+    if not 0.0 <= perturbation.brightness_delta <= 1.0:
+        raise ValueError(
+            "strategy.perturbation.brightness_delta requires 0 <= delta <= 1"
+        )
+    if not 0.0 <= perturbation.contrast_delta <= 1.0:
+        raise ValueError(
+            "strategy.perturbation.contrast_delta requires 0 <= delta <= 1"
+        )
     return strategy
 
 

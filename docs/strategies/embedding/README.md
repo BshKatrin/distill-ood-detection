@@ -47,7 +47,7 @@ Set `strategy.perturbation.method` to select a method:
 | [Clipping](clipping.md)           | `clipping` or omitted | Perturbed embedding and sampled percentile |
 | [Monte-Carlo dropout](dropout.md) | `mc_dropout`          | Dropped embedding                          |
 | [PCA projection](pca.md)          | `pca_projection`      | Reduced PCA representation                 |
-| [Masked PCA projection](pca.md#masked-pca-projection) | `pca_masked_projection` | Masked reduced PCA representation and component-column keep mask |
+| [Masked PCA projection](pca.md#masked-pca-projection) | `pca_masked_projection` | Masked reduced PCA representation and PCA-component keep mask |
 
 Configs that omit `method` use clipping.
 
