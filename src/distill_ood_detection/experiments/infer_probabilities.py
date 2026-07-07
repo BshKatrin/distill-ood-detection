@@ -78,7 +78,7 @@ def run_probability_inference(
         ]
     )
     teacher = load_teacher(config.teacher, device)
-    image_normalization = dataset_normalization(config.dataset.name)
+    image_normalization = dataset_normalization(config.dataset)
     pca_projector = None
     if (
         config.strategy.name == "perturbation"

@@ -100,6 +100,11 @@ is_tree_config() {
   [[ "${config}" == *random_forest* ]]
 }
 
+is_feature_denoising_config() {
+  local config="$1"
+  [[ "${config}" == configs/students/feature_denoising/* ]]
+}
+
 train_config() {
   local config="$1"
 
@@ -122,6 +127,22 @@ train_config() {
 
 infer_config() {
   local config="$1"
+  if is_feature_denoising_config "${config}"; then
+    local args=(export-feature-denoising-scores --config "${config}" --checkpoint "${CHECKPOINT}")
+
+    if [ "${INCLUDE_TRAIN}" = "1" ]; then
+      args+=(--include-train)
+    fi
+
+    if [ "${INCLUDE_VALIDATION}" = "1" ]; then
+      args+=(--include-validation)
+    fi
+
+    echo "[$(date --iso-8601=seconds)] Exporting Feature Denoising reconstruction scores: ${config}"
+    run_distill_ood "${args[@]}"
+    return
+  fi
+
   local args=(infer-probabilities --config "${config}" --checkpoint "${CHECKPOINT}")
 
   if is_tree_config "${config}" && [ -n "${TREE_MODE}" ]; then

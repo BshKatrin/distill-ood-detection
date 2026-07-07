@@ -1,0 +1,63 @@
+experiment_name: feature_denoising_spatial_token_layer4_student_resnet18_cifar10_blocks2_targets6
+run_dir: runs/students/feature_denoising/spatial_token_prediction/cifar_10/resnet18/token_layer4_blocks2_targets6
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar100
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar10
+  revision: main
+  num_classes: 10
+
+student:
+  kind: spatial_token_predictor
+  feature_layer: layer4
+  input_shape: [512, 4, 4]
+  hidden_channels: [256, 2, 4]
+  num_classes: 512
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: spatial_token_prediction
+    activation_path: runs/teachers/cifar_10/resnet18/teacher_activations/cifar10_train/layer4.pt
+    target_block_count: 2
+    target_block_scale_min: 0.15
+    target_block_scale_max: 0.20
+    target_aspect_ratio_min: 0.75
+    target_aspect_ratio_max: 1.50
+    context_scale_min: 1.00
+    context_scale_max: 1.00
+    target_token_count: 6
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: true
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db

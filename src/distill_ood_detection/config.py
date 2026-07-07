@@ -21,9 +21,19 @@ DistillationMethod = Literal[
     "mse_logits",
     "kl_divergence",
 ]
+FeatureDenoisingMethod = Literal[
+    "pca_masked_reconstruction",
+    "spatial_masked_reconstruction",
+    "channel_masked_reconstruction",
+    "spatial_token_prediction",
+    "pixel_masked_embedding_prediction",
+    "pixel_augmented_embedding_prediction",
+    "pixel_masked_multilayer_prediction",
+    "pixel_masked_multilayer_l234_prediction",
+]
 TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
-StrategyName = Literal["baseline", "perturbation"]
+StrategyName = Literal["baseline", "perturbation", "feature_denoising"]
 PerturbationMethod = Literal[
     "clipping",
     "mc_dropout",
@@ -57,6 +67,9 @@ class DatasetConfig:
     num_workers: int = 2
     validation_fraction: float = 0.1
     ood_datasets: tuple[OODDatasetConfig, ...] = field(default_factory=tuple)
+    pre_size: int | None = None
+    image_size: int | None = None
+    normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None
 
 
 @dataclass(frozen=True)
@@ -116,11 +129,45 @@ class PerturbationConfig:
 
 
 @dataclass(frozen=True)
+class FeatureDenoisingConfig:
+    """Feature Denoising representation-prediction settings."""
+
+    method: FeatureDenoisingMethod = "pca_masked_reconstruction"
+    activation_path: str | None = None
+    mask_probability: float = 0.3
+    target_block_count: int = 4
+    target_block_scale_min: float = 0.15
+    target_block_scale_max: float = 0.20
+    target_aspect_ratio_min: float = 0.75
+    target_aspect_ratio_max: float = 1.50
+    context_scale_min: float = 0.85
+    context_scale_max: float = 1.00
+    target_token_count: int = 0
+    image_mask_block_count: int = 2
+    image_mask_scale_min: float = 0.15
+    image_mask_scale_max: float = 0.20
+    image_mask_aspect_ratio_min: float = 0.75
+    image_mask_aspect_ratio_max: float = 1.50
+    embedding_pool: str = "avg"
+    rotation_degrees: float = 10.0
+    translate_fraction: float = 0.10
+    scale_min: float = 0.90
+    scale_max: float = 1.10
+    brightness_delta: float = 0.10
+    contrast_delta: float = 0.20
+    pca_components: int = 128
+    pca_mask_probability: float = 0.3
+    pca_activation_path: str | None = None
+    evaluation_draws: int = 1
+
+
+@dataclass(frozen=True)
 class StrategyConfig:
     """Distillation strategy settings."""
 
     name: StrategyName = "baseline"
     perturbation: PerturbationConfig = field(default_factory=PerturbationConfig)
+    feature_denoising: FeatureDenoisingConfig = field(default_factory=FeatureDenoisingConfig)
 
 
 @dataclass(frozen=True)
@@ -193,6 +240,7 @@ class OptimizerByMethodConfig:
     cross_entropy: OptimizerConfig = field(default_factory=OptimizerConfig)
     mse_logits: OptimizerConfig = field(default_factory=OptimizerConfig)
     kl_divergence: OptimizerConfig = field(default_factory=OptimizerConfig)
+    pca_masked_reconstruction: OptimizerConfig = field(default_factory=OptimizerConfig)
 
     def for_method(self, method: DistillationMethod) -> OptimizerConfig:
         """Return the optimizer settings for one distillation method."""
@@ -403,8 +451,8 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     if "hidden_channels" in student_raw:
         student_raw["hidden_channels"] = tuple(student_raw["hidden_channels"])
     student = _parse_student_config(student_raw, strategy=strategy)
-    if strategy.name == "perturbation" and student.feature_layer is None:
-        raise ValueError("student.feature_layer is required for perturbation strategy")
+    if strategy.name in {"perturbation", "feature_denoising"} and student.feature_layer is None:
+        raise ValueError("student.feature_layer is required for perturbation and Feature Denoising strategies")
     if (
         strategy.name == "perturbation"
         and strategy.perturbation.method == "pixel_augmentation"
@@ -414,7 +462,7 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     optimizer = _parse_optimizer_config(raw.get("optimizer", {}))
     training = _parse_training_config(
         raw.get("training", {}),
-        require_methods=student.kind != "random_forest",
+        require_methods=student.kind != "random_forest" and strategy.name != "feature_denoising",
     )
     tree = _parse_tree_config(raw.get("tree", {}))
     mlflow = MlflowConfig(**raw.get("mlflow", {}))
@@ -441,6 +489,9 @@ def _parse_dataset_config(raw: dict[str, Any]) -> DatasetConfig:
         dataset_raw["ood_datasets"] = tuple(
             OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
         )
+    if "normalization" in dataset_raw and dataset_raw["normalization"] is not None:
+        mean, std = dataset_raw["normalization"]
+        dataset_raw["normalization"] = (tuple(mean), tuple(std))
     data_dir_override = get_data_dir_override()
     if data_dir_override:
         dataset_raw["data_dir"] = data_dir_override
@@ -451,7 +502,13 @@ def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> Stud
     """Parse neural-network student settings."""
 
     student = StudentConfig(**raw)
-    if student.kind not in {"linear", "mlp", "random_forest"}:
+    if student.kind not in {
+        "linear",
+        "mlp",
+        "random_forest",
+        "feature_reconstructor",
+        "spatial_token_predictor",
+    }:
         raise ValueError(f"Unsupported student kind: {student.kind}")
     if not student.input_shape:
         raise ValueError("student.input_shape must contain at least one dimension")
@@ -478,20 +535,24 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
 
     strategy_raw = raw.copy()
     perturbation_raw = strategy_raw.pop("perturbation", {})
+    feature_denoising_raw = strategy_raw.pop("feature_denoising", {})
+    strategy_name = strategy_raw.pop("name", "baseline")
     if (
         perturbation_raw.get("method") == "pixel_augmentation"
         and "teacher_target" not in perturbation_raw
     ):
         perturbation_raw["teacher_target"] = "perturbed"
     perturbation = PerturbationConfig(**perturbation_raw)
+    feature_denoising = FeatureDenoisingConfig(**feature_denoising_raw)
     strategy = StrategyConfig(
-        name=strategy_raw.pop("name", "baseline"),
+        name=strategy_name,
         perturbation=perturbation,
+        feature_denoising=feature_denoising,
     )
     if strategy_raw:
         unknown = ", ".join(sorted(strategy_raw))
         raise ValueError(f"Unsupported strategy config fields: {unknown}")
-    if strategy.name not in {"baseline", "perturbation"}:
+    if strategy.name not in {"baseline", "perturbation", "feature_denoising"}:
         raise ValueError(f"Unsupported strategy: {strategy.name}")
     if perturbation.method not in {
         "clipping",
@@ -541,6 +602,71 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(
             "strategy.perturbation.contrast_delta requires 0 <= delta <= 1"
         )
+    if feature_denoising.method not in {
+        "pca_masked_reconstruction",
+        "spatial_masked_reconstruction",
+        "channel_masked_reconstruction",
+        "spatial_token_prediction",
+        "pixel_masked_embedding_prediction",
+        "pixel_augmented_embedding_prediction",
+        "pixel_masked_multilayer_prediction",
+        "pixel_masked_multilayer_l234_prediction",
+    }:
+        raise ValueError(f"Unsupported Feature Denoising method: {feature_denoising.method}")
+    if not 0.0 < feature_denoising.mask_probability < 1.0:
+        raise ValueError("strategy.feature_denoising.mask_probability requires 0 < p < 1")
+    if feature_denoising.target_block_count <= 0:
+        raise ValueError("strategy.feature_denoising.target_block_count must be positive")
+    if not 0.0 < feature_denoising.target_block_scale_min <= feature_denoising.target_block_scale_max <= 1.0:
+        raise ValueError(
+            "strategy.feature_denoising target block scale requires 0 < min <= max <= 1"
+        )
+    if (
+        feature_denoising.target_aspect_ratio_min <= 0.0
+        or feature_denoising.target_aspect_ratio_min > feature_denoising.target_aspect_ratio_max
+    ):
+        raise ValueError(
+            "strategy.feature_denoising target aspect ratio requires 0 < min <= max"
+        )
+    if not 0.0 < feature_denoising.context_scale_min <= feature_denoising.context_scale_max <= 1.0:
+        raise ValueError(
+            "strategy.feature_denoising context scale requires 0 < min <= max <= 1"
+        )
+    if feature_denoising.target_token_count < 0:
+        raise ValueError("strategy.feature_denoising.target_token_count must be non-negative")
+    if feature_denoising.image_mask_block_count <= 0:
+        raise ValueError("strategy.feature_denoising.image_mask_block_count must be positive")
+    if not 0.0 < feature_denoising.image_mask_scale_min <= feature_denoising.image_mask_scale_max <= 1.0:
+        raise ValueError(
+            "strategy.feature_denoising image mask scale requires 0 < min <= max <= 1"
+        )
+    if (
+        feature_denoising.image_mask_aspect_ratio_min <= 0.0
+        or feature_denoising.image_mask_aspect_ratio_min > feature_denoising.image_mask_aspect_ratio_max
+    ):
+        raise ValueError(
+            "strategy.feature_denoising image mask aspect ratio requires 0 < min <= max"
+        )
+    if feature_denoising.embedding_pool not in {"avg", "cls"}:
+        raise ValueError("strategy.feature_denoising.embedding_pool must be 'avg' or 'cls'")
+    if feature_denoising.rotation_degrees < 0.0:
+        raise ValueError("strategy.feature_denoising.rotation_degrees must be non-negative")
+    if not 0.0 <= feature_denoising.translate_fraction <= 1.0:
+        raise ValueError(
+            "strategy.feature_denoising.translate_fraction requires 0 <= fraction <= 1"
+        )
+    if feature_denoising.scale_min <= 0.0 or feature_denoising.scale_min > feature_denoising.scale_max:
+        raise ValueError("strategy.feature_denoising requires 0 < scale_min <= scale_max")
+    if not 0.0 <= feature_denoising.brightness_delta <= 1.0:
+        raise ValueError("strategy.feature_denoising.brightness_delta requires 0 <= delta <= 1")
+    if not 0.0 <= feature_denoising.contrast_delta <= 1.0:
+        raise ValueError("strategy.feature_denoising.contrast_delta requires 0 <= delta <= 1")
+    if feature_denoising.pca_components <= 0:
+        raise ValueError("strategy.feature_denoising.pca_components must be positive")
+    if not 0.0 < feature_denoising.pca_mask_probability < 1.0:
+        raise ValueError("strategy.feature_denoising.pca_mask_probability requires 0 < p < 1")
+    if feature_denoising.evaluation_draws <= 0:
+        raise ValueError("strategy.feature_denoising.evaluation_draws must be positive")
     return strategy
 
 
@@ -609,7 +735,7 @@ def _parse_tree_method_config(
 def _parse_optimizer_config(raw: dict[str, Any]) -> OptimizerByMethodConfig:
     """Parse optimizer settings from a shared or per-method config block."""
 
-    method_names = DISTILLATION_METHODS
+    method_names = (*DISTILLATION_METHODS, "pca_masked_reconstruction")
     optimizer_raw = {
         _normalize_method_name(name) if name in LEGACY_METHOD_ALIASES else name: value
         for name, value in raw.copy().items()

@@ -137,7 +137,7 @@ def _ood_dataset(
         name=ood_config.name,
         root=Path(dataset_config.data_dir),
         split=ood_config.split,
-        transform=_inference_transform(dataset_config.name),
+        transform=_dataset_transform(dataset_config),
     )
 
 
@@ -178,7 +178,7 @@ def _id_dataset(config: DatasetConfig, split: str) -> Dataset[tuple[torch.Tensor
         name=config.name,
         root=Path(config.data_dir),
         split=split,
-        transform=_inference_transform(config.name),
+        transform=_dataset_transform(config),
     )
 
 
@@ -223,12 +223,30 @@ def _inference_transform(id_name: str) -> Compose:
     )
 
 
+def _dataset_transform(config: DatasetConfig) -> Compose:
+    preprocessing = _id_preprocessing(config.name)
+    mean, std = dataset_normalization(config)
+    return Compose(
+        [
+            Lambda(lambda image: image.convert("RGB")),
+            Resize(config.pre_size or preprocessing["pre_size"]),
+            CenterCrop(config.image_size or preprocessing["image_size"]),
+            ToTensor(),
+            Normalize(mean, std),
+        ]
+    )
+
+
 def dataset_normalization(
-    name: str,
+    dataset: str | DatasetConfig,
 ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
     """Return RGB normalization constants for an in-distribution dataset."""
 
-    return _id_preprocessing(name)["normalization"]
+    if isinstance(dataset, DatasetConfig):
+        if dataset.normalization is not None:
+            return dataset.normalization
+        return _id_preprocessing(dataset.name)["normalization"]
+    return _id_preprocessing(dataset)["normalization"]
 
 
 def _id_preprocessing(name: str) -> IDPreprocessingConfig:

@@ -39,6 +39,7 @@ class PcaProjector:
 
     mean: torch.Tensor
     components: torch.Tensor
+    component_stds: torch.Tensor | None = None
 
     def to(self, device: torch.device) -> PcaProjector:
         """Move PCA tensors to a device."""
@@ -46,6 +47,11 @@ class PcaProjector:
         return PcaProjector(
             mean=self.mean.to(device),
             components=self.components.to(device),
+            component_stds=(
+                self.component_stds.to(device)
+                if self.component_stds is not None
+                else None
+            ),
         )
 
     def transform(self, features: torch.Tensor) -> torch.Tensor:
@@ -54,6 +60,15 @@ class PcaProjector:
         flat_features = torch.flatten(features, start_dim=1)
         mean, components = self._aligned_tensors(features)
         return (flat_features - mean) @ components.T
+
+    def whitened_transform(self, features: torch.Tensor, eps: float = 1.0e-6) -> torch.Tensor:
+        """Project features and scale PCA coordinates to ID unit variance."""
+
+        projected = self.transform(features)
+        if self.component_stds is None:
+            raise ValueError("PCA projector is missing component_stds for whitening")
+        stds = self.component_stds.to(device=projected.device, dtype=projected.dtype)
+        return projected / stds.clamp_min(eps)
 
     def projection_matrix(self, reference: torch.Tensor) -> torch.Tensor:
         """Return PCA eigenvectors as ``Q`` with shape ``(original_dim, pca_dim)``."""
@@ -447,9 +462,12 @@ def fit_pca_projector_from_activations(
         )
     mean = values.mean(dim=0)
     components = _fit_truncated_pca_components(values, n_components)
+    projected = (values - mean) @ components.T
+    component_stds = projected.std(dim=0, unbiased=False)
     return PcaProjector(
         mean=mean,
         components=components,
+        component_stds=component_stds,
     )
 
 
@@ -462,6 +480,11 @@ def save_pca_projector(path: Path, projector: PcaProjector, metadata: dict[str, 
             **metadata,
             "mean": projector.mean.cpu(),
             "components": projector.components.cpu(),
+            "component_stds": (
+                projector.component_stds.cpu()
+                if projector.component_stds is not None
+                else None
+            ),
         },
         path,
     )
@@ -473,9 +496,18 @@ def load_pca_projector(path: Path, device: torch.device | None = None) -> PcaPro
     artifact = torch.load(path, map_location="cpu", weights_only=False)
     mean = artifact.get("mean")
     components = artifact.get("components")
+    component_stds = artifact.get("component_stds")
     if not torch.is_tensor(mean) or not torch.is_tensor(components):
         raise ValueError(f"PCA projector artifact is missing tensors: {path}")
-    projector = PcaProjector(mean=mean.float(), components=components.float())
+    projector = PcaProjector(
+        mean=mean.float(),
+        components=components.float(),
+        component_stds=(
+            component_stds.float()
+            if torch.is_tensor(component_stds)
+            else None
+        ),
+    )
     if device is not None:
         projector = projector.to(device)
     return projector

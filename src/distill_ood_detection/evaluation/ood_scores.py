@@ -16,6 +16,16 @@ ENERGY_GAP = "energy_gap"
 ABSOLUTE_ENERGY_GAP = "absolute_energy_gap"
 STUDENT_MSP = "student_msp"
 STUDENT_ENERGY = "student_energy"
+FEATURE_DENOISING_PCA_RECONSTRUCTION_ERROR = "feature_denoising_pca_reconstruction_error"
+FEATURE_DENOISING_SPATIAL_RECONSTRUCTION_ERROR = "feature_denoising_spatial_reconstruction_error"
+FEATURE_DENOISING_CHANNEL_RECONSTRUCTION_ERROR = "feature_denoising_channel_reconstruction_error"
+FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_ERROR = "feature_denoising_spatial_token_prediction_error"
+FEATURE_DENOISING_PIXEL_EMBEDDING_PREDICTION_ERROR = "feature_denoising_pixel_embedding_prediction_error"
+FEATURE_DENOISING_PIXEL_AUGMENTED_EMBEDDING_PREDICTION_ERROR = (
+    "feature_denoising_pixel_augmented_embedding_prediction_error"
+)
+FEATURE_DENOISING_PIXEL_MULTILAYER_PREDICTION_ERROR = "feature_denoising_pixel_multilayer_prediction_error"
+FEATURE_DENOISING_PIXEL_MULTILAYER_L234_PREDICTION_ERROR = "feature_denoising_pixel_multilayer_l234_prediction_error"
 
 # Signs convert raw scores to the repository convention used by OOD metrics:
 # ID is the positive class, so larger signed scores are more ID-like.
@@ -29,6 +39,14 @@ SIGNS: Mapping[str, int] = {
     ABSOLUTE_ENERGY_GAP: -1,
     STUDENT_MSP: +1,
     STUDENT_ENERGY: +1,
+    FEATURE_DENOISING_PCA_RECONSTRUCTION_ERROR: -1,
+    FEATURE_DENOISING_SPATIAL_RECONSTRUCTION_ERROR: -1,
+    FEATURE_DENOISING_CHANNEL_RECONSTRUCTION_ERROR: -1,
+    FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_ERROR: -1,
+    FEATURE_DENOISING_PIXEL_EMBEDDING_PREDICTION_ERROR: -1,
+    FEATURE_DENOISING_PIXEL_AUGMENTED_EMBEDDING_PREDICTION_ERROR: -1,
+    FEATURE_DENOISING_PIXEL_MULTILAYER_PREDICTION_ERROR: -1,
+    FEATURE_DENOISING_PIXEL_MULTILAYER_L234_PREDICTION_ERROR: -1,
 }
 
 

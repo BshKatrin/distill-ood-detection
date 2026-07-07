@@ -1,0 +1,29 @@
+# Feature Denoising Methods
+
+Feature Denoising methods train students to predict clean teacher representations
+from partial or corrupted teacher representations. These methods are separate
+from logits and probability distillation objectives.
+
+## Methods
+
+| Method | Configuration value | Student input | Target |
+| --- | --- | --- | --- |
+| [PCA Masked Reconstruction](pca_masking.md) | `pca_masked_reconstruction` | Masked whitened PCA embedding | Clean whitened PCA embedding |
+| [Feature Masked Reconstruction](feature_masking.md) | `spatial_masked_reconstruction` | Spatially masked raw feature map | Clean raw feature map |
+| [Feature Masked Reconstruction](feature_masking.md) | `channel_masked_reconstruction` | Channel-masked raw feature map | Clean raw feature map |
+| [Spatial Token Prediction](spatial_token_prediction.md) | `spatial_token_prediction` | Visible raw feature tokens and target positions | Target raw feature tokens |
+| [Pixel-Masked Embedding Prediction](pixel_masked_embedding.md) | `pixel_masked_embedding_prediction` | Pooled embedding from pixel-masked image | Pooled embedding from clean image |
+| [Pixel-Augmented Embedding Prediction](pixel_augmented_embedding.md) | `pixel_augmented_embedding_prediction` | Pooled embedding from pixel-augmented image | Pooled embedding from clean image |
+| Pixel-Masked Multilayer Prediction | `pixel_masked_multilayer_prediction` | Pooled layer3 + layer4 from pixel-masked image | Clean pooled layer3 + layer4 + logits |
+| Pixel-Masked Multilayer L234 Prediction | `pixel_masked_multilayer_l234_prediction` | Pooled layer2 + layer3 + layer4 from pixel-masked image | Clean pooled layer2 + layer3 + layer4 + logits |
+
+PCA Masked Reconstruction is the v1 method. Spatial and channel masked
+feature reconstruction are v2 methods. Spatial Token Prediction is the v3 method
+that avoids passing hidden feature values to the student. Pixel-Masked Embedding
+Prediction tests whether corrupted image views can predict clean teacher
+embeddings.
+
+## Implementation
+
+Feature Denoising training is implemented by `distill-ood train-student`.
+Reconstruction-score export is implemented by `distill-ood export-feature-denoising-scores`.

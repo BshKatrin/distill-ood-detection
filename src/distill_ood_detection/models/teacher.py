@@ -84,6 +84,25 @@ class TeacherFeatureExtractor(nn.Module):
         self._features = output
 
 
+class HuggingFaceImageClassifier(nn.Module):
+    """Thin wrapper returning logits from a Hugging Face image classifier."""
+
+    def __init__(self, model: nn.Module) -> None:
+        super().__init__()
+        self.model = model
+
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        """Return classifier logits."""
+
+        outputs = self.model(images)
+        return outputs.logits
+
+    def forward_with_hidden_states(self, images: torch.Tensor) -> object:
+        """Return Hugging Face outputs including hidden states."""
+
+        return self.model(images, output_hidden_states=True)
+
+
 class ResNetFeatureForwarder(nn.Module):
     """Run a ResNet teacher to and from a named residual feature layer."""
 
@@ -143,12 +162,59 @@ class ResNetFeatureForwarder(nn.Module):
         return self.teacher.fc(x)
 
 
+class VitClsFeatureForwarder(nn.Module):
+    """Return CLS-token features from a configured ViT hidden layer."""
+
+    def __init__(self, teacher: HuggingFaceImageClassifier, feature_layer: str) -> None:
+        super().__init__()
+        layer_index = _vit_layer_index(feature_layer)
+        if layer_index < 1:
+            raise ValueError("ViT feature_layer must refer to encoder layer 1 or later")
+        self.teacher = teacher
+        self.feature_layer = feature_layer
+        self.layer_index = layer_index
+
+    def forward(self, images: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return ``(teacher_logits, cls_features)`` for the configured layer."""
+
+        outputs = self.teacher.forward_with_hidden_states(images)
+        return outputs.logits, self._cls_from_outputs(outputs)
+
+    def forward_to_features(self, images: torch.Tensor) -> torch.Tensor:
+        """Return CLS-token activations at the configured hidden layer."""
+
+        outputs = self.teacher.forward_with_hidden_states(images)
+        return self._cls_from_outputs(outputs)
+
+    def _cls_from_outputs(self, outputs: object) -> torch.Tensor:
+        hidden_states = getattr(outputs, "hidden_states", None)
+        if hidden_states is None:
+            raise RuntimeError("ViT teacher did not return hidden states")
+        if self.layer_index >= len(hidden_states):
+            max_layer = len(hidden_states) - 1
+            raise ValueError(
+                f"ViT feature_layer {self.feature_layer!r} is out of range; "
+                f"maximum encoder layer is layer{max_layer}"
+            )
+        return hidden_states[self.layer_index][:, 0, :]
+
+
+def build_feature_forwarder(teacher: nn.Module, feature_layer: str) -> nn.Module:
+    """Create a feature forwarder matching the teacher architecture."""
+
+    if isinstance(teacher, HuggingFaceImageClassifier):
+        return VitClsFeatureForwarder(teacher, feature_layer)
+    return ResNetFeatureForwarder(teacher, feature_layer)
+
+
 def load_teacher(config: TeacherConfig, device: torch.device) -> nn.Module:
     """Load a pretrained CIFAR teacher from Hugging Face."""
 
     model = build_teacher_model(config)
-    state_dict = _download_state_dict(config)
-    model.load_state_dict(state_dict)
+    architecture = _infer_architecture_from_hf_model_id(config.hf_model_id)
+    if architecture in {"resnet18", "resnet50"}:
+        state_dict = _download_state_dict(config)
+        model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
     for parameter in model.parameters():
@@ -164,6 +230,20 @@ def build_teacher_model(config: TeacherConfig) -> nn.Module:
         return CifarResNet18(num_classes=config.num_classes)
     if architecture == "resnet50":
         return CifarResNet50(num_classes=config.num_classes)
+    if architecture == "vit":
+        try:
+            from transformers import AutoModelForImageClassification
+        except ImportError as error:
+            raise ImportError(
+                "ViT teachers require the 'transformers' package in the active uv env"
+            ) from error
+        token = get_hf_token()
+        model = AutoModelForImageClassification.from_pretrained(
+            config.hf_model_id,
+            revision=config.revision,
+            token=token,
+        )
+        return HuggingFaceImageClassifier(model)
     raise AssertionError(f"Unsupported inferred architecture: {architecture}")
 
 
@@ -195,9 +275,25 @@ def _infer_architecture_from_hf_model_id(hf_model_id: str) -> str:
         return "resnet18"
     if "resnet50" in model_id:
         return "resnet50"
+    if "vit" in model_id or "patch16" in model_id:
+        return "vit"
     msg = (
         "Could not infer teacher architecture from hf_model_id. "
-        "Expected a model id containing 'resnet18' or 'resnet50', got "
+        "Expected a model id containing 'resnet18', 'resnet50', or 'vit', got "
         f"{hf_model_id!r}."
     )
     raise ValueError(msg)
+
+
+def _vit_layer_index(feature_layer: str) -> int:
+    if not feature_layer.startswith("layer"):
+        raise ValueError(
+            f"ViT feature_layer must use names like 'layer3'; got {feature_layer!r}"
+        )
+    raw_index = feature_layer.removeprefix("layer")
+    try:
+        return int(raw_index)
+    except ValueError as error:
+        raise ValueError(
+            f"ViT feature_layer must use names like 'layer3'; got {feature_layer!r}"
+        ) from error

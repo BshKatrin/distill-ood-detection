@@ -57,6 +57,37 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
 - Student energy : Student-only energy. Defined as `T * logsumexp(logits / T)` (similar to teacher's baseline energy OOD score)
   - `sign: +1`
 
+- Feature Denoising PCA reconstruction error: Hidden-component reconstruction error in
+  whitened PCA space from PCA Masked Reconstruction. The raw error increases
+  when a sample is less predictable from ID teacher-feature structure, so it is
+  negated before computing OOD metrics.
+  - `sign: -1`
+
+- Feature Denoising spatial reconstruction error: Hidden-location reconstruction error in
+  raw teacher feature-map space from spatial Feature Masked Reconstruction.
+  - `sign: -1`
+
+- Feature Denoising channel reconstruction error: Hidden-channel reconstruction error in
+  raw teacher feature-map space from channel Feature Masked Reconstruction.
+  - `sign: -1`
+
+- Feature Denoising spatial token prediction error: Target-token prediction error in raw
+  teacher feature-map space from Spatial Token Prediction.
+  - `sign: -1`
+
+- Feature Denoising pixel embedding prediction error: Clean pooled teacher-embedding
+  prediction error from Pixel-Masked Embedding Prediction.
+  - `sign: -1`
+
+- Feature Denoising pixel multilayer prediction error: Clean pooled layer3, pooled layer4,
+  and centered-logit prediction error from Pixel-Masked Multilayer Prediction.
+  - `sign: -1`
+
+- Feature Denoising pixel multilayer L234 prediction error: Clean pooled layer2, layer3,
+  layer4, and centered-logit prediction error from Pixel-Masked Multilayer L234
+  Prediction.
+  - `sign: -1`
+
 ## Implementation
 
 - OOD Score functions are implemented in [ood_scores.py](../../src/distill_ood_detection/evaluation/ood_scores.py).

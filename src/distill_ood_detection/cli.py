@@ -100,6 +100,31 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("configs/teachers/cifar_10/resnet50.yaml"),
         help="Path to a YAML teacher probability export config.",
     )
+    feature_denoising_scores_parser = subparsers.add_parser(
+        "export-feature-denoising-scores",
+    )
+    feature_denoising_scores_parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/students/feature_denoising/pca_masking/cifar_10/resnet18/linear_layer4_pca9_mask_p030.yaml"),
+        help="Path to a YAML Feature Denoising experiment config.",
+    )
+    feature_denoising_scores_parser.add_argument(
+        "--checkpoint",
+        choices=("best", "latest"),
+        default="best",
+        help="Student checkpoint to use. Defaults to best.",
+    )
+    feature_denoising_scores_parser.add_argument(
+        "--include-train",
+        action="store_true",
+        help="Also export the deterministic ID training split.",
+    )
+    feature_denoising_scores_parser.add_argument(
+        "--include-validation",
+        action="store_true",
+        help="Also export the deterministic ID validation split.",
+    )
     return parser
 
 
@@ -147,6 +172,18 @@ def main() -> None:
 
         config = load_teacher_probability_config(args.config)
         run_teacher_probability_export(config)
+    if args.command == "export-feature-denoising-scores":
+        from distill_ood_detection.experiments.export_feature_denoising_scores import (
+            run_feature_denoising_score_export,
+        )
+
+        config = load_config(args.config)
+        run_feature_denoising_score_export(
+            config,
+            checkpoint=args.checkpoint,
+            include_train=args.include_train,
+            include_validation=args.include_validation,
+        )
 
 
 if __name__ == "__main__":

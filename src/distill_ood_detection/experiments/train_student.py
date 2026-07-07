@@ -16,11 +16,15 @@ from distill_ood_detection.distillation.perturbation import (
     pca_projector_path,
     save_pca_projector,
 )
+from distill_ood_detection.distillation.feature_denoising import (
+    reconstruction_loss,
+    train_feature_denoising_student,
+)
 from distill_ood_detection.evaluation.metrics import accuracy, distillation_metrics
 from distill_ood_detection.models.student import build_student
 from distill_ood_detection.models.teacher import (
-    ResNetFeatureForwarder,
     TeacherFeatureExtractor,
+    build_feature_forwarder,
     load_teacher,
 )
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
@@ -44,22 +48,37 @@ def run_experiment(
         mlflow.set_experiment(config.mlflow.experiment_name)
 
     loaders = build_id_loaders(config.dataset, seed=training_defaults.seed)
-    image_normalization = dataset_normalization(config.dataset.name)
+    image_normalization = dataset_normalization(config.dataset)
     teacher = load_teacher(config.teacher, device)
     pca_projector = None
     if (
-        config.strategy.name == "perturbation"
-        and config.strategy.perturbation.method
-        in {"pca_projection", "pca_masked_projection"}
+        (
+            config.strategy.name == "perturbation"
+            and config.strategy.perturbation.method
+            in {"pca_projection", "pca_masked_projection"}
+        )
+        or (
+            config.strategy.name == "feature_denoising"
+            and config.strategy.feature_denoising.method == "pca_masked_reconstruction"
+        )
     ):
-        activation_path = config.strategy.perturbation.pca_activation_path
+        activation_path = (
+            config.strategy.feature_denoising.pca_activation_path
+            if config.strategy.name == "feature_denoising"
+            else config.strategy.perturbation.pca_activation_path
+        )
         if activation_path is None:
             raise ValueError(
-                "strategy.perturbation.pca_activation_path is required for PCA projection"
+                "pca_activation_path is required for PCA-based training"
             )
+        pca_components = (
+            config.strategy.feature_denoising.pca_components
+            if config.strategy.name == "feature_denoising"
+            else config.strategy.perturbation.pca_components
+        )
         pca_projector = fit_pca_projector_from_activations(
             Path(activation_path),
-            config.strategy.perturbation.pca_components,
+            pca_components,
             expected_dataset=f"{config.dataset.name}_train",
         ).to(device)
         save_pca_projector(
@@ -67,14 +86,19 @@ def run_experiment(
             pca_projector,
             {
                 "activation_path": activation_path,
-                "pca_components": config.strategy.perturbation.pca_components,
-                "pca_mask_probability": config.strategy.perturbation.pca_mask_probability,
+                "pca_components": pca_components,
+                "pca_mask_probability": (
+                    config.strategy.feature_denoising.pca_mask_probability
+                    if config.strategy.name == "feature_denoising"
+                    else config.strategy.perturbation.pca_mask_probability
+                ),
                 "feature_layer": config.student.feature_layer,
+                "strategy": config.strategy.name,
             },
         )
     perturbation_forwarder = (
-        ResNetFeatureForwarder(teacher, config.student.feature_layer)
-        if config.strategy.name == "perturbation"
+        build_feature_forwarder(teacher, config.student.feature_layer)
+        if config.strategy.name in {"perturbation", "feature_denoising"}
         else None
     )
     feature_extractor = (
@@ -99,6 +123,57 @@ def run_experiment(
                 }
             )
             mlflow.log_artifact(str(experiment_dir / "resolved_config.json"))
+
+        if config.strategy.name == "feature_denoising":
+            if perturbation_forwarder is None:
+                raise ValueError("Feature Denoising training requires a feature forwarder")
+            method_training_config = config.training.for_method("mse_logits")
+            student = build_student(config.student)
+            output_dir = experiment_dir / config.strategy.feature_denoising.method
+            with _mlflow_method_run(config, config.strategy.feature_denoising.method):
+                if config.mlflow.enabled:
+                    mlflow.log_param("distillation_method", config.strategy.feature_denoising.method)
+                    mlflow.log_param("distillation_strategy", config.strategy.name)
+                summary = train_feature_denoising_student(
+                    student=student,
+                    train_loader=loaders.train,
+                    validation_loader=loaders.validation,
+                    device=device,
+                    optimizer_config=config.optimizer.pca_masked_reconstruction,
+                    training_config=method_training_config,
+                    output_dir=output_dir,
+                    mlflow_enabled=config.mlflow.enabled,
+                    perturbation_forwarder=perturbation_forwarder,
+                    feature_denoising_config=config.strategy.feature_denoising,
+                    pca_projector=pca_projector,
+                    image_normalization=image_normalization,
+                )
+                best_checkpoint_path = Path(str(summary["best_checkpoint_path"]))
+                student.load_state_dict(
+                    torch.load(
+                        best_checkpoint_path,
+                        map_location=device,
+                        weights_only=True,
+                    )
+                )
+                test_reconstruction_loss = reconstruction_loss(
+                    student=student,
+                    loader=loaders.test,
+                    device=device,
+                    perturbation_forwarder=perturbation_forwarder,
+                    feature_denoising_config=config.strategy.feature_denoising,
+                    pca_projector=pca_projector,
+                    image_normalization=image_normalization,
+                )
+                summary["test_reconstruction_loss"] = test_reconstruction_loss
+                write_json(output_dir / "metrics.json", summary)
+                if config.mlflow.enabled:
+                    mlflow.log_metric("test_reconstruction_loss", test_reconstruction_loss)
+                    mlflow.log_artifact(str(output_dir / "metrics.json"))
+                    mlflow.log_artifact(str(output_dir / "history.json"))
+                summaries.append(summary)
+            write_json(experiment_dir / "summary.json", {"methods": summaries})
+            return summaries
 
         for current_method in methods:
             method_training_config = config.training.for_method(current_method)

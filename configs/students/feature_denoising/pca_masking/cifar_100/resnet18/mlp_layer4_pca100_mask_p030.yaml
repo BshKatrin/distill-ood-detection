@@ -1,0 +1,57 @@
+experiment_name: feature_denoising_mlp_layer4_student_resnet18_cifar100_pca100_mask_p030
+run_dir: runs/students/feature_denoising/pca_masking/cifar_100/resnet18/mlp_layer4_pca100_mask_p030
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar10
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar100
+  revision: main
+  num_classes: 100
+
+student:
+  kind: mlp
+  feature_layer: layer4
+  input_shape: [100]
+  hidden_channels: [256, 256]
+  num_classes: 100
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: pca_masked_reconstruction
+    pca_components: 100
+    pca_mask_probability: 0.3
+    pca_activation_path: runs/teachers/cifar_100/resnet18/teacher_activations/cifar100_train/layer4.pt
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: true
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db

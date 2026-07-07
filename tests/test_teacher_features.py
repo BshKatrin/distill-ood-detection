@@ -10,8 +10,10 @@ from torch import nn
 from distill_ood_detection.models.teacher import (
     CifarResNet18,
     CifarResNet50,
+    HuggingFaceImageClassifier,
     ResNetFeatureForwarder,
     TeacherFeatureExtractor,
+    VitClsFeatureForwarder,
     _infer_architecture_from_hf_model_id,
 )
 
@@ -31,6 +33,39 @@ class ToyTeacher(nn.Module):
         features = self.features(images)
         pooled = torch.flatten(self.pool(features), start_dim=1)
         return self.classifier(pooled)
+
+
+class ToyHuggingFaceOutputs:
+    """Minimal Hugging Face-style output container for tests."""
+
+    def __init__(
+        self,
+        logits: torch.Tensor,
+        hidden_states: tuple[torch.Tensor, ...],
+    ) -> None:
+        self.logits = logits
+        self.hidden_states = hidden_states
+
+
+class ToyVitTeacher(nn.Module):
+    """Small model that mimics ViT hidden-state outputs."""
+
+    def forward(
+        self,
+        images: torch.Tensor,
+        output_hidden_states: bool = False,
+    ) -> ToyHuggingFaceOutputs:
+        """Return logits and optional hidden states."""
+
+        batch_size = images.shape[0]
+        logits = torch.zeros(batch_size, 3)
+        hidden_states = tuple(
+            torch.full((batch_size, 5, 7), fill_value=float(layer))
+            for layer in range(13)
+        )
+        if not output_hidden_states:
+            hidden_states = ()
+        return ToyHuggingFaceOutputs(logits=logits, hidden_states=hidden_states)
 
 
 class TeacherFeatureExtractorTests(unittest.TestCase):
@@ -84,6 +119,17 @@ class TeacherFeatureExtractorTests(unittest.TestCase):
         self.assertEqual(tuple(features.shape), (2, 2048, 4, 4))
         torch.testing.assert_close(resumed_logits, full_logits)
 
+    def test_vit_forwarder_extracts_cls_token_from_layer(self) -> None:
+        teacher = HuggingFaceImageClassifier(ToyVitTeacher())
+        forwarder = VitClsFeatureForwarder(teacher, "layer6")
+        images = torch.randn(2, 3, 224, 224)
+
+        logits, features = forwarder(images)
+
+        self.assertEqual(tuple(logits.shape), (2, 3))
+        self.assertEqual(tuple(features.shape), (2, 7))
+        torch.testing.assert_close(features, torch.full((2, 7), 6.0))
+
     def test_infers_architecture_from_hf_model_id(self) -> None:
         self.assertEqual(
             _infer_architecture_from_hf_model_id("edadaltocg/resnet18_cifar10"),
@@ -92,6 +138,10 @@ class TeacherFeatureExtractorTests(unittest.TestCase):
         self.assertEqual(
             _infer_architecture_from_hf_model_id("edadaltocg/resnet50_cifar100"),
             "resnet50",
+        )
+        self.assertEqual(
+            _infer_architecture_from_hf_model_id("nateraw/vit-base-patch16-224-cifar10"),
+            "vit",
         )
 
     def test_rejects_unknown_teacher_architecture(self) -> None:

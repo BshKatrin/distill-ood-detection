@@ -22,16 +22,24 @@ configs/
           <id_dataset>/
             <teacher_architecture>/
               <student_variant>.yaml
+    feature_denoising/
+      <feature_denoising_method>/
+        <id_dataset>/
+          <teacher_architecture>/
+            <student_variant>.yaml
 ```
 
 Current perturbation levels are `embedding` and the planned `pixel`. Embedding
 methods currently include `clipping`, `dropout`, and `pca`.
+Current Feature Denoising methods include `pca_masking`, `feature_masking`,
+`spatial_token_prediction`, and `pixel_masked_embedding`.
 
 Examples:
 
 - `configs/teachers/cifar_10/resnet18.yaml`
 - `configs/students/baseline/cifar_10/resnet18/linear.yaml`
 - `configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_channel.yaml`
+- `configs/students/feature_denoising/pca_masking/cifar_10/resnet18/linear_layer4_pca9_mask_p030.yaml`
 
 When adding a new strategy, perturbation level, or method, update the matching
 [strategy documentation](strategies/README.md).
@@ -93,3 +101,9 @@ teacher activation under `runs/teachers/`.
 Masked PCA configs set `student.input_shape` to the PCA component count plus
 the PCA component count because the student receives both the masked PCA
 projection and the binary PCA-component keep mask.
+Feature Denoising PCA masked-reconstruction configs set `student.input_shape` and
+`student.num_classes` to the PCA component count because the student receives
+only the masked PCA projection and reconstructs the clean PCA projection.
+Feature Denoising spatial token prediction configs set `student.input_shape` to the teacher
+feature-map shape. The student receives padded visible tokens plus spatial
+position indices, not a zero-masked dense feature map.

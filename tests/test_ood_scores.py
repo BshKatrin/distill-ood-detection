@@ -146,6 +146,14 @@ class OODScoreTests(unittest.TestCase):
                 "student_teacher_kl_divergence",
                 "student_msp",
                 "student_energy",
+                "feature_denoising_pca_reconstruction_error",
+                "feature_denoising_spatial_reconstruction_error",
+                "feature_denoising_channel_reconstruction_error",
+                "feature_denoising_spatial_token_prediction_error",
+                "feature_denoising_pixel_embedding_prediction_error",
+                "feature_denoising_pixel_augmented_embedding_prediction_error",
+                "feature_denoising_pixel_multilayer_prediction_error",
+                "feature_denoising_pixel_multilayer_l234_prediction_error",
             },
         )
 

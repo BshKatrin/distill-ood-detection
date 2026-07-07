@@ -1,0 +1,61 @@
+experiment_name: feature_denoising_pixel_augmented_embedding_mlp_layer4_student_resnet18_cifar10_strong
+run_dir: runs/students/feature_denoising/pixel_augmented_embedding/cifar_10/resnet18/mlp_layer4_aug_strong
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar100
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar10
+  revision: main
+  num_classes: 10
+
+student:
+  kind: mlp
+  feature_layer: layer4
+  input_shape: [512]
+  hidden_channels: [1024, 512]
+  num_classes: 512
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: pixel_augmented_embedding_prediction
+    rotation_degrees: 20.0
+    translate_fraction: 0.15
+    scale_min: 0.80
+    scale_max: 1.20
+    brightness_delta: 0.20
+    contrast_delta: 0.35
+    embedding_pool: avg
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: true
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db
