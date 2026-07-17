@@ -61,24 +61,24 @@ score, while `layer2` has the best macro FPR@95. `layer2` is again strongest on
 SVHN, with ROC-AUC `0.968` and FPR@95 `0.158`. Unlike the masked variant,
 `layer4` becomes useful for CIFAR-100, with ROC-AUC `0.832`.
 
-## Improvement Score
+## Relative Improvement Score
 
 Score:
 
 ```text
-improvement = identity_error - reconstruction_error
+relative_improvement = (identity_error - reconstruction_error) / max(identity_error, eps)
 ```
 
 | Layer | MNIST ROC-AUC / FPR@95 | SVHN ROC-AUC / FPR@95 | CIFAR-100 ROC-AUC / FPR@95 | Macro ROC-AUC / FPR@95 |
 |---|---:|---:|---:|---:|
-| layer1 | 0.999 / 0.000 | 0.905 / 0.316 | 0.511 / 0.925 | 0.805 / 0.414 |
-| layer2 | 0.999 / 0.000 | 0.847 / 0.422 | 0.554 / 0.897 | 0.800 / 0.440 |
-| layer3 | 0.998 / 0.000 | 0.921 / 0.349 | 0.779 / 0.805 | 0.899 / 0.384 |
-| layer4 | 0.934 / 0.410 | 0.867 / 0.774 | 0.762 / 0.736 | 0.854 / 0.640 |
+| layer1 | 0.999 / 0.000 | 0.965 / 0.184 | 0.594 / 0.885 | 0.853 / 0.356 |
+| layer2 | 0.999 / 0.000 | 0.951 / 0.222 | 0.616 / 0.856 | 0.855 / 0.359 |
+| layer3 | 0.999 / 0.000 | 0.925 / 0.326 | 0.746 / 0.816 | 0.890 / 0.381 |
+| layer4 | 0.954 / 0.231 | 0.885 / 0.621 | 0.819 / 0.774 | 0.886 / 0.542 |
 
-Takeaway: `layer3` is clearly best for the improvement score. It has the best
-macro ROC-AUC and macro FPR@95, and it is the best layer for CIFAR-100 under
-this score.
+Takeaway: `layer3` has the best macro ROC-AUC, while `layer1` has the best
+macro FPR@95 by a narrow margin. Higher layers remain stronger for near-OOD
+CIFAR-100.
 
 ## Component Summary
 
@@ -86,30 +86,33 @@ this score.
 |---|---:|---:|---|
 | `-raw_reconstruction_error` | layer1 | 0.802 / 0.683 | Best macro ROC-AUC for default score. |
 | `-raw_reconstruction_error` | layer2 | 0.752 / 0.643 | Best macro FPR@95 for default score. |
-| `improvement` | layer3 | 0.899 / 0.384 | Best overall score. |
+| `relative_improvement` | layer3 | 0.890 / 0.381 | Best macro ROC-AUC. |
+| `relative_improvement` | layer1 | 0.853 / 0.356 | Best macro FPR@95. |
 | `cosine_similarity` | layer4 | 0.819 / 0.822 | Best cosine score, still high FPR@95. |
 | `-identity_error` | layer4 | 0.498 / 0.965 | Identity alone is not useful. |
 
 ## Comparison With Pixel Masking
 
-- Pixel augmentation substantially improves the `improvement` score:
-  masked `layer3` macro ROC-AUC / FPR@95 was `0.765 / 0.873`; augmented
-  `layer3` is `0.899 / 0.384`.
+- Pixel augmentation makes the normalized student correction useful:
+  `layer3` relative improvement reaches macro ROC-AUC / FPR@95
+  `0.890 / 0.381`.
 - Pixel augmentation also improves CIFAR-100 for high layers:
   default `layer4` CIFAR-100 ROC-AUC / FPR@95 improves from `0.649 / 0.969`
   with masking to `0.832 / 0.793` with augmentation.
 - `layer2` remains strong for SVHN under raw reconstruction in both variants:
   masking gives `0.957 / 0.196`, augmentation gives `0.968 / 0.158`.
-- The best overall current single-layer Feature Denoising score is pixel augmentation with
-  `layer3` and the `improvement` score.
+- The best current single-layer Feature Denoising score for CIFAR-10 ID is
+  pixel augmentation with `layer3` and the relative improvement score by
+  macro ROC-AUC.
 
 ## Interpretation
 
 - Pixel augmentation is more promising than hard pixel masking for this
   Feature Denoising setup.
-- `improvement` is much stronger than raw reconstruction error for the
+- Relative improvement is much stronger than raw reconstruction error for the
   augmented variant, especially on MNIST and CIFAR-100.
-- `layer3` is the best single layer when identity correction is used.
+- `layer3` is the best single layer by macro ROC-AUC when identity correction
+  is normalized by the perturbation size.
 - `layer2` is still the best raw-reconstruction layer for SVHN.
 - `layer4` becomes useful for CIFAR-100 under augmentation, which suggests
   semantic high-level features benefit more from realistic image corruptions

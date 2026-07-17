@@ -164,3 +164,28 @@ The script maps these environment variables to exporter flags:
 - `OUTPUT_PATH`: `export_test_metrics_table.py --output`.
 - `OUTPUT_DIR`: `export_test_metrics_table.py --output-dir`.
 - `JSON_OUTPUT`: `export_test_metrics_table.py --json-output`.
+
+## Feature Denoising activation subspaces
+
+Submit the exact per-draw classifier-subspace analysis:
+
+```bash
+sbatch --exclude=daft \
+  slurm_scripts/export_feature_denoising_subspace_errors.sbatch \
+  <layer4-config>
+```
+
+The job is inference-only. It makes one clean teacher pass over ID training
+data to choose `k`, then writes compact distribution
+artifacts below `<run_dir>/feature_denoising_subspace_errors/`.
+
+## PixMix mixing set
+
+Before the first PixMix experiment, if the data is not already present, download and extract the official external mixing set through SLURM:
+
+```bash
+sbatch --exclude=daft slurm_scripts/prepare_pixmix_data.sbatch
+```
+
+The script respects `DISTILL_OOD_DATA_DIR` and installs the archive under
+`<data-dir>/pixmix/fractals_and_fvis/`.

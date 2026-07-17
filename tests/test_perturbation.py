@@ -8,23 +8,32 @@ import tempfile
 
 import torch
 
-from distill_ood_detection.config import PerturbationConfig, load_config
+from distill_ood_detection.config import (
+    ClippingLayerConfig,
+    PerturbationConfig,
+    load_config,
+)
 from distill_ood_detection.distillation.perturbation import (
     PcaProjector,
     _build_pca_masked_projection_batch,
     _clip_single_feature_map,
     apply_pixel_augmentation,
     build_pixel_student_inputs,
+    build_sequential_clipping_batch,
     build_unperturbed_pixel_params,
     build_unperturbed_perturbation_batch,
     fit_pca_projector_from_activations,
+    forward_clean_from_clipping_start,
+    forward_to_clipping_start,
     sample_pixel_augmentation,
     sample_pixel_augmentation_params,
     sample_clipping_perturbation,
     sample_mc_dropout_perturbation,
     sample_perturbation,
     teacher_target_features,
+    pool_pixel_features,
 )
+from distill_ood_detection.models.teacher import CifarResNet18
 
 
 class PerturbationTests(unittest.TestCase):
@@ -32,40 +41,79 @@ class PerturbationTests(unittest.TestCase):
 
     def test_perturbation_configs_match_student_input_shape(self) -> None:
         feature_shapes = {
+            ("resnet18", "layer1"): (64, 32, 32),
+            ("resnet18", "layer2"): (128, 16, 16),
             ("resnet18", "layer3"): (256, 8, 8),
             ("resnet18", "layer4"): (512, 4, 4),
+            ("resnet50", "layer1"): (256, 32, 32),
+            ("resnet50", "layer2"): (512, 16, 16),
+            ("resnet50", "layer3"): (1024, 8, 8),
             ("resnet50", "layer4"): (2048, 4, 4),
         }
 
         for path in sorted(Path("configs/students/perturbation").rglob("*.yaml")):
             with self.subTest(path=str(path)):
                 config = load_config(path)
-                feature_layer = config.student.feature_layer
                 architecture = "resnet50" if "resnet50" in path.parts else "resnet18"
+                perturbation = config.strategy.perturbation
+                if perturbation.method == "clipping":
+                    final_channels, final_height, final_width = feature_shapes[
+                        (architecture, "layer4")
+                    ]
+                    embedding_dim = (
+                        final_channels
+                        if perturbation.embedding_pool == "avg"
+                        else final_channels * final_height * final_width
+                    )
+                    perturbation_dim = 0
+                    for layer_name, layer_config in perturbation.clipping_layers.items():
+                        channels, height, width = feature_shapes[
+                            (architecture, layer_name)
+                        ]
+                        if layer_config.clipping_mode == "constant":
+                            perturbation_dim += 1
+                        elif layer_config.clipping_mode == "spatial_dependent":
+                            perturbation_dim += height * width
+                        elif layer_config.clipping_mode == "channel_dependent":
+                            perturbation_dim += channels
+                        else:
+                            self.fail(
+                                f"Unexpected clipping mode in {path}: "
+                                f"{layer_config.clipping_mode}"
+                            )
+                    self.assertEqual(
+                        config.student.input_shape,
+                        (embedding_dim + perturbation_dim,),
+                    )
+                    continue
+
+                feature_layer = config.student.feature_layer
                 feature_shape = feature_shapes.get((architecture, feature_layer))
                 if feature_shape is None:
                     self.fail(f"Unexpected perturbation feature layer in {path}: {feature_layer}")
                 channels, height, width = feature_shape
                 feature_dim = channels * height * width
-                perturbation = config.strategy.perturbation
                 if perturbation.method == "mc_dropout":
                     perturbation_dim = 0
                     expected_shape = (feature_dim + perturbation_dim,)
                 elif perturbation.method == "pixel_augmentation":
-                    expected_shape = (feature_dim + 6,)
+                    embedding_dim = (
+                        channels
+                        if perturbation.embedding_pool == "avg"
+                        else feature_dim
+                    )
+                    expected_shape = (embedding_dim + 6,)
+                elif perturbation.method == "pixmix":
+                    embedding_dim = (
+                        channels
+                        if perturbation.embedding_pool == "avg"
+                        else feature_dim
+                    )
+                    expected_shape = (embedding_dim,)
                 elif perturbation.method == "pca_projection":
                     expected_shape = (perturbation.pca_components,)
                 elif perturbation.method == "pca_masked_projection":
                     expected_shape = (2 * perturbation.pca_components,)
-                elif perturbation.clipping_mode == "constant":
-                    perturbation_dim = 1
-                    expected_shape = (feature_dim + perturbation_dim,)
-                elif perturbation.clipping_mode == "spatial_dependent":
-                    perturbation_dim = height * width
-                    expected_shape = (feature_dim + perturbation_dim,)
-                elif perturbation.clipping_mode == "channel_dependent":
-                    perturbation_dim = channels
-                    expected_shape = (feature_dim + perturbation_dim,)
                 else:
                     self.fail(
                         f"Unexpected perturbation config in {path}: {perturbation}"
@@ -82,7 +130,7 @@ class PerturbationTests(unittest.TestCase):
         ):
             with self.subTest(clipping_mode=clipping_mode):
                 torch.manual_seed(123)
-                config = PerturbationConfig(
+                config = ClippingLayerConfig(
                     u_min=0.25,
                     u_max=0.75,
                     clipping_mode=clipping_mode,
@@ -104,6 +152,60 @@ class PerturbationTests(unittest.TestCase):
                     batch.student_inputs[:, 48:],
                     batch.perturbations,
                 )
+
+    def test_sequential_clipping_uses_final_layer4_pool_and_all_percentiles(self) -> None:
+        teacher = CifarResNet18(num_classes=10).eval()
+        images = torch.randn(2, 3, 32, 32)
+        config = PerturbationConfig(
+            method="clipping",
+            embedding_pool="avg",
+            clipping_layers={
+                "layer3": ClippingLayerConfig(
+                    clipping_mode="constant",
+                    u_min=0.25,
+                    u_max=0.75,
+                ),
+                "layer4": ClippingLayerConfig(
+                    clipping_mode="spatial_dependent",
+                    u_min=0.50,
+                    u_max=1.00,
+                ),
+            },
+        )
+
+        start_features = forward_to_clipping_start(teacher, images, config)
+        clean_logits = forward_clean_from_clipping_start(
+            teacher,
+            start_features,
+            config,
+        )
+        unperturbed = build_sequential_clipping_batch(
+            teacher,
+            start_features,
+            config,
+            apply_perturbation=False,
+        )
+        torch.manual_seed(123)
+        perturbed = build_sequential_clipping_batch(
+            teacher,
+            start_features,
+            config,
+            apply_perturbation=True,
+        )
+
+        self.assertEqual(tuple(start_features.shape), (2, 128, 16, 16))
+        self.assertEqual(tuple(perturbed.final_features.shape), (2, 512, 4, 4))
+        self.assertEqual(tuple(perturbed.student_inputs.shape), (2, 529))
+        self.assertEqual(tuple(perturbed.perturbations["layer3"].shape), (2, 1))
+        self.assertEqual(tuple(perturbed.perturbations["layer4"].shape), (2, 16))
+        torch.testing.assert_close(unperturbed.teacher_logits, clean_logits)
+        torch.testing.assert_close(
+            unperturbed.student_inputs[:, :512],
+            unperturbed.final_features.mean(dim=(-2, -1)),
+        )
+        self.assertFalse(
+            torch.equal(perturbed.final_features, unperturbed.final_features)
+        )
 
     def test_pixel_augmentation_samples_normalized_parameters(self) -> None:
         images = torch.zeros(4, 3, 32, 32)
@@ -176,8 +278,37 @@ class PerturbationTests(unittest.TestCase):
             torch.zeros(2, 6),
         )
 
+    def test_pixel_student_inputs_support_global_average_pooling(self) -> None:
+        features = torch.arange(2 * 4 * 2 * 2, dtype=torch.float32).reshape(
+            2,
+            4,
+            2,
+            2,
+        )
+        params = torch.zeros(2, 6)
+
+        student_inputs = build_pixel_student_inputs(
+            features,
+            params,
+            embedding_pool="avg",
+        )
+
+        self.assertEqual(tuple(student_inputs.shape), (2, 10))
+        torch.testing.assert_close(
+            student_inputs[:, :4],
+            features.mean(dim=(-2, -1)),
+        )
+        torch.testing.assert_close(
+            pool_pixel_features(features, "flatten"),
+            torch.flatten(features, start_dim=1),
+        )
+
     def test_rejects_non_convolutional_features(self) -> None:
-        config = PerturbationConfig()
+        config = ClippingLayerConfig(
+            clipping_mode="constant",
+            u_min=0.0,
+            u_max=1.0,
+        )
 
         with self.assertRaises(ValueError):
             sample_clipping_perturbation(torch.zeros(2, 3), config)
@@ -190,15 +321,17 @@ class PerturbationTests(unittest.TestCase):
 
     def test_unperturbed_batch_preserves_features_with_neutral_perturbation(self) -> None:
         features = torch.arange(2 * 3 * 4 * 4, dtype=torch.float32).reshape(2, 3, 4, 4)
-        config = PerturbationConfig(clipping_mode="channel_dependent")
+        config = PerturbationConfig(method="mc_dropout")
 
         batch = build_unperturbed_perturbation_batch(features, config)
 
         torch.testing.assert_close(batch.perturbed_features, features)
-        torch.testing.assert_close(batch.percentiles, torch.ones(2, 3))
-        torch.testing.assert_close(batch.perturbations, torch.ones(2, 3))
-        torch.testing.assert_close(batch.student_inputs[:, :48], torch.flatten(features, start_dim=1))
-        torch.testing.assert_close(batch.student_inputs[:, 48:], torch.ones(2, 3))
+        torch.testing.assert_close(batch.percentiles, torch.ones_like(features))
+        torch.testing.assert_close(batch.perturbations, torch.ones(2, 48))
+        torch.testing.assert_close(
+            batch.student_inputs,
+            torch.flatten(features, start_dim=1),
+        )
 
     def test_mc_dropout_returns_flattened_dropped_features(self) -> None:
         features = torch.ones(2, 3, 4, 4)
@@ -513,7 +646,11 @@ class PerturbationTests(unittest.TestCase):
         spatial_actual = _clip_single_feature_map(
             feature_map,
             spatial_percentiles,
-            PerturbationConfig(clipping_mode="spatial_dependent"),
+            ClippingLayerConfig(
+                clipping_mode="spatial_dependent",
+                u_min=0.0,
+                u_max=1.0,
+            ),
         )
         spatial_thresholds = torch.stack(
             [
@@ -533,7 +670,11 @@ class PerturbationTests(unittest.TestCase):
         channel_actual = _clip_single_feature_map(
             feature_map,
             channel_percentiles,
-            PerturbationConfig(clipping_mode="channel_dependent"),
+            ClippingLayerConfig(
+                clipping_mode="channel_dependent",
+                u_min=0.0,
+                u_max=1.0,
+            ),
         )
         channel_thresholds = torch.stack(
             [

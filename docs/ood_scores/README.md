@@ -88,6 +88,18 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
   Prediction.
   - `sign: -1`
 
+- Activation-subspace insignificant reconstruction error: Per-sample MSE
+  between reconstructed and target insignificant SVD coordinates.
+  - `sign: -1`
+
+- Activation-subspace insignificant relative reconstruction error: Per-sample
+  `L2(reconstruction - target) / max(L2(target), eps)`.
+  - `sign: -1`
+
+- Activation-subspace insignificant cosine similarity: Per-sample cosine
+  similarity between reconstructed and target insignificant SVD coordinates.
+  - `sign: +1`
+
 ## Implementation
 
 - OOD Score functions are implemented in [ood_scores.py](../../src/distill_ood_detection/evaluation/ood_scores.py).

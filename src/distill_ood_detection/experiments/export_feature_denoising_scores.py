@@ -16,6 +16,7 @@ from distill_ood_detection.datasets.inference import (
     build_ood_loaders,
     dataset_normalization,
 )
+from distill_ood_detection.datasets.pixmix import build_pixmix_mixing_provider
 from distill_ood_detection.distillation.feature_denoising import (
     collect_feature_denoising_reconstruction_scores,
     feature_denoising_metadata,
@@ -79,6 +80,19 @@ def run_feature_denoising_score_export(
     student.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))
     student.to(device)
     student.eval()
+    pixmix_provider = (
+        build_pixmix_mixing_provider(
+            config.dataset,
+            config.strategy.feature_denoising.pixmix,
+            training_defaults.seed,
+        )
+        if (
+            config.strategy.feature_denoising.method
+            == "pixel_augmented_embedding_prediction"
+            and config.strategy.feature_denoising.pixel_augmentation_method == "pixmix"
+        )
+        else None
+    )
 
     artifacts = []
     for named_loader in loaders:
@@ -91,6 +105,7 @@ def run_feature_denoising_score_export(
             feature_denoising_config=config.strategy.feature_denoising,
             pca_projector=pca_projector,
             image_normalization=image_normalization,
+            pixmix_provider=pixmix_provider,
         )
         path = output_dir / named_loader.name / f"student_{checkpoint}.pt"
         path.parent.mkdir(parents=True, exist_ok=True)

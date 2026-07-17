@@ -9,11 +9,13 @@ for raw-pixel augmentation experiments.
 - [Pixel augmentation](pixel_augmentation.md): Mild affine and photometric
   jitter applied to normalized image tensors by unnormalizing, transforming in
   pixel space, and re-normalizing before teacher inference.
+- [PixMix](pixmix.md): Paper-style crop/flip preprocessing followed by
+  iterative additive or multiplicative mixing with structurally complex images.
 
 ## Shared behavior
 
 Pixel-space methods run the teacher on perturbed images up to the configured
-student feature layer. The student receives the flattened teacher embedding
-concatenated with method-specific transformation parameters. Probability
+student feature layer. `embedding_pool` selects `flatten` or global average
+pooling before method-specific conditioning values are appended. Probability
 inference can draw multiple perturbations per image and stores one logit and
 probability vector per draw.

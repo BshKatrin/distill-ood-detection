@@ -6,10 +6,11 @@ the teacher supplies either a clean or perturbed target.
 
 ## Strategy
 
-1. Extract an intermediate teacher embedding `z`.
-2. Apply the selected perturbation to obtain `z_tilde`.
-3. Continue the teacher forward pass from either `z` or `z_tilde`, according to
-   `strategy.perturbation.teacher_target`.
+1. Extract the configured teacher representation.
+2. Apply the selected perturbation. Clipping may inject perturbations
+   sequentially at several ResNet layers.
+3. Continue the teacher forward pass from the clean or perturbed state,
+   according to `strategy.perturbation.teacher_target`.
 4. Construct the method-specific student input from the perturbed embedding.
 5. Predict `y_tilde_student` with the student.
 6. Compute the distillation loss between the selected teacher target and
@@ -17,8 +18,8 @@ the teacher supplies either a clean or perturbed target.
 
 The implemented methods construct the student input differently:
 
-- [Clipping](clipping.md):
-  `concat(flatten(z_tilde), flatten(u))`
+- [Clipping](clipping.md): pooled final `layer4` activation concatenated with
+  the sampled percentile tensors from every configured clipping layer
 - [Monte-Carlo dropout](dropout.md): `flatten(z_tilde)`
 - [PCA projection](pca.md): the reduced PCA representation of `flatten(z)`
 - [Masked PCA projection](pca.md#masked-pca-projection):
@@ -44,12 +45,12 @@ Set `strategy.perturbation.method` to select a method:
 
 | Method                            | Configuration value   | Student input                              |
 | --------------------------------- | --------------------- | ------------------------------------------ |
-| [Clipping](clipping.md)           | `clipping` or omitted | Perturbed embedding and sampled percentile |
+| [Clipping](clipping.md)           | `clipping`            | Pooled final layer4 activation and all configured layer percentiles |
 | [Monte-Carlo dropout](dropout.md) | `mc_dropout`          | Dropped embedding                          |
 | [PCA projection](pca.md)          | `pca_projection`      | Reduced PCA representation                 |
 | [Masked PCA projection](pca.md#masked-pca-projection) | `pca_masked_projection` | Masked reduced PCA representation and PCA-component keep mask |
 
-Configs that omit `method` use clipping.
+Clipping configs must set `method: clipping` and define `clipping_layers`.
 
 ## Probability inference and OOD Score
 

@@ -19,12 +19,20 @@ from distill_ood_detection.config import (
     PerturbationConfig,
     ResolvedTrainingMethodConfig,
 )
+from distill_ood_detection.datasets.pixmix import PixMixMixingProvider
 from distill_ood_detection.distillation.losses import distillation_loss
 from distill_ood_detection.distillation.perturbation import sample_perturbation
 from distill_ood_detection.distillation.perturbation import PcaProjector
 from distill_ood_detection.distillation.perturbation import build_pixel_student_inputs
+from distill_ood_detection.distillation.perturbation import (
+    build_sequential_clipping_batch,
+    clipping_teacher_target_logits,
+    forward_clean_from_clipping_start,
+    forward_to_clipping_start,
+)
 from distill_ood_detection.distillation.perturbation import sample_pixel_augmentation
 from distill_ood_detection.distillation.perturbation import teacher_target_features
+from distill_ood_detection.distillation.pixmix import sample_pixmix
 from distill_ood_detection.evaluation.metrics import distillation_metrics
 from distill_ood_detection.utils import write_json
 
@@ -45,6 +53,7 @@ def train_student(
     perturbation_config: PerturbationConfig | None = None,
     pca_projector: PcaProjector | None = None,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    pixmix_provider: PixMixMixingProvider | None = None,
 ) -> dict[str, float | int | str]:
     """Train a student against teacher predictions and save trace artifacts."""
     student.to(device)
@@ -77,28 +86,74 @@ def train_student(
                 if perturbation_forwarder is not None:
                     if perturbation_config is None:
                         raise ValueError("perturbation_config is required for perturbation training")
-                    if perturbation_config.method == "pixel_augmentation":
+                    if perturbation_config.method in {"pixel_augmentation", "pixmix"}:
                         if image_normalization is None:
                             raise ValueError(
-                                "image_normalization is required for pixel augmentation"
+                                "image_normalization is required for pixel perturbations"
                             )
-                        pixel_batch = sample_pixel_augmentation(
-                            images,
-                            perturbation_config,
-                            image_normalization,
-                        )
+                        if perturbation_config.method == "pixmix":
+                            if pixmix_provider is None:
+                                raise ValueError(
+                                    "pixmix_provider is required for PixMix training"
+                                )
+                            mixing_images = pixmix_provider.sample(
+                                images.shape[0],
+                                images.device,
+                                images.dtype,
+                            )
+                            pixel_batch = sample_pixmix(
+                                images,
+                                mixing_images,
+                                perturbation_config.pixmix,
+                                image_normalization,
+                            )
+                            conditioning = images.new_empty((images.shape[0], 0))
+                        else:
+                            pixel_batch = sample_pixel_augmentation(
+                                images,
+                                perturbation_config,
+                                image_normalization,
+                            )
+                            conditioning = pixel_batch.normalized_transform_params
                         perturbed_logits, perturbed_features = perturbation_forwarder(
                             pixel_batch.perturbed_images
                         )
                         teacher_logits = (
-                            teacher(images)
+                            teacher(pixel_batch.clean_images)
                             if perturbation_config.teacher_target == "clean"
                             else perturbed_logits
                         )
                         student_inputs = build_pixel_student_inputs(
                             perturbed_features,
-                            pixel_batch.normalized_transform_params,
+                            conditioning,
+                            embedding_pool=perturbation_config.embedding_pool,
                         )
+                    elif perturbation_config.method == "clipping":
+                        start_features = forward_to_clipping_start(
+                            perturbation_forwarder.teacher,
+                            images,
+                            perturbation_config,
+                        )
+                        clipping_batch = build_sequential_clipping_batch(
+                            perturbation_forwarder.teacher,
+                            start_features,
+                            perturbation_config,
+                        )
+                        clean_logits = (
+                            forward_clean_from_clipping_start(
+                                perturbation_forwarder.teacher,
+                                start_features,
+                                perturbation_config,
+                            )
+                            if perturbation_config.teacher_target == "clean"
+                            else clipping_batch.teacher_logits
+                        )
+                        teacher_logits = clipping_teacher_target_logits(
+                            clipping_batch,
+                            clean_logits,
+                            perturbation_config,
+                        )
+                        student_inputs = clipping_batch.student_inputs
                     else:
                         features = perturbation_forwarder.forward_to_features(images)
                         perturbation_batch = sample_perturbation(
@@ -150,9 +205,10 @@ def train_student(
             perturbation_config=perturbation_config,
             pca_projector=pca_projector,
             image_normalization=image_normalization,
+            pixmix_provider=pixmix_provider,
             apply_perturbation=(
                 perturbation_config is not None
-                and perturbation_config.method == "pixel_augmentation"
+                and perturbation_config.method in {"pixel_augmentation", "pixmix"}
             ),
             split="validation",
         )

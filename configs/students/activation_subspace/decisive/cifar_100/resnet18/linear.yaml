@@ -1,0 +1,55 @@
+experiment_name: activation_subspace_decisive_linear_resnet18_cifar100
+run_dir: runs/students/activation_subspace/decisive/cifar_100/resnet18/linear
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar10
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar100
+  revision: main
+  num_classes: 100
+
+student:
+  kind: linear
+  feature_layer: layer4
+  input_shape: [38]
+  num_classes: 100
+
+strategy:
+  name: activation_subspace
+  activation_subspace:
+    component: decisive
+    target: projected_logits
+    expected_dimension: 38
+    embedding_pool: avg
+
+optimizer:
+  activation_subspace:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: true
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///runs/students/activation_subspace/decisive/cifar_100/resnet18/linear/mlflow.db

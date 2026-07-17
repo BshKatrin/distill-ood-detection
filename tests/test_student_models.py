@@ -83,16 +83,26 @@ class StudentModelTests(unittest.TestCase):
             "run_dir": "runs/tests/perturbation_config",
             "student": {
                 "kind": "linear",
-                "feature_layer": "layer3",
-                "input_shape": [16385],
+                "input_shape": [1088],
                 "num_classes": 10,
             },
             "strategy": {
                 "name": "perturbation",
                 "perturbation": {
-                    "u_min": 0.2,
-                    "u_max": 0.8,
-                    "clipping_mode": "channel_dependent",
+                    "method": "clipping",
+                    "embedding_pool": "avg",
+                    "clipping_layers": {
+                        "layer3": {
+                            "u_min": 0.2,
+                            "u_max": 0.8,
+                            "clipping_mode": "spatial_dependent",
+                        },
+                        "layer4": {
+                            "u_min": 0.5,
+                            "u_max": 1.0,
+                            "clipping_mode": "channel_dependent",
+                        },
+                    },
                     "evaluation_draws": 3,
                 },
             },
@@ -106,9 +116,16 @@ class StudentModelTests(unittest.TestCase):
         config = parse_config(raw)
 
         self.assertEqual(config.strategy.name, "perturbation")
-        self.assertEqual(config.strategy.perturbation.clipping_mode, "channel_dependent")
+        self.assertEqual(
+            config.strategy.perturbation.clipping_layers["layer3"].clipping_mode,
+            "spatial_dependent",
+        )
+        self.assertEqual(
+            config.strategy.perturbation.clipping_layers["layer4"].clipping_mode,
+            "channel_dependent",
+        )
         self.assertEqual(config.strategy.perturbation.evaluation_draws, 3)
-        self.assertEqual(config.student.input_shape, (16385,))
+        self.assertEqual(config.student.input_shape, (1088,))
         self.assertEqual(config.training.enabled_methods(), ("kl_divergence",))
 
     def test_rejects_perturbation_strategy_without_feature_layer(self) -> None:
@@ -119,6 +136,28 @@ class StudentModelTests(unittest.TestCase):
         }
 
         with self.assertRaises(ValueError):
+            parse_config(raw)
+
+    def test_rejects_legacy_clipping_fields(self) -> None:
+        raw = {
+            "experiment_name": "legacy_clipping_config",
+            "run_dir": "runs/tests/legacy_clipping_config",
+            "student": {
+                "kind": "linear",
+                "input_shape": [513],
+                "num_classes": 10,
+            },
+            "strategy": {
+                "name": "perturbation",
+                "perturbation": {
+                    "u_min": 0.5,
+                    "u_max": 1.0,
+                    "clipping_mode": "constant",
+                },
+            },
+        }
+
+        with self.assertRaisesRegex(ValueError, "unsupported legacy fields"):
             parse_config(raw)
 
     def test_pixel_augmentation_defaults_to_perturbed_target(self) -> None:

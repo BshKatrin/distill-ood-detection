@@ -26,11 +26,23 @@ class ProbabilityInferenceTests(unittest.TestCase):
                 "run_dir": "runs/tests/perturbation_config",
                 "student": {
                     "kind": "linear",
-                    "feature_layer": "layer3",
-                    "input_shape": [16385],
+                    "input_shape": [513],
                     "num_classes": 10,
                 },
-                "strategy": {"name": "perturbation"},
+                "strategy": {
+                    "name": "perturbation",
+                    "perturbation": {
+                        "method": "clipping",
+                        "embedding_pool": "avg",
+                        "clipping_layers": {
+                            "layer4": {
+                                "clipping_mode": "constant",
+                                "u_min": 0.5,
+                                "u_max": 1.0,
+                            }
+                        },
+                    },
+                },
             }
         )
 
@@ -61,22 +73,29 @@ class ProbabilityInferenceTests(unittest.TestCase):
                 "run_dir": "runs/tests/perturbation_config",
                 "student": {
                     "kind": "linear",
-                    "feature_layer": "layer3",
-                    "input_shape": [16385],
+                    "input_shape": [513],
                     "num_classes": 10,
                 },
                 "strategy": {
                     "name": "perturbation",
                     "perturbation": {
-                        "u_min": 0.0,
-                        "u_max": 0.5,
+                        "method": "clipping",
+                        "embedding_pool": "avg",
+                        "clipping_layers": {
+                            "layer4": {
+                                "clipping_mode": "constant",
+                                "u_min": 0.0,
+                                "u_max": 0.5,
+                            }
+                        },
                     },
                 },
             }
         )
 
-        self.assertEqual(config.strategy.perturbation.u_min, 0.0)
-        self.assertEqual(config.strategy.perturbation.u_max, 0.5)
+        layer_config = config.strategy.perturbation.clipping_layers["layer4"]
+        self.assertEqual(layer_config.u_min, 0.0)
+        self.assertEqual(layer_config.u_max, 0.5)
 
     def test_mc_dropout_perturbation_config_parses_dropout_probability(self) -> None:
         config = parse_config(

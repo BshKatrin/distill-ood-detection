@@ -1,7 +1,8 @@
 # Clipping
 
-Clipping modifies an intermediate teacher embedding `z` by limiting its values
-to sampled upper-percentile thresholds.
+Clipping modifies one or more ResNet feature layers by limiting their values to
+sampled upper-percentile thresholds. Layers are processed in teacher-forward
+order, so clipping an earlier layer changes every downstream activation.
 
 ## Algorithm
 
@@ -22,8 +23,8 @@ percentile. Smaller values of `u` produce stronger/aggressive perturbations.
 
 ## Clipping modes
 
-The convolutional embedding has spatial and channel dimensions. Set
-`strategy.perturbation.clipping_mode` to one of:
+Each convolutional embedding has spatial and channel dimensions. Set
+`clipping_mode` independently under every configured clipping layer:
 
 - `constant`: `u` is a scalar. One threshold is computed over the complete
   embedding and applied to every value.
@@ -35,9 +36,17 @@ The convolutional embedding has spatial and channel dimensions. Set
 
 ## Student input
 
-The student receives the perturbed embedding and the sampled percentile:
+After all configured clipping operations, the teacher continues through
+`layer4`. The student receives the pooled final `layer4` activation and every
+sampled percentile tensor in `layer1` to `layer4` order:
 
-`concat(flatten(z_tilde), flatten(u))`
+`concat(pool(z_layer4), flatten(u_layer1), ..., flatten(u_layer4))`
+
+Only configured clipping layers contribute percentile tensors. Set
+`strategy.perturbation.embedding_pool` to:
+
+- `flatten`: flatten the final `layer4` feature map;
+- `avg`: apply global average pooling to the final `layer4` feature map.
 
 The teacher target is selected as described in the
 [embedding-space strategy](README.md#teacher-target).
@@ -48,23 +57,36 @@ With `--apply-perturbation`, inference samples clipping percentiles and exports
 the configured number of stochastic draws. Without the flag, the student
 receives the unmodified embedding and a neutral all-ones perturbation vector:
 
-`concat(flatten(z), flatten(1))`
+`concat(pool(z_layer4), flatten(1_layer1), ..., flatten(1_layer4))`
 
 ## Configuration
 
-Clipping is the default when `strategy.perturbation.method` is omitted. Relevant
-fields are:
+Clipping requires an explicit `method: clipping` and a non-empty
+`clipping_layers` mapping. The former top-level `u_min`, `u_max`, and
+`clipping_mode` fields are not supported.
 
 ```yaml
 strategy:
   name: perturbation
   perturbation:
+    method: clipping
     teacher_target: clean
-    u_min: 0.5
-    u_max: 1.0
-    clipping_mode: constant
+    embedding_pool: avg
+    clipping_layers:
+      layer3:
+        clipping_mode: channel_dependent
+        u_min: 0.5
+        u_max: 1.0
+      layer4:
+        clipping_mode: spatial_dependent
+        u_min: 0.25
+        u_max: 0.75
     evaluation_draws: 50
 ```
+
+Supported keys are `layer1`, `layer2`, `layer3`, and `layer4`. Any subset is
+accepted, and different clipping modes and percentile ranges may be configured
+per layer.
 
 See the clipping configs under
 [`configs/students/perturbation/embedding/clipping/`](../../../configs/students/perturbation/embedding/clipping/).

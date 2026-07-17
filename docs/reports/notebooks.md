@@ -52,3 +52,18 @@ variance threshold has not been reached.
 The statistics JSON is written beside the activation artifact unless
 `--output-path` is supplied. The notebook is generated from
 `reports/templates/notebooks/pca_explained_variance.ipynb`.
+
+## Feature Denoising activation subspaces
+
+After exporting layer-4 activation-subspace errors, generate a notebook that
+compares ID, Near-OOD, and Far-OOD distributions:
+
+```bash
+uv run --project envs/notebooks --no-sync python \
+  reports/scripts/create_feature_denoising_subspace_notebook.py \
+  configs/students/feature_denoising/pixel_augmented_embedding/cifar_10/resnet18/mlp_layer4_aug_strong.yaml \
+  configs/students/feature_denoising/pixel_augmented_embedding/cifar_100/resnet18/mlp_layer4_aug_strong.yaml
+```
+
+The notebook plots decisive and insignificant reconstruction-error and
+relative-improvement distributions separately for both ID datasets.

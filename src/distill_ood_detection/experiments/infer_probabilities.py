@@ -22,6 +22,7 @@ from distill_ood_detection.datasets.inference import (
     build_ood_loaders,
     dataset_normalization,
 )
+from distill_ood_detection.datasets.pixmix import build_pixmix_mixing_provider
 from distill_ood_detection.distillation.perturbation import (
     PcaProjector,
     load_pca_projector,
@@ -86,11 +87,17 @@ def run_probability_inference(
         in {"pca_projection", "pca_masked_projection"}
     ):
         pca_projector = load_pca_projector(pca_projector_path(experiment_dir), device)
-    perturbation_forwarder = (
-        ResNetFeatureForwarder(teacher, config.student.feature_layer)
-        if config.strategy.name == "perturbation"
-        else None
-    )
+    if config.strategy.name == "perturbation":
+        feature_layer = (
+            "layer4"
+            if config.strategy.perturbation.method == "clipping"
+            else config.student.feature_layer
+        )
+        if feature_layer is None:
+            raise ValueError("student.feature_layer is required for this perturbation")
+        perturbation_forwarder = ResNetFeatureForwarder(teacher, feature_layer)
+    else:
+        perturbation_forwarder = None
     feature_extractor = (
         TeacherFeatureExtractor(teacher, config.student.feature_layer)
         if config.student.feature_layer is not None and perturbation_forwarder is None
@@ -103,9 +110,9 @@ def run_probability_inference(
     if (
         config.student.kind == "random_forest"
         and config.strategy.name == "perturbation"
-        and config.strategy.perturbation.method == "pixel_augmentation"
+        and config.strategy.perturbation.method in {"pixel_augmentation", "pixmix"}
     ):
-        raise ValueError("pixel_augmentation does not support random-forest inference")
+        raise ValueError("pixel-space perturbations do not support random-forest inference")
 
     artifacts: list[dict[str, object]] = []
     for named_loader in loaders:
@@ -119,7 +126,8 @@ def run_probability_inference(
         }
         if perturbation_forwarder is not None:
             teacher_metadata["strategy"] = config.strategy.name
-            teacher_metadata["feature_layer"] = config.student.feature_layer
+            if config.student.feature_layer is not None:
+                teacher_metadata["feature_layer"] = config.student.feature_layer
             teacher_metadata["perturbation"] = asdict(config.strategy.perturbation)
             teacher_metadata["apply_perturbation"] = apply_perturbation
             set_seed(training_defaults.seed)
@@ -134,6 +142,18 @@ def run_probability_inference(
                     apply_perturbation=apply_perturbation,
                     pca_projector=pca_projector,
                     image_normalization=image_normalization,
+                    pixmix_provider=(
+                        build_pixmix_mixing_provider(
+                            config.dataset,
+                            config.strategy.perturbation.pixmix,
+                            training_defaults.seed,
+                        )
+                        if (
+                            config.strategy.perturbation.method == "pixmix"
+                            and apply_perturbation
+                        )
+                        else None
+                    ),
                 )
                 if perturbation_forwarder is not None
                 else collect_model_outputs(teacher, named_loader.loader, device)
@@ -251,6 +271,18 @@ def _infer_torch_students(
                         apply_perturbation=apply_perturbation,
                         pca_projector=pca_projector,
                         image_normalization=image_normalization,
+                        pixmix_provider=(
+                            build_pixmix_mixing_provider(
+                                config.dataset,
+                                config.strategy.perturbation.pixmix,
+                                config.training.defaults.seed,
+                            )
+                            if (
+                                config.strategy.perturbation.method == "pixmix"
+                                and apply_perturbation
+                            )
+                            else None
+                        ),
                     )
                     if perturbation_forwarder is not None
                     else collect_model_outputs(student, loader, device)

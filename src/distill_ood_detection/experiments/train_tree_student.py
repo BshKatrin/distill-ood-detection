@@ -19,7 +19,11 @@ from distill_ood_detection.config import (
     TreeDistillationMode,
 )
 from distill_ood_detection.distillation.perturbation import (
+    build_sequential_clipping_batch,
     build_unperturbed_perturbation_batch,
+    clipping_teacher_target_logits,
+    forward_clean_from_clipping_start,
+    forward_to_clipping_start,
     sample_perturbation,
     teacher_target_features,
 )
@@ -74,11 +78,17 @@ def run_tree_experiment(
     )
     test_loader = build_in_distribution_test_loader(config.dataset)
     teacher = load_teacher(config.teacher, device)
-    perturbation_forwarder = (
-        ResNetFeatureForwarder(teacher, config.student.feature_layer)
-        if config.strategy.name == "perturbation"
-        else None
-    )
+    if config.strategy.name == "perturbation":
+        feature_layer = (
+            "layer4"
+            if config.strategy.perturbation.method == "clipping"
+            else config.student.feature_layer
+        )
+        if feature_layer is None:
+            raise ValueError("student.feature_layer is required for this perturbation")
+        perturbation_forwarder = ResNetFeatureForwarder(teacher, feature_layer)
+    else:
+        perturbation_forwarder = None
     feature_extractor = (
         TeacherFeatureExtractor(teacher, config.student.feature_layer)
         if config.student.feature_layer is not None and perturbation_forwarder is None
@@ -343,37 +353,69 @@ def _collect_tree_dataset(
         perturbation_forwarder.eval()
         if (
             config is not None
-            and config.strategy.perturbation.method == "pixel_augmentation"
+            and config.strategy.perturbation.method in {"pixel_augmentation", "pixmix"}
         ):
-            raise ValueError("pixel_augmentation does not support random-forest training")
+            raise ValueError(
+                "pixel-space perturbations do not support random-forest training"
+            )
     for images, labels in loader:
         images = images.to(device)
         if perturbation_forwarder is not None:
             if config is None:
                 raise ValueError("config is required for perturbation tree collection")
-            features = perturbation_forwarder.forward_to_features(images)
-            if apply_perturbation:
-                perturbation_batch = sample_perturbation(
-                    features,
+            if config.strategy.perturbation.method == "clipping":
+                start_features = forward_to_clipping_start(
+                    perturbation_forwarder.teacher,
+                    images,
+                    config.strategy.perturbation,
+                )
+                clipping_batch = build_sequential_clipping_batch(
+                    perturbation_forwarder.teacher,
+                    start_features,
+                    config.strategy.perturbation,
+                    apply_perturbation=apply_perturbation,
+                )
+                clean_logits = (
+                    forward_clean_from_clipping_start(
+                        perturbation_forwarder.teacher,
+                        start_features,
+                        config.strategy.perturbation,
+                    )
+                    if config.strategy.perturbation.teacher_target == "clean"
+                    else clipping_batch.teacher_logits
+                )
+                feature_batches.append(
+                    clipping_batch.student_inputs.cpu().numpy().astype(np.float32)
+                )
+                logits = clipping_teacher_target_logits(
+                    clipping_batch,
+                    clean_logits,
                     config.strategy.perturbation,
                 )
             else:
-                perturbation_batch = build_unperturbed_perturbation_batch(
-                    features,
-                    config.strategy.perturbation,
+                features = perturbation_forwarder.forward_to_features(images)
+                if apply_perturbation:
+                    perturbation_batch = sample_perturbation(
+                        features,
+                        config.strategy.perturbation,
+                    )
+                else:
+                    perturbation_batch = build_unperturbed_perturbation_batch(
+                        features,
+                        config.strategy.perturbation,
+                    )
+                feature_batches.append(
+                    torch.flatten(perturbation_batch.student_inputs, start_dim=1)
+                    .cpu()
+                    .numpy()
+                    .astype(np.float32)
                 )
-            feature_batches.append(
-                torch.flatten(perturbation_batch.student_inputs, start_dim=1)
-                .cpu()
-                .numpy()
-                .astype(np.float32)
-            )
-            logits = perturbation_forwarder.forward_from_features(
-                teacher_target_features(
-                    perturbation_batch,
-                    config.strategy.perturbation,
+                logits = perturbation_forwarder.forward_from_features(
+                    teacher_target_features(
+                        perturbation_batch,
+                        config.strategy.perturbation,
+                    )
                 )
-            )
         elif feature_extractor is not None:
             logits, features = feature_extractor(images)
             feature_batches.append(

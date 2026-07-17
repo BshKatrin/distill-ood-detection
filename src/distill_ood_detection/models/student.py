@@ -45,6 +45,30 @@ class MLPStudent(nn.Module):
         return self.classifier(torch.flatten(images, start_dim=1))
 
 
+class BottleneckAutoencoderStudent(nn.Module):
+    """Non-residual MLP autoencoder for pooled feature coordinates."""
+
+    def __init__(
+        self,
+        input_shape: tuple[int, ...],
+        hidden_channels: tuple[int, ...],
+    ) -> None:
+        super().__init__()
+        if len(input_shape) != 1:
+            raise ValueError("autoencoder input_shape must contain one feature dimension")
+        dimensions = (input_shape[0], *hidden_channels, input_shape[0])
+        layers: list[nn.Module] = []
+        for input_dim, output_dim in zip(dimensions[:-2], dimensions[1:-1], strict=True):
+            layers.extend([nn.Linear(input_dim, output_dim), nn.GELU()])
+        layers.append(nn.Linear(dimensions[-2], dimensions[-1]))
+        self.autoencoder = nn.Sequential(*layers)
+
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        """Reconstruct flattened feature coordinates."""
+
+        return self.autoencoder(torch.flatten(features, start_dim=1))
+
+
 class ResidualConvBlock(nn.Module):
     """Small residual convolutional block for feature-map reconstruction."""
 
@@ -192,6 +216,11 @@ def build_student(config: StudentConfig) -> nn.Module:
         )
     if config.kind == "spatial_token_predictor":
         return SpatialTokenPredictorStudent(
+            input_shape=config.input_shape,
+            hidden_channels=config.hidden_channels,
+        )
+    if config.kind == "autoencoder":
+        return BottleneckAutoencoderStudent(
             input_shape=config.input_shape,
             hidden_channels=config.hidden_channels,
         )

@@ -130,6 +130,22 @@ def perturbation_label(perturbation: str | None) -> str:
     return labels.get(perturbation, perturbation.replace("_", " ").title())
 
 
+def clipping_layers_label(perturbation_config: dict[str, Any]) -> str | None:
+    """Return a report label for configured clipping layers."""
+
+    clipping_layers = perturbation_config.get("clipping_layers")
+    if not isinstance(clipping_layers, dict) or not clipping_layers:
+        return None
+    labels = []
+    for layer_name, layer_config in clipping_layers.items():
+        if not isinstance(layer_config, dict):
+            continue
+        clipping_mode = layer_config.get("clipping_mode")
+        if isinstance(clipping_mode, str):
+            labels.append(f"{layer_name}: {perturbation_label(clipping_mode)}")
+    return "; ".join(labels) if labels else None
+
+
 def method_keys_from_config(config: dict[str, Any]) -> tuple[str, ...]:
     """Return neural-network training methods from a config in report order."""
 
@@ -157,11 +173,13 @@ def experiment_config(path: Path) -> ExperimentConfig:
     dataset = config["dataset"]
     strategy = config_strategy(path, config)
     feature_layer = student.get("feature_layer")
-    perturbation = (
+    perturbation_config = (
         config.get("strategy", {})
         .get("perturbation", {})
-        .get("clipping_mode")
     )
+    perturbation = clipping_layers_label(perturbation_config)
+    if perturbation is not None:
+        feature_layer = "layer4"
     return ExperimentConfig(
         path=path,
         strategy=strategy,
@@ -169,7 +187,7 @@ def experiment_config(path: Path) -> ExperimentConfig:
         dataset_name=dataset["name"],
         student_kind=student_kind_label(student["kind"]),
         feature_source=feature_source_label(feature_layer),
-        perturbation=perturbation_label(perturbation) if perturbation is not None else None,
+        perturbation=perturbation,
         method_keys=method_keys_from_config(config),
         run_dir=ROOT / config["run_dir"],
     )

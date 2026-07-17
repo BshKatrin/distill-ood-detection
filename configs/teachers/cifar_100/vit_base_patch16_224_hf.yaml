@@ -1,0 +1,31 @@
+experiment_name: teacher_vit_base_patch16_224_hf_cifar100
+run_dir: runs/teachers/cifar_100/vit_base_patch16_224_hf
+device: auto
+seed: 42
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 4
+  validation_fraction: 0.1
+  pre_size: 224
+  image_size: 224
+  normalization:
+    - [0.5, 0.5, 0.5]
+    - [0.5, 0.5, 0.5]
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar10
+      split: test
+
+teacher:
+  hf_model_id: MatanBT/vit-base-patch16-224-cifar100
+  revision: main
+  num_classes: 100
+
+layers:
+  - layer12

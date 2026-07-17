@@ -245,6 +245,22 @@ def perturbation_label(perturbation: str | None) -> str:
     return labels.get(perturbation, perturbation.replace("_", " ").title())
 
 
+def clipping_layers_label(perturbation_config: dict[str, Any]) -> str | None:
+    """Return a report label for configured clipping layers."""
+
+    clipping_layers = perturbation_config.get("clipping_layers")
+    if not isinstance(clipping_layers, dict) or not clipping_layers:
+        return None
+    labels = []
+    for layer_name, layer_config in clipping_layers.items():
+        if not isinstance(layer_config, dict):
+            continue
+        clipping_mode = layer_config.get("clipping_mode")
+        if isinstance(clipping_mode, str):
+            labels.append(f"{layer_name}: {perturbation_label(clipping_mode)}")
+    return "; ".join(labels) if labels else None
+
+
 def teacher_name_label(hf_model_id: str) -> str:
     """Return the report label for one teacher checkpoint."""
 
@@ -290,9 +306,13 @@ def experiment_config(path: Path) -> ExperimentConfig:
     feature_layer = student.get("feature_layer")
     teacher_hf_model_id = config["teacher"]["hf_model_id"]
     perturbation_config = config.get("strategy", {}).get("perturbation", {})
-    perturbation = perturbation_config.get("clipping_mode")
+    perturbation = clipping_layers_label(perturbation_config)
+    if perturbation is not None:
+        feature_layer = "layer4"
     if perturbation is None and perturbation_config.get("method") == "mc_dropout":
-        perturbation = perturbation_config.get("dropout_mode")
+        perturbation = perturbation_label(
+            perturbation_config.get("dropout_mode")
+        )
     return ExperimentConfig(
         path=path,
         strategy=strategy,
@@ -305,9 +325,7 @@ def experiment_config(path: Path) -> ExperimentConfig:
         teacher_label=teacher_name_label(teacher_hf_model_id),
         student_kind=student_kind_label(student["kind"]),
         feature_source=feature_source_label(feature_layer),
-        perturbation=(
-            perturbation_label(perturbation) if perturbation is not None else None
-        ),
+        perturbation=perturbation,
         method_keys=method_keys_from_config(config),
         run_dir=ROOT / config["run_dir"],
     )

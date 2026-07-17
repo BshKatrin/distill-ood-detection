@@ -10,7 +10,15 @@ import torch
 
 from distill_ood_detection.config import DistillationMethod, ExperimentConfig
 from distill_ood_detection.datasets.inference import build_id_loaders, dataset_normalization
+from distill_ood_detection.datasets.pixmix import build_pixmix_mixing_provider
 from distill_ood_detection.distillation.train import train_student
+from distill_ood_detection.distillation.activation_subspace import (
+    collect_clean_pooled_embeddings,
+    component_training_tensors,
+    fit_activation_subspaces,
+    save_activation_subspaces,
+    train_activation_subspace_student,
+)
 from distill_ood_detection.distillation.perturbation import (
     fit_pca_projector_from_activations,
     pca_projector_path,
@@ -49,6 +57,32 @@ def run_experiment(
 
     loaders = build_id_loaders(config.dataset, seed=training_defaults.seed)
     image_normalization = dataset_normalization(config.dataset)
+    perturbation_pixmix_provider = (
+        build_pixmix_mixing_provider(
+            config.dataset,
+            config.strategy.perturbation.pixmix,
+            training_defaults.seed,
+        )
+        if (
+            config.strategy.name == "perturbation"
+            and config.strategy.perturbation.method == "pixmix"
+        )
+        else None
+    )
+    feature_denoising_pixmix_provider = (
+        build_pixmix_mixing_provider(
+            config.dataset,
+            config.strategy.feature_denoising.pixmix,
+            training_defaults.seed,
+        )
+        if (
+            config.strategy.name == "feature_denoising"
+            and config.strategy.feature_denoising.method
+            == "pixel_augmented_embedding_prediction"
+            and config.strategy.feature_denoising.pixel_augmentation_method == "pixmix"
+        )
+        else None
+    )
     teacher = load_teacher(config.teacher, device)
     pca_projector = None
     if (
@@ -96,11 +130,24 @@ def run_experiment(
                 "strategy": config.strategy.name,
             },
         )
-    perturbation_forwarder = (
-        build_feature_forwarder(teacher, config.student.feature_layer)
-        if config.strategy.name in {"perturbation", "feature_denoising"}
-        else None
-    )
+    if (
+        config.strategy.name == "perturbation"
+        and config.strategy.perturbation.method == "clipping"
+    ):
+        perturbation_forwarder = build_feature_forwarder(teacher, "layer4")
+    elif config.strategy.name in {
+        "perturbation",
+        "feature_denoising",
+        "activation_subspace",
+    }:
+        if config.student.feature_layer is None:
+            raise ValueError("student.feature_layer is required for this strategy")
+        perturbation_forwarder = build_feature_forwarder(
+            teacher,
+            config.student.feature_layer,
+        )
+    else:
+        perturbation_forwarder = None
     feature_extractor = (
         TeacherFeatureExtractor(teacher, config.student.feature_layer)
         if config.student.feature_layer is not None and perturbation_forwarder is None
@@ -123,6 +170,164 @@ def run_experiment(
                 }
             )
             mlflow.log_artifact(str(experiment_dir / "resolved_config.json"))
+
+        if config.strategy.name == "activation_subspace":
+            if perturbation_forwarder is None:
+                raise ValueError(
+                    "Activation-subspace training requires a feature forwarder"
+                )
+            classifier = getattr(teacher, "fc", None)
+            if not isinstance(classifier, torch.nn.Linear):
+                raise ValueError(
+                    "Activation-subspace training requires a ResNet linear fc head"
+                )
+            subspace_config = config.strategy.activation_subspace
+            train_split = collect_clean_pooled_embeddings(
+                forwarder=perturbation_forwarder,
+                loader=loaders.train,
+                device=device,
+            )
+            validation_split = collect_clean_pooled_embeddings(
+                forwarder=perturbation_forwarder,
+                loader=loaders.validation,
+                device=device,
+            )
+            test_split = collect_clean_pooled_embeddings(
+                forwarder=perturbation_forwarder,
+                loader=loaders.test,
+                device=device,
+            )
+            subspaces = fit_activation_subspaces(
+                classifier_weight=classifier.weight.detach(),
+                train_embeddings=train_split.embeddings,
+                device=device,
+            )
+            component_dimension = subspaces.component_dimension(
+                subspace_config.component
+            )
+            if component_dimension != subspace_config.expected_dimension:
+                raise ValueError(
+                    "Fitted activation-subspace dimension differs from config: "
+                    f"{component_dimension} != {subspace_config.expected_dimension}"
+                )
+            if config.student.input_shape != (component_dimension,):
+                raise ValueError(
+                    "student.input_shape must match the fitted component dimension: "
+                    f"{config.student.input_shape} != {(component_dimension,)}"
+                )
+            if (
+                subspace_config.target == "projected_logits"
+                and config.student.kind != "linear"
+            ):
+                raise ValueError(
+                    "Projected-logit activation-subspace targets require a linear student"
+                )
+            if (
+                subspace_config.target == "coordinates"
+                and config.student.kind != "autoencoder"
+            ):
+                raise ValueError(
+                    "Coordinate activation-subspace targets require an autoencoder"
+                )
+            save_activation_subspaces(
+                path=experiment_dir / "activation_subspace.pt",
+                subspaces=subspaces,
+                config=subspace_config,
+                fit_samples=train_split.embeddings.shape[0],
+                classifier_weight_shape=tuple(classifier.weight.shape),
+            )
+            train_data = component_training_tensors(
+                split=train_split,
+                subspaces=subspaces,
+                component=subspace_config.component,
+                target=subspace_config.target,
+                classifier=classifier,
+                device=device,
+            )
+            validation_data = component_training_tensors(
+                split=validation_split,
+                subspaces=subspaces,
+                component=subspace_config.component,
+                target=subspace_config.target,
+                classifier=classifier,
+                device=device,
+            )
+            test_data = component_training_tensors(
+                split=test_split,
+                subspaces=subspaces,
+                component=subspace_config.component,
+                target=subspace_config.target,
+                classifier=classifier,
+                device=device,
+            )
+            student = build_student(config.student)
+            output_dir = experiment_dir / subspace_config.component
+            if len(methods) != 1:
+                raise ValueError(
+                    "Activation-subspace training requires exactly one enabled "
+                    "distillation method"
+                )
+            activation_method = methods[0]
+            if (
+                subspace_config.target == "coordinates"
+                and activation_method != "mse_logits"
+            ):
+                raise ValueError(
+                    "Coordinate activation-subspace training requires "
+                    "training.methods.mse_logits"
+                )
+            method_training_config = config.training.for_method(activation_method)
+            with _mlflow_method_run(config, subspace_config.component):
+                if config.mlflow.enabled:
+                    mlflow.log_param(
+                        "distillation_method",
+                        f"activation_subspace_{subspace_config.component}_"
+                        f"{activation_method}",
+                    )
+                    mlflow.log_param("distillation_strategy", config.strategy.name)
+                    mlflow.log_param(
+                        "decisive_dimension",
+                        subspaces.decisive_dimension,
+                    )
+                    mlflow.log_param(
+                        "insignificant_dimension",
+                        subspaces.insignificant_dimension,
+                    )
+                summary = train_activation_subspace_student(
+                    student=student,
+                    component=subspace_config.component,
+                    target=subspace_config.target,
+                    distillation_method=activation_method,
+                    train_data=train_data,
+                    validation_data=validation_data,
+                    test_data=test_data,
+                    batch_size=config.dataset.batch_size,
+                    device=device,
+                    optimizer_config=config.optimizer.activation_subspace,
+                    training_config=method_training_config,
+                    output_dir=output_dir,
+                    mlflow_enabled=config.mlflow.enabled,
+                )
+                summary.update(
+                    {
+                        "activation_dimension": subspaces.activation_dimension,
+                        "decisive_dimension": subspaces.decisive_dimension,
+                        "insignificant_dimension": subspaces.insignificant_dimension,
+                        "subspace_path": str(
+                            experiment_dir / "activation_subspace.pt"
+                        ),
+                    }
+                )
+                write_json(output_dir / "metrics.json", summary)
+                if config.mlflow.enabled:
+                    mlflow.log_artifact(str(output_dir / "metrics.json"))
+                    mlflow.log_artifact(str(output_dir / "history.json"))
+                    mlflow.log_artifact(
+                        str(experiment_dir / "activation_subspace.pt")
+                    )
+                summaries.append(summary)
+            write_json(experiment_dir / "summary.json", {"methods": summaries})
+            return summaries
 
         if config.strategy.name == "feature_denoising":
             if perturbation_forwarder is None:
@@ -147,6 +352,7 @@ def run_experiment(
                     feature_denoising_config=config.strategy.feature_denoising,
                     pca_projector=pca_projector,
                     image_normalization=image_normalization,
+                    pixmix_provider=feature_denoising_pixmix_provider,
                 )
                 best_checkpoint_path = Path(str(summary["best_checkpoint_path"]))
                 student.load_state_dict(
@@ -164,6 +370,7 @@ def run_experiment(
                     feature_denoising_config=config.strategy.feature_denoising,
                     pca_projector=pca_projector,
                     image_normalization=image_normalization,
+                    pixmix_provider=feature_denoising_pixmix_provider,
                 )
                 summary["test_reconstruction_loss"] = test_reconstruction_loss
                 write_json(output_dir / "metrics.json", summary)
@@ -203,6 +410,7 @@ def run_experiment(
                     ),
                     pca_projector=pca_projector,
                     image_normalization=image_normalization,
+                    pixmix_provider=perturbation_pixmix_provider,
                 )
                 best_checkpoint_path = Path(str(summary["best_checkpoint_path"]))
                 student.load_state_dict(
@@ -229,9 +437,11 @@ def run_experiment(
                     ),
                     pca_projector=pca_projector,
                     image_normalization=image_normalization,
+                    pixmix_provider=perturbation_pixmix_provider,
                     apply_perturbation=(
                         config.strategy.name == "perturbation"
-                        and config.strategy.perturbation.method == "pixel_augmentation"
+                        and config.strategy.perturbation.method
+                        in {"pixel_augmentation", "pixmix"}
                     ),
                     split="test",
                 )
@@ -253,7 +463,7 @@ def _mlflow_parent_run(config: ExperimentConfig):
     return mlflow.start_run(run_name=config.experiment_name)
 
 
-def _mlflow_method_run(config: ExperimentConfig, method: DistillationMethod):
+def _mlflow_method_run(config: ExperimentConfig, method: str):
     if not config.mlflow.enabled:
         return _null_context()
     return mlflow.start_run(run_name=f"{config.experiment_name}/{method}", nested=True)

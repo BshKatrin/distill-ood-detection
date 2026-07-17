@@ -5,8 +5,8 @@ from an augmented image back to the teacher embedding from the clean image.
 
 ## Method
 
-For a normalized image `x`, sample the same affine and photometric pixel-space
-augmentation used by the pixel augmentation perturbation strategy:
+For a normalized image `x`, select either the affine/photometric augmentation
+or PixMix:
 
 ```text
 x_aug = pixel_augmentation(x)
@@ -16,6 +16,9 @@ z_pred = student(z_context)
 ```
 
 The teacher is frozen. The target is `stop_gradient(z_target)`.
+
+With `pixel_augmentation_method: pixmix`, `x_aug` is the PixMix image and the
+target view is the paper-style crop/flip view immediately before mixing.
 
 Unlike the perturbation strategy, this Feature Denoising variant does not append the sampled
 transform parameters to the student input. The benchmark asks whether the
@@ -73,6 +76,7 @@ strategy:
   name: feature_denoising
   feature_denoising:
     method: pixel_augmented_embedding_prediction
+    pixel_augmentation_method: affine
     rotation_degrees: 20.0
     translate_fraction: 0.15
     scale_min: 0.80

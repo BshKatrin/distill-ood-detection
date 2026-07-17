@@ -7,6 +7,9 @@ Sections marked "Not implemented" describe planned work. All other sections corr
 ## Start here
 
 - [Strategies](strategies/README.md): OOD distillation training strategies and their rationale.
+- [Activation-Subspace Students](strategies/activation_subspace.md):
+  self-contained ActSub paper background, project-specific student variant,
+  training/inference/scoring workflow, and artifact contracts.
 - [Configs](configs.md): Experiment configuration layout and naming conventions.
 - [Environments](envs.md): Focused `uv` environments for GPU jobs, notebooks, and tests.
 - [HPC](hpc/README.md): High-performance computing cluster access. Read this only when HPC or GPU cluster access is requested.

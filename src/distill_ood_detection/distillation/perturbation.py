@@ -9,7 +9,10 @@ import torch
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import functional as TF
 
-from distill_ood_detection.config import PerturbationConfig
+from distill_ood_detection.config import ClippingLayerConfig, PerturbationConfig
+
+
+RESNET_FEATURE_LAYERS = ("layer1", "layer2", "layer3", "layer4")
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,16 @@ class PixelAugmentationBatch:
     perturbed_images: torch.Tensor
     transform_params: torch.Tensor
     normalized_transform_params: torch.Tensor
+
+
+@dataclass(frozen=True)
+class SequentialClippingBatch:
+    """Final teacher state and student inputs after sequential layer clipping."""
+
+    student_inputs: torch.Tensor
+    final_features: torch.Tensor
+    perturbations: dict[str, torch.Tensor]
+    teacher_logits: torch.Tensor
 
 
 @dataclass(frozen=True)
@@ -94,11 +107,120 @@ class PcaProjector:
         )
 
 
+def clipping_start_layer(config: PerturbationConfig) -> str:
+    """Return the earliest configured clipping layer."""
+
+    if config.method != "clipping" or not config.clipping_layers:
+        raise ValueError("A non-empty clipping_layers mapping is required")
+    return next(
+        layer_name
+        for layer_name in RESNET_FEATURE_LAYERS
+        if layer_name in config.clipping_layers
+    )
+
+
+def forward_to_clipping_start(
+    teacher: torch.nn.Module,
+    images: torch.Tensor,
+    config: PerturbationConfig,
+) -> torch.Tensor:
+    """Run a ResNet teacher to the input of its earliest clipped layer."""
+
+    start_layer = clipping_start_layer(config)
+    _validate_resnet_teacher(teacher)
+    x = teacher.conv1(images)
+    x = teacher.bn1(x)
+    x = teacher.relu(x)
+    x = teacher.maxpool(x)
+    for layer_name in RESNET_FEATURE_LAYERS:
+        if layer_name == start_layer:
+            return x
+        x = getattr(teacher, layer_name)(x)
+    raise RuntimeError(f"Clipping start layer was not reached: {start_layer}")
+
+
+def forward_clean_from_clipping_start(
+    teacher: torch.nn.Module,
+    start_features: torch.Tensor,
+    config: PerturbationConfig,
+) -> torch.Tensor:
+    """Continue a clean ResNet forward pass from the clipping start."""
+
+    _validate_resnet_teacher(teacher)
+    start_index = RESNET_FEATURE_LAYERS.index(clipping_start_layer(config))
+    x = start_features
+    for layer_name in RESNET_FEATURE_LAYERS[start_index:]:
+        x = getattr(teacher, layer_name)(x)
+    return _resnet_logits_from_layer4(teacher, x)
+
+
+def build_sequential_clipping_batch(
+    teacher: torch.nn.Module,
+    start_features: torch.Tensor,
+    config: PerturbationConfig,
+    apply_perturbation: bool = True,
+) -> SequentialClippingBatch:
+    """Apply configured clipping layers in ResNet forward order."""
+
+    if config.method != "clipping":
+        raise ValueError("Sequential clipping requires perturbation method 'clipping'")
+    _validate_resnet_teacher(teacher)
+    start_index = RESNET_FEATURE_LAYERS.index(clipping_start_layer(config))
+    x = start_features
+    perturbations: dict[str, torch.Tensor] = {}
+    for layer_name in RESNET_FEATURE_LAYERS[start_index:]:
+        x = getattr(teacher, layer_name)(x)
+        layer_config = config.clipping_layers.get(layer_name)
+        if layer_config is None:
+            continue
+        if apply_perturbation:
+            percentiles = _sample_percentiles(x, layer_config)
+            x = _clip_feature_batch(x, percentiles, layer_config)
+        else:
+            percentiles = torch.ones(
+                _percentile_shape(x, layer_config),
+                device=x.device,
+                dtype=x.dtype,
+            )
+        perturbations[layer_name] = torch.flatten(percentiles, start_dim=1)
+
+    final_features = x
+    student_parts = [
+        pool_embedding_features(final_features, config.embedding_pool),
+        *(
+            perturbations[layer_name]
+            for layer_name in RESNET_FEATURE_LAYERS
+            if layer_name in perturbations
+        ),
+    ]
+    return SequentialClippingBatch(
+        student_inputs=torch.cat(student_parts, dim=1),
+        final_features=final_features,
+        perturbations=perturbations,
+        teacher_logits=_resnet_logits_from_layer4(teacher, final_features),
+    )
+
+
+def clipping_teacher_target_logits(
+    batch: SequentialClippingBatch,
+    clean_logits: torch.Tensor,
+    config: PerturbationConfig,
+) -> torch.Tensor:
+    """Select clean or sequentially clipped teacher logits."""
+
+    if config.teacher_target == "clean":
+        return clean_logits
+    if config.teacher_target == "perturbed":
+        return batch.teacher_logits
+    raise ValueError(f"Unsupported teacher target: {config.teacher_target}")
+
+
 def sample_clipping_perturbation(
     features: torch.Tensor,
-    config: PerturbationConfig,
+    config: ClippingLayerConfig,
+    embedding_pool: str = "flatten",
 ) -> PerturbationBatch:
-    """Sample clipping perturbations and concatenate ``z_tilde`` with ``u``.
+    """Clip one feature map and concatenate its pooled representation with ``u``.
 
     The shape of ``u`` follows the clipping mode: scalar for ``constant``,
     spatial map for ``spatial_dependent``, and channel vector for
@@ -115,7 +237,7 @@ def sample_clipping_perturbation(
     perturbations = torch.flatten(percentiles, start_dim=1)
     student_inputs = torch.cat(
         [
-            torch.flatten(perturbed, start_dim=1),
+            pool_embedding_features(perturbed, embedding_pool),
             perturbations,
         ],
         dim=1,
@@ -136,8 +258,6 @@ def sample_perturbation(
 ) -> PerturbationBatch:
     """Sample the perturbation configured for stochastic distillation."""
 
-    if config.method == "clipping":
-        return sample_clipping_perturbation(features, config)
     if config.method == "mc_dropout":
         return sample_mc_dropout_perturbation(features, config)
     if config.method == "pca_projection":
@@ -148,6 +268,11 @@ def sample_perturbation(
         if pca_projector is None:
             raise ValueError("pca_projector is required for masked PCA projection")
         return sample_pca_masked_projection_batch(features, config, pca_projector)
+    if config.method == "clipping":
+        raise ValueError(
+            "clipping requires sequential teacher forwarding; "
+            "use build_sequential_clipping_batch"
+        )
     raise ValueError(f"Unsupported perturbation method: {config.method}")
 
 
@@ -252,31 +377,55 @@ def apply_pixel_augmentation(
 def build_pixel_student_inputs(
     features: torch.Tensor,
     normalized_transform_params: torch.Tensor,
+    embedding_pool: str = "flatten",
 ) -> torch.Tensor:
-    """Concatenate flattened teacher features with normalized transform parameters."""
+    """Pool teacher features and append pixel-corruption conditioning values."""
 
     if features.shape[0] != normalized_transform_params.shape[0]:
         raise ValueError("features and transform parameters must have the same batch size")
-    if normalized_transform_params.shape[1] != 6:
-        raise ValueError("pixel augmentation expects six normalized transform parameters")
+    pooled_features = pool_pixel_features(features, embedding_pool)
     return torch.cat(
         [
-            torch.flatten(features, start_dim=1),
+            pooled_features,
             normalized_transform_params.to(device=features.device, dtype=features.dtype),
         ],
         dim=1,
     )
 
 
-def build_unperturbed_pixel_params(images: torch.Tensor) -> torch.Tensor:
-    """Return identity normalized transform parameters for clean pixel inputs."""
+def pool_pixel_features(features: torch.Tensor, embedding_pool: str) -> torch.Tensor:
+    """Return flattened or global-average-pooled teacher features."""
+
+    return pool_embedding_features(features, embedding_pool)
+
+
+def pool_embedding_features(features: torch.Tensor, embedding_pool: str) -> torch.Tensor:
+    """Return flattened or global-average-pooled convolutional features."""
+
+    if embedding_pool == "flatten":
+        return torch.flatten(features, start_dim=1)
+    if embedding_pool == "avg":
+        if features.ndim != 4:
+            raise ValueError(
+                "global average pooling expects convolutional features with shape "
+                "(batch, channels, height, width)"
+            )
+        return features.mean(dim=(-2, -1))
+    raise ValueError(f"Unsupported embedding pool: {embedding_pool}")
+
+
+def build_unperturbed_pixel_params(
+    images: torch.Tensor,
+    parameter_count: int = 6,
+) -> torch.Tensor:
+    """Return neutral conditioning values for clean pixel inputs."""
 
     if images.ndim != 4:
         raise ValueError(
             "unperturbed pixel parameters expect images with shape "
             "(batch, channels, height, width)"
         )
-    return images.new_zeros((images.shape[0], 6))
+    return images.new_zeros((images.shape[0], parameter_count))
 
 
 def sample_mc_dropout_perturbation(
@@ -323,31 +472,12 @@ def build_unperturbed_perturbation_batch(
         if pca_projector is None:
             raise ValueError("pca_projector is required for masked PCA projection")
         return build_unperturbed_pca_masked_projection_batch(features, pca_projector)
-    if features.ndim != 4:
+    if config.method == "clipping":
         raise ValueError(
-            "unperturbed perturbation inputs expect convolutional features with shape "
-            "(batch, channels, height, width)"
+            "clipping requires sequential teacher forwarding; "
+            "use build_sequential_clipping_batch"
         )
-    percentiles = torch.ones(
-        _percentile_shape(features, config),
-        device=features.device,
-        dtype=features.dtype,
-    )
-    perturbations = torch.flatten(percentiles, start_dim=1)
-    student_inputs = torch.cat(
-        [
-            torch.flatten(features, start_dim=1),
-            perturbations,
-        ],
-        dim=1,
-    )
-    return PerturbationBatch(
-        student_inputs=student_inputs,
-        original_features=features,
-        perturbations=perturbations,
-        perturbed_features=features,
-        percentiles=percentiles,
-    )
+    raise ValueError(f"Unsupported perturbation method: {config.method}")
 
 
 def build_unperturbed_mc_dropout_batch(
@@ -610,7 +740,7 @@ def _sample_dropout_mask(
 
 def _sample_percentiles(
     features: torch.Tensor,
-    config: PerturbationConfig,
+    config: ClippingLayerConfig,
 ) -> torch.Tensor:
     return torch.empty(
         _percentile_shape(features, config),
@@ -621,7 +751,7 @@ def _sample_percentiles(
 
 def _percentile_shape(
     features: torch.Tensor,
-    config: PerturbationConfig,
+    config: ClippingLayerConfig,
 ) -> tuple[int, ...]:
     batch_size, channels, height, width = features.shape
     if config.clipping_mode == "constant":
@@ -637,7 +767,7 @@ def _percentile_shape(
 def _clip_feature_batch(
     features: torch.Tensor,
     percentiles: torch.Tensor,
-    config: PerturbationConfig,
+    config: ClippingLayerConfig,
 ) -> torch.Tensor:
     batch_size, channels, height, width = features.shape
     if config.clipping_mode == "constant":
@@ -666,7 +796,7 @@ def _clip_feature_batch(
 def _clip_single_feature_map(
     feature_map: torch.Tensor,
     percentiles: torch.Tensor,
-    config: PerturbationConfig,
+    config: ClippingLayerConfig,
 ) -> torch.Tensor:
     if config.clipping_mode == "constant":
         batched_percentiles = percentiles.reshape(1, 1)
@@ -690,6 +820,28 @@ def _rowwise_quantile(values: torch.Tensor, percentiles: torch.Tensor) -> torch.
     lower_values = sorted_values.gather(1, lower_indices[:, None]).squeeze(1)
     upper_values = sorted_values.gather(1, upper_indices[:, None]).squeeze(1)
     return lower_values + weights * (upper_values - lower_values)
+
+
+def _validate_resnet_teacher(teacher: torch.nn.Module) -> None:
+    for name in (
+        "conv1",
+        "bn1",
+        "relu",
+        "maxpool",
+        "avgpool",
+        "fc",
+        *RESNET_FEATURE_LAYERS,
+    ):
+        if not hasattr(teacher, name):
+            raise ValueError(f"Clipping teacher is missing ResNet submodule: {name}")
+
+
+def _resnet_logits_from_layer4(
+    teacher: torch.nn.Module,
+    features: torch.Tensor,
+) -> torch.Tensor:
+    pooled = teacher.avgpool(features)
+    return teacher.fc(torch.flatten(pooled, start_dim=1))
 
 
 def _sample_integer_offsets(

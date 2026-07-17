@@ -125,6 +125,68 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also export the deterministic ID validation split.",
     )
+    feature_denoising_subspaces_parser = subparsers.add_parser(
+        "export-feature-denoising-subspace-errors",
+        help="Export layer4 reconstruction errors in ActSub classifier subspaces.",
+    )
+    feature_denoising_subspaces_parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a layer4 Feature Denoising experiment config.",
+    )
+    feature_denoising_subspaces_parser.add_argument(
+        "--checkpoint",
+        choices=("best", "latest"),
+        default="best",
+        help="Student checkpoint to use. Defaults to best.",
+    )
+    activation_subspace_inference_parser = subparsers.add_parser(
+        "export-activation-subspace-inference",
+        help="Export OOD pooled teacher embeddings and raw student outputs.",
+    )
+    activation_subspace_inference_parser.add_argument(
+        "--config",
+        type=Path,
+        action="append",
+        required=True,
+        help="Activation-subspace student config. Repeat for every student.",
+    )
+    activation_subspace_inference_parser.add_argument(
+        "--teacher-output-dir",
+        type=Path,
+        required=True,
+        help="Shared output directory for teacher embedding artifacts.",
+    )
+    activation_subspace_inference_parser.add_argument(
+        "--checkpoint",
+        choices=("best", "latest"),
+        default="best",
+        help="Student checkpoint to use. Defaults to best.",
+    )
+    activation_subspace_scores_parser = subparsers.add_parser(
+        "export-activation-subspace-scores",
+        help="Export OOD Scores from activation-subspace inference artifacts.",
+    )
+    activation_subspace_scores_parser.add_argument(
+        "--config",
+        type=Path,
+        action="append",
+        required=True,
+        help="Activation-subspace student config. Repeat for every student.",
+    )
+    activation_subspace_scores_parser.add_argument(
+        "--teacher-embedding-dir",
+        type=Path,
+        required=True,
+        help="Directory containing shared teacher embedding artifacts.",
+    )
+    activation_subspace_scores_parser.add_argument(
+        "--checkpoint",
+        choices=("best", "latest"),
+        default="best",
+        help="Student inference checkpoint to score. Defaults to best.",
+    )
     return parser
 
 
@@ -183,6 +245,38 @@ def main() -> None:
             checkpoint=args.checkpoint,
             include_train=args.include_train,
             include_validation=args.include_validation,
+        )
+    if args.command == "export-feature-denoising-subspace-errors":
+        from distill_ood_detection.experiments.export_feature_denoising_subspace_errors import (
+            run_feature_denoising_subspace_error_export,
+        )
+
+        config = load_config(args.config)
+        run_feature_denoising_subspace_error_export(
+            config,
+            checkpoint=args.checkpoint,
+        )
+    if args.command == "export-activation-subspace-inference":
+        from distill_ood_detection.experiments.export_activation_subspace_inference import (
+            run_activation_subspace_inference_export,
+        )
+
+        configs = [load_config(path) for path in args.config]
+        run_activation_subspace_inference_export(
+            configs,
+            teacher_output_dir=args.teacher_output_dir,
+            checkpoint=args.checkpoint,
+        )
+    if args.command == "export-activation-subspace-scores":
+        from distill_ood_detection.experiments.export_activation_subspace_scores import (
+            run_activation_subspace_score_export,
+        )
+
+        configs = [load_config(path) for path in args.config]
+        run_activation_subspace_score_export(
+            configs,
+            teacher_embedding_dir=args.teacher_embedding_dir,
+            checkpoint=args.checkpoint,
         )
 
 

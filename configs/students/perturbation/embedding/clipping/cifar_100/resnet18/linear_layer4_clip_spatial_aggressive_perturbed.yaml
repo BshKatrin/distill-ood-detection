@@ -22,17 +22,20 @@ teacher:
 
 student:
   kind: linear
-  feature_layer: layer4
-  input_shape: [8208] # 512 * 4 * 4 + 4 * 4
+  input_shape: [8208] # 8192 final layer4 features + 16 layer4 percentiles
   num_classes: 100
 
 strategy:
   name: perturbation
   perturbation:
     teacher_target: perturbed
-    u_min: 0.0
-    u_max: 0.5
-    clipping_mode: spatial_dependent
+    method: clipping
+    embedding_pool: flatten
+    clipping_layers:
+      layer4:
+        clipping_mode: spatial_dependent
+        u_min: 0.0
+        u_max: 0.5
     evaluation_draws: 50
 
 optimizer:

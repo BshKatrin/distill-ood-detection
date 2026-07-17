@@ -52,3 +52,27 @@ more ID-like samples, this score uses `sign: -1`.
 
 Feature Denoising training is implemented by `distill-ood train-student`.
 Reconstruction-score export is implemented by `distill-ood export-feature-denoising-scores`.
+
+## Classifier activation subspaces
+
+For pooled `layer4` embedding-prediction variants, reconstruction diagnostics
+can be decomposed using the SVD of the teacher's linear classification head.
+The complete right-singular basis is split into decisive and insignificant
+components. Following ActSub, the decisive dimension `k` minimizes the absolute
+difference between the mean component L2 norms over clean ID training targets.
+
+Calculate exact per-draw component errors from an existing student checkpoint:
+
+```bash
+distill-ood export-feature-denoising-subspace-errors --config <config>
+```
+
+The command makes one clean teacher pass over the ID training split to select
+`k`, then exports per-sample reconstruction error, identity error,
+absolute improvement, and relative improvement for both subspaces under
+`<run_dir>/feature_denoising_subspace_errors/`. It performs inference only and
+does not train or update the student.
+
+It does not save the temporary training embeddings. This classifier-weight
+decomposition is not applied to intermediate ResNet layers because their
+mapping to the classifier is nonlinear.

@@ -27,12 +27,21 @@ configs/
         <id_dataset>/
           <teacher_architecture>/
             <student_variant>.yaml
+    activation_subspace/
+      <component>/
+        <id_dataset>/
+          <teacher_architecture>/
+            <student_variant>.yaml
 ```
 
-Current perturbation levels are `embedding` and the planned `pixel`. Embedding
+Current perturbation levels are `embedding` and `pixel`. Embedding
 methods currently include `clipping`, `dropout`, and `pca`.
+Pixel methods include affine `pixel_augmentation` and `pixmix`.
 Current Feature Denoising methods include `pca_masking`, `feature_masking`,
 `spatial_token_prediction`, and `pixel_masked_embedding`.
+Activation-subspace components are `decisive` and `insignificant`.
+Their explicit targets are `projected_logits` or `coordinates`;
+coordinate-target students use the `autoencoder` kind.
 
 Examples:
 
@@ -40,6 +49,7 @@ Examples:
 - `configs/students/baseline/cifar_10/resnet18/linear.yaml`
 - `configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_channel.yaml`
 - `configs/students/feature_denoising/pca_masking/cifar_10/resnet18/linear_layer4_pca9_mask_p030.yaml`
+- `configs/students/activation_subspace/decisive/cifar_10/resnet18/linear.yaml`
 
 When adding a new strategy, perturbation level, or method, update the matching
 [strategy documentation](strategies/README.md).
@@ -94,6 +104,12 @@ Perturbation inference separates deterministic and stochastic modes:
 <run_dir>/probabilities/unperturbed/
 <run_dir>/probabilities/perturbed/
 ```
+
+Clipping configs explicitly set `method: clipping`, select `embedding_pool` as
+`avg` or `flatten`, and define a non-empty `clipping_layers` mapping. Each
+configured ResNet layer has its own `clipping_mode`, `u_min`, and `u_max`.
+Clipping configs do not use `student.feature_layer`; the student representation
+always comes from the final propagated `layer4` activation.
 
 PCA configs set `student.input_shape` to the component count and point
 `strategy.perturbation.pca_activation_path` to a complete ID training-split

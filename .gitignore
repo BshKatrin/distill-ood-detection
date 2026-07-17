@@ -2,6 +2,8 @@
 .DS_Store
 
 TODO.md
+papers/
+recap/
 tmp/
 slurm/
 reports/outputs/plots

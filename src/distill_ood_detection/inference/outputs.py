@@ -13,15 +13,20 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from distill_ood_detection.config import PerturbationConfig, TreeDistillationMode
+from distill_ood_detection.datasets.pixmix import PixMixMixingProvider
 from distill_ood_detection.distillation.perturbation import (
     PcaProjector,
     build_pixel_student_inputs,
+    build_sequential_clipping_batch,
     build_unperturbed_pixel_params,
     build_unperturbed_perturbation_batch,
+    forward_clean_from_clipping_start,
+    forward_to_clipping_start,
     sample_pixel_augmentation,
     sample_perturbation,
     teacher_target_features,
 )
+from distill_ood_detection.distillation.pixmix import sample_pixmix
 
 
 @dataclass(frozen=True)
@@ -96,6 +101,7 @@ def collect_perturbation_model_outputs(
     apply_perturbation: bool = False,
     pca_projector: PcaProjector | None = None,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    pixmix_provider: PixMixMixingProvider | None = None,
 ) -> ModelOutputs:
     """Collect per-draw outputs for a perturbation-aware student."""
 
@@ -106,7 +112,7 @@ def collect_perturbation_model_outputs(
     perturbation_forwarder.eval()
     for images, batch_labels in loader:
         images = images.to(device)
-        if perturbation_config.method == "pixel_augmentation":
+        if perturbation_config.method in {"pixel_augmentation", "pixmix"}:
             outputs = _collect_pixel_model_batch_outputs(
                 model,
                 perturbation_forwarder,
@@ -114,9 +120,41 @@ def collect_perturbation_model_outputs(
                 images,
                 apply_perturbation=apply_perturbation,
                 image_normalization=image_normalization,
+                pixmix_provider=pixmix_provider,
             )
             logits_batches.append(outputs[0].cpu())
             probabilities.append(outputs[1].cpu())
+            labels.append(batch_labels.cpu())
+            continue
+        if perturbation_config.method == "clipping":
+            start_features = forward_to_clipping_start(
+                perturbation_forwarder.teacher,
+                images,
+                perturbation_config,
+            )
+            draw_logits = []
+            draw_probabilities = []
+            batch_size = images.shape[0]
+            evaluation_draws = _evaluation_draws(
+                perturbation_config,
+                apply_perturbation,
+            )
+            for draw_count in _draw_chunks(evaluation_draws, batch_size):
+                clipping_batch = build_sequential_clipping_batch(
+                    perturbation_forwarder.teacher,
+                    start_features.repeat_interleave(draw_count, dim=0),
+                    perturbation_config,
+                    apply_perturbation=apply_perturbation,
+                )
+                logits = model(clipping_batch.student_inputs).reshape(
+                    batch_size,
+                    draw_count,
+                    -1,
+                )
+                draw_logits.append(logits)
+                draw_probabilities.append(F.softmax(logits, dim=-1))
+            logits_batches.append(torch.cat(draw_logits, dim=1).cpu())
+            probabilities.append(torch.cat(draw_probabilities, dim=1).cpu())
             labels.append(batch_labels.cpu())
             continue
         features = perturbation_forwarder.forward_to_features(images)
@@ -155,6 +193,7 @@ def collect_perturbed_teacher_outputs(
     apply_perturbation: bool = False,
     pca_projector: PcaProjector | None = None,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    pixmix_provider: PixMixMixingProvider | None = None,
 ) -> ModelOutputs:
     """Collect per-draw perturbed teacher logits and probabilities."""
 
@@ -164,16 +203,58 @@ def collect_perturbed_teacher_outputs(
     perturbation_forwarder.eval()
     for images, batch_labels in loader:
         images = images.to(device)
-        if perturbation_config.method == "pixel_augmentation":
+        if perturbation_config.method in {"pixel_augmentation", "pixmix"}:
             outputs = _collect_pixel_teacher_batch_outputs(
                 perturbation_forwarder,
                 perturbation_config,
                 images,
                 apply_perturbation=apply_perturbation,
                 image_normalization=image_normalization,
+                pixmix_provider=pixmix_provider,
             )
             logits_batches.append(outputs[0].cpu())
             probabilities.append(outputs[1].cpu())
+            labels.append(batch_labels.cpu())
+            continue
+        if perturbation_config.method == "clipping":
+            start_features = forward_to_clipping_start(
+                perturbation_forwarder.teacher,
+                images,
+                perturbation_config,
+            )
+            clean_logits = (
+                forward_clean_from_clipping_start(
+                    perturbation_forwarder.teacher,
+                    start_features,
+                    perturbation_config,
+                )
+                if perturbation_config.teacher_target == "clean"
+                else None
+            )
+            draw_logits = []
+            draw_probabilities = []
+            batch_size = images.shape[0]
+            evaluation_draws = _evaluation_draws(
+                perturbation_config,
+                apply_perturbation,
+            )
+            for draw_count in _draw_chunks(evaluation_draws, batch_size):
+                clipping_batch = build_sequential_clipping_batch(
+                    perturbation_forwarder.teacher,
+                    start_features.repeat_interleave(draw_count, dim=0),
+                    perturbation_config,
+                    apply_perturbation=apply_perturbation,
+                )
+                selected_logits = (
+                    clean_logits.repeat_interleave(draw_count, dim=0)
+                    if clean_logits is not None
+                    else clipping_batch.teacher_logits
+                )
+                logits = selected_logits.reshape(batch_size, draw_count, -1)
+                draw_logits.append(logits)
+                draw_probabilities.append(F.softmax(logits, dim=-1))
+            logits_batches.append(torch.cat(draw_logits, dim=1).cpu())
+            probabilities.append(torch.cat(draw_probabilities, dim=1).cpu())
             labels.append(batch_labels.cpu())
             continue
         features = perturbation_forwarder.forward_to_features(images)
@@ -212,6 +293,7 @@ def _collect_pixel_model_batch_outputs(
     images: torch.Tensor,
     apply_perturbation: bool,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+    pixmix_provider: PixMixMixingProvider | None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     draw_logits: list[torch.Tensor] = []
     draw_probabilities: list[torch.Tensor] = []
@@ -224,6 +306,7 @@ def _collect_pixel_model_batch_outputs(
             images=images,
             apply_perturbation=apply_perturbation,
             image_normalization=image_normalization,
+            pixmix_provider=pixmix_provider,
         )
         logits = model(student_inputs).reshape(batch_size, 1, -1)
         draw_logits.append(logits)
@@ -237,6 +320,7 @@ def _collect_pixel_teacher_batch_outputs(
     images: torch.Tensor,
     apply_perturbation: bool,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+    pixmix_provider: PixMixMixingProvider | None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     draw_logits: list[torch.Tensor] = []
     draw_probabilities: list[torch.Tensor] = []
@@ -249,9 +333,8 @@ def _collect_pixel_teacher_batch_outputs(
             images=images,
             apply_perturbation=apply_perturbation,
             image_normalization=image_normalization,
+            pixmix_provider=pixmix_provider,
         )
-        if config.teacher_target == "clean":
-            logits = perturbation_forwarder.teacher(images)
         logits = logits.reshape(batch_size, 1, -1)
         draw_logits.append(logits)
         draw_probabilities.append(F.softmax(logits, dim=-1))
@@ -264,17 +347,41 @@ def _pixel_student_inputs_and_teacher_logits(
     images: torch.Tensor,
     apply_perturbation: bool,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+    pixmix_provider: PixMixMixingProvider | None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     if apply_perturbation:
         if image_normalization is None:
-            raise ValueError("image_normalization is required for pixel augmentation")
-        pixel_batch = sample_pixel_augmentation(images, config, image_normalization)
+            raise ValueError("image_normalization is required for pixel perturbations")
+        if config.method == "pixmix":
+            if pixmix_provider is None:
+                raise ValueError("pixmix_provider is required for PixMix inference")
+            pixel_batch = sample_pixmix(
+                images,
+                pixmix_provider.sample(images.shape[0], images.device, images.dtype),
+                config.pixmix,
+                image_normalization,
+            )
+            params = images.new_empty((images.shape[0], 0))
+        else:
+            pixel_batch = sample_pixel_augmentation(images, config, image_normalization)
+            params = pixel_batch.normalized_transform_params
         logits, features = perturbation_forwarder(pixel_batch.perturbed_images)
-        params = pixel_batch.normalized_transform_params
+        if config.teacher_target == "clean":
+            logits = perturbation_forwarder.teacher(pixel_batch.clean_images)
     else:
         logits, features = perturbation_forwarder(images)
-        params = build_unperturbed_pixel_params(images)
-    return build_pixel_student_inputs(features, params), logits
+        params = build_unperturbed_pixel_params(
+            images,
+            0 if config.method == "pixmix" else 6,
+        )
+    return (
+        build_pixel_student_inputs(
+            features,
+            params,
+            embedding_pool=config.embedding_pool,
+        ),
+        logits,
+    )
 
 
 def save_model_outputs(
@@ -361,14 +468,52 @@ def collect_perturbation_tree_model_outputs(
 ) -> ModelOutputs:
     """Collect per-draw outputs from a perturbation-aware tree student."""
 
-    if perturbation_config.method == "pixel_augmentation":
-        raise ValueError("pixel_augmentation does not support random-forest inference")
+    if perturbation_config.method in {"pixel_augmentation", "pixmix"}:
+        raise ValueError("pixel-space perturbations do not support random-forest inference")
     logits_batches: list[torch.Tensor] = []
     probability_batches: list[torch.Tensor] = []
     label_batches: list[torch.Tensor] = []
     perturbation_forwarder.eval()
     for images, batch_labels in loader:
         images = images.to(device)
+        if perturbation_config.method == "clipping":
+            start_features = forward_to_clipping_start(
+                perturbation_forwarder.teacher,
+                images,
+                perturbation_config,
+            )
+            draw_logits = []
+            draw_probabilities = []
+            batch_size = images.shape[0]
+            evaluation_draws = _evaluation_draws(
+                perturbation_config,
+                apply_perturbation,
+            )
+            for draw_count in _draw_chunks(evaluation_draws, batch_size):
+                clipping_batch = build_sequential_clipping_batch(
+                    perturbation_forwarder.teacher,
+                    start_features.repeat_interleave(draw_count, dim=0),
+                    perturbation_config,
+                    apply_perturbation=apply_perturbation,
+                )
+                student_features = (
+                    clipping_batch.student_inputs.cpu().numpy().astype(np.float32)
+                )
+                logits, probabilities = predict_tree_model_outputs(
+                    model,
+                    mode,
+                    student_features,
+                )
+                draw_logits.append(logits.reshape(batch_size, draw_count, -1))
+                draw_probabilities.append(
+                    probabilities.reshape(batch_size, draw_count, -1)
+                )
+            logits_batches.append(torch.from_numpy(np.concatenate(draw_logits, axis=1)))
+            probability_batches.append(
+                torch.from_numpy(np.concatenate(draw_probabilities, axis=1))
+            )
+            label_batches.append(batch_labels.cpu())
+            continue
         features = perturbation_forwarder.forward_to_features(images)
         draw_logits: list[np.ndarray] = []
         draw_probabilities: list[np.ndarray] = []

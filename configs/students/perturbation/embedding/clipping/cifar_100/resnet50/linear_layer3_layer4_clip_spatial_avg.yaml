@@ -1,0 +1,70 @@
+experiment_name: perturbation_linear_layer3_layer4_student_resnet50_cifar100_clip_spatial_avg
+run_dir: runs/students/perturbation/embedding/clipping/cifar_100/resnet50/linear_layer3_layer4_clip_spatial_avg
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar10
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet50_cifar100
+  revision: main
+  num_classes: 100
+
+student:
+  kind: linear
+  input_shape: [2128] # 2048 global-average-pooled layer4 features + 80 layer3/layer4 percentiles
+  num_classes: 100
+
+strategy:
+  name: perturbation
+  perturbation:
+    teacher_target: clean
+    method: clipping
+    embedding_pool: avg
+    clipping_layers:
+      layer3:
+        clipping_mode: spatial_dependent
+        u_min: 0.5
+        u_max: 1.0
+      layer4:
+        clipping_mode: spatial_dependent
+        u_min: 0.5
+        u_max: 1.0
+    evaluation_draws: 50
+
+optimizer:
+  mse_logits:
+    name: sgd
+    learning_rate: 0.005
+    momentum: 0.9
+    weight_decay: 0.001
+  kl_divergence:
+    name: sgd
+    learning_rate: 0.005
+    momentum: 0.9
+    weight_decay: 0.001
+
+training:
+  defaults:
+    epochs: 30
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+    kl_divergence: {}
+
+mlflow:
+  enabled: true
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db

@@ -31,15 +31,25 @@ FeatureDenoisingMethod = Literal[
     "pixel_masked_multilayer_prediction",
     "pixel_masked_multilayer_l234_prediction",
 ]
+EmbeddingPool = Literal["avg", "flatten"]
+PixelAugmentationMethod = Literal["affine", "pixmix"]
 TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
-StrategyName = Literal["baseline", "perturbation", "feature_denoising"]
+StrategyName = Literal[
+    "baseline",
+    "perturbation",
+    "feature_denoising",
+    "activation_subspace",
+]
+ActivationSubspaceComponent = Literal["decisive", "insignificant"]
+ActivationSubspaceTarget = Literal["projected_logits", "coordinates"]
 PerturbationMethod = Literal[
     "clipping",
     "mc_dropout",
     "pca_projection",
     "pca_masked_projection",
     "pixel_augmentation",
+    "pixmix",
 ]
 TeacherTarget = Literal["clean", "perturbed"]
 ClippingMode = Literal["constant", "spatial_dependent", "channel_dependent"]
@@ -106,14 +116,33 @@ class RandomForestConfig:
 
 
 @dataclass(frozen=True)
+class PixMixConfig:
+    """PixMix pixel-corruption settings."""
+
+    mixing_set_path: str | None = None
+    mixing_iterations: int = 4
+    beta: float = 3.0
+    augmentation_severity: float = 3.0
+    all_ops: bool = True
+    working_size: int = 32
+
+
+@dataclass(frozen=True)
+class ClippingLayerConfig:
+    """Clipping settings for one ResNet feature layer."""
+
+    clipping_mode: ClippingMode
+    u_min: float
+    u_max: float
+
+
+@dataclass(frozen=True)
 class PerturbationConfig:
     """Perturbation settings for stochastic distillation."""
 
     method: PerturbationMethod = "clipping"
     teacher_target: TeacherTarget = "clean"
-    u_min: float = 0.0
-    u_max: float = 1.0
-    clipping_mode: ClippingMode = "constant"
+    clipping_layers: dict[str, ClippingLayerConfig] = field(default_factory=dict)
     dropout_probability: float = 0.5
     dropout_mode: DropoutMode = "element"
     pca_components: int = 128
@@ -126,6 +155,8 @@ class PerturbationConfig:
     scale_max: float = 1.10
     brightness_delta: float = 0.10
     contrast_delta: float = 0.20
+    embedding_pool: EmbeddingPool = "flatten"
+    pixmix: PixMixConfig = field(default_factory=PixMixConfig)
 
 
 @dataclass(frozen=True)
@@ -159,6 +190,18 @@ class FeatureDenoisingConfig:
     pca_mask_probability: float = 0.3
     pca_activation_path: str | None = None
     evaluation_draws: int = 1
+    pixel_augmentation_method: PixelAugmentationMethod = "affine"
+    pixmix: PixMixConfig = field(default_factory=PixMixConfig)
+
+
+@dataclass(frozen=True)
+class ActivationSubspaceConfig:
+    """Classifier-SVD activation-subspace student settings."""
+
+    component: ActivationSubspaceComponent = "decisive"
+    target: ActivationSubspaceTarget = "projected_logits"
+    expected_dimension: int = 1
+    embedding_pool: str = "avg"
 
 
 @dataclass(frozen=True)
@@ -168,6 +211,9 @@ class StrategyConfig:
     name: StrategyName = "baseline"
     perturbation: PerturbationConfig = field(default_factory=PerturbationConfig)
     feature_denoising: FeatureDenoisingConfig = field(default_factory=FeatureDenoisingConfig)
+    activation_subspace: ActivationSubspaceConfig = field(
+        default_factory=ActivationSubspaceConfig
+    )
 
 
 @dataclass(frozen=True)
@@ -241,6 +287,7 @@ class OptimizerByMethodConfig:
     mse_logits: OptimizerConfig = field(default_factory=OptimizerConfig)
     kl_divergence: OptimizerConfig = field(default_factory=OptimizerConfig)
     pca_masked_reconstruction: OptimizerConfig = field(default_factory=OptimizerConfig)
+    activation_subspace: OptimizerConfig = field(default_factory=OptimizerConfig)
 
     def for_method(self, method: DistillationMethod) -> OptimizerConfig:
         """Return the optimizer settings for one distillation method."""
@@ -451,18 +498,49 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     if "hidden_channels" in student_raw:
         student_raw["hidden_channels"] = tuple(student_raw["hidden_channels"])
     student = _parse_student_config(student_raw, strategy=strategy)
-    if strategy.name in {"perturbation", "feature_denoising"} and student.feature_layer is None:
-        raise ValueError("student.feature_layer is required for perturbation and Feature Denoising strategies")
+    if strategy.name == "activation_subspace":
+        activation_subspace = strategy.activation_subspace
+        if activation_subspace.target == "projected_logits" and (
+            activation_subspace.component != "decisive"
+            or student.kind != "linear"
+        ):
+            raise ValueError(
+                "activation-subspace projected_logits targets require a "
+                "decisive linear student"
+            )
+        if (
+            activation_subspace.target == "coordinates"
+            and student.kind != "autoencoder"
+        ):
+            raise ValueError(
+                "activation-subspace coordinate targets require an autoencoder"
+            )
+    if (
+        strategy.name
+        in {"perturbation", "feature_denoising", "activation_subspace"}
+        and student.feature_layer is None
+        and not (
+            strategy.name == "perturbation"
+            and strategy.perturbation.method == "clipping"
+        )
+    ):
+        raise ValueError(
+            "student.feature_layer is required for perturbation, Feature Denoising, "
+            "and activation-subspace strategies"
+        )
     if (
         strategy.name == "perturbation"
-        and strategy.perturbation.method == "pixel_augmentation"
+        and strategy.perturbation.method in {"pixel_augmentation", "pixmix"}
         and student.kind == "random_forest"
     ):
-        raise ValueError("pixel_augmentation supports only linear and MLP students")
+        raise ValueError("pixel-space perturbations support only linear and MLP students")
     optimizer = _parse_optimizer_config(raw.get("optimizer", {}))
     training = _parse_training_config(
         raw.get("training", {}),
-        require_methods=student.kind != "random_forest" and strategy.name != "feature_denoising",
+        require_methods=(
+            student.kind != "random_forest"
+            and strategy.name not in {"feature_denoising", "activation_subspace"}
+        ),
     )
     tree = _parse_tree_config(raw.get("tree", {}))
     mlflow = MlflowConfig(**raw.get("mlflow", {}))
@@ -508,6 +586,7 @@ def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> Stud
         "random_forest",
         "feature_reconstructor",
         "spatial_token_predictor",
+        "autoencoder",
     }:
         raise ValueError(f"Unsupported student kind: {student.kind}")
     if not student.input_shape:
@@ -525,6 +604,16 @@ def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> Stud
             "student.hidden_channels must define at least one hidden layer "
             "for MLP students"
         )
+    if student.kind == "autoencoder" and not student.hidden_channels:
+        raise ValueError(
+            "student.hidden_channels must define the autoencoder bottleneck path"
+        )
+    if student.kind == "autoencoder" and len(student.input_shape) != 1:
+        raise ValueError("autoencoder student.input_shape must be one-dimensional")
+    if student.kind == "autoencoder" and student.num_classes != student.input_shape[0]:
+        raise ValueError(
+            "autoencoder student.num_classes must match its one-dimensional input"
+        )
     if any(hidden_channel <= 0 for hidden_channel in student.hidden_channels):
         raise ValueError("student.hidden_channels values must be positive")
     return student
@@ -536,23 +625,64 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
     strategy_raw = raw.copy()
     perturbation_raw = strategy_raw.pop("perturbation", {})
     feature_denoising_raw = strategy_raw.pop("feature_denoising", {})
+    activation_subspace_raw = strategy_raw.pop("activation_subspace", {})
     strategy_name = strategy_raw.pop("name", "baseline")
     if (
         perturbation_raw.get("method") == "pixel_augmentation"
         and "teacher_target" not in perturbation_raw
     ):
         perturbation_raw["teacher_target"] = "perturbed"
-    perturbation = PerturbationConfig(**perturbation_raw)
+    if perturbation_raw.get("method") == "pixmix" and "teacher_target" not in perturbation_raw:
+        perturbation_raw["teacher_target"] = "perturbed"
+    legacy_clipping_fields = {
+        field_name
+        for field_name in ("u_min", "u_max", "clipping_mode")
+        if field_name in perturbation_raw
+    }
+    if legacy_clipping_fields:
+        fields = ", ".join(sorted(legacy_clipping_fields))
+        raise ValueError(
+            "Clipping requires strategy.perturbation.clipping_layers; "
+            f"unsupported legacy fields: {fields}"
+        )
+    clipping_layers_raw = perturbation_raw.pop("clipping_layers", {})
+    if not isinstance(clipping_layers_raw, dict):
+        raise ValueError("strategy.perturbation.clipping_layers must be a mapping")
+    supported_clipping_layers = ("layer1", "layer2", "layer3", "layer4")
+    unknown_clipping_layers = set(clipping_layers_raw) - set(supported_clipping_layers)
+    if unknown_clipping_layers:
+        unknown = ", ".join(sorted(unknown_clipping_layers))
+        raise ValueError(f"Unsupported clipping layers: {unknown}")
+    clipping_layers = {
+        layer_name: ClippingLayerConfig(**clipping_layers_raw[layer_name])
+        for layer_name in supported_clipping_layers
+        if layer_name in clipping_layers_raw
+    }
+    perturbation_pixmix_raw = perturbation_raw.pop("pixmix", {})
+    feature_denoising_pixmix_raw = feature_denoising_raw.pop("pixmix", {})
+    perturbation_raw["pixmix"] = PixMixConfig(**perturbation_pixmix_raw)
+    feature_denoising_raw["pixmix"] = PixMixConfig(**feature_denoising_pixmix_raw)
+    perturbation = PerturbationConfig(
+        **perturbation_raw,
+        clipping_layers=clipping_layers,
+    )
     feature_denoising = FeatureDenoisingConfig(**feature_denoising_raw)
+    activation_subspace = ActivationSubspaceConfig(**activation_subspace_raw)
     strategy = StrategyConfig(
         name=strategy_name,
         perturbation=perturbation,
         feature_denoising=feature_denoising,
+        activation_subspace=activation_subspace,
     )
     if strategy_raw:
         unknown = ", ".join(sorted(strategy_raw))
         raise ValueError(f"Unsupported strategy config fields: {unknown}")
-    if strategy.name not in {"baseline", "perturbation", "feature_denoising"}:
+    if strategy.name not in {
+        "baseline",
+        "perturbation",
+        "feature_denoising",
+        "activation_subspace",
+    }:
         raise ValueError(f"Unsupported strategy: {strategy.name}")
     if perturbation.method not in {
         "clipping",
@@ -560,16 +690,40 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         "pca_projection",
         "pca_masked_projection",
         "pixel_augmentation",
+        "pixmix",
     }:
         raise ValueError(f"Unsupported perturbation method: {perturbation.method}")
-    if perturbation.clipping_mode not in {
-        "constant",
-        "spatial_dependent",
-        "channel_dependent",
-    }:
-        raise ValueError(f"Unsupported clipping mode: {perturbation.clipping_mode}")
-    if not 0.0 <= perturbation.u_min < perturbation.u_max <= 1.0:
-        raise ValueError("strategy.perturbation requires 0 <= u_min < u_max <= 1")
+    if (
+        strategy.name == "perturbation"
+        and perturbation.method == "clipping"
+        and not perturbation.clipping_layers
+    ):
+        raise ValueError(
+            "strategy.perturbation.clipping_layers is required for clipping"
+        )
+    if (
+        strategy.name == "perturbation"
+        and perturbation.method != "clipping"
+        and perturbation.clipping_layers
+    ):
+        raise ValueError(
+            "strategy.perturbation.clipping_layers is supported only for clipping"
+        )
+    for layer_name, layer_config in perturbation.clipping_layers.items():
+        if layer_config.clipping_mode not in {
+            "constant",
+            "spatial_dependent",
+            "channel_dependent",
+        }:
+            raise ValueError(
+                f"Unsupported clipping mode for {layer_name}: "
+                f"{layer_config.clipping_mode}"
+            )
+        if not 0.0 <= layer_config.u_min < layer_config.u_max <= 1.0:
+            raise ValueError(
+                f"strategy.perturbation.clipping_layers.{layer_name} requires "
+                "0 <= u_min < u_max <= 1"
+            )
     if not 0.0 <= perturbation.dropout_probability < 1.0:
         raise ValueError(
             "strategy.perturbation.dropout_probability requires 0 <= p < 1"
@@ -584,6 +738,10 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         )
     if perturbation.evaluation_draws <= 0:
         raise ValueError("strategy.perturbation.evaluation_draws must be positive")
+    if perturbation.embedding_pool not in {"avg", "flatten"}:
+        raise ValueError(
+            "strategy.perturbation.embedding_pool must be 'avg' or 'flatten'"
+        )
     if perturbation.rotation_degrees < 0.0:
         raise ValueError("strategy.perturbation.rotation_degrees must be non-negative")
     if not 0.0 <= perturbation.translate_fraction <= 1.0:
@@ -602,6 +760,7 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(
             "strategy.perturbation.contrast_delta requires 0 <= delta <= 1"
         )
+    _validate_pixmix_config(perturbation.pixmix, "strategy.perturbation.pixmix")
     if feature_denoising.method not in {
         "pca_masked_reconstruction",
         "spatial_masked_reconstruction",
@@ -667,7 +826,47 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError("strategy.feature_denoising.pca_mask_probability requires 0 < p < 1")
     if feature_denoising.evaluation_draws <= 0:
         raise ValueError("strategy.feature_denoising.evaluation_draws must be positive")
+    if feature_denoising.pixel_augmentation_method not in {"affine", "pixmix"}:
+        raise ValueError(
+            "strategy.feature_denoising.pixel_augmentation_method must be "
+            "'affine' or 'pixmix'"
+        )
+    _validate_pixmix_config(
+        feature_denoising.pixmix,
+        "strategy.feature_denoising.pixmix",
+    )
+    if activation_subspace.component not in {"decisive", "insignificant"}:
+        raise ValueError(
+            "strategy.activation_subspace.component must be decisive or insignificant"
+        )
+    if activation_subspace.target not in {"projected_logits", "coordinates"}:
+        raise ValueError(
+            "strategy.activation_subspace.target must be projected_logits or coordinates"
+        )
+    if activation_subspace.expected_dimension <= 0:
+        raise ValueError(
+            "strategy.activation_subspace.expected_dimension must be positive"
+        )
+    if activation_subspace.embedding_pool != "avg":
+        raise ValueError(
+            "strategy.activation_subspace.embedding_pool currently supports only avg"
+        )
     return strategy
+
+
+def _validate_pixmix_config(config: PixMixConfig, prefix: str) -> None:
+    """Validate shared PixMix configuration values."""
+
+    if config.mixing_iterations < 0:
+        raise ValueError(f"{prefix}.mixing_iterations must be non-negative")
+    if config.beta <= 0.0:
+        raise ValueError(f"{prefix}.beta must be positive")
+    if not 0.1 <= config.augmentation_severity <= 10.0:
+        raise ValueError(
+            f"{prefix}.augmentation_severity requires 0.1 <= severity <= 10"
+        )
+    if config.working_size <= 0:
+        raise ValueError(f"{prefix}.working_size must be positive")
 
 
 def _parse_tree_config(raw: dict[str, Any]) -> TreeConfig:
@@ -735,7 +934,11 @@ def _parse_tree_method_config(
 def _parse_optimizer_config(raw: dict[str, Any]) -> OptimizerByMethodConfig:
     """Parse optimizer settings from a shared or per-method config block."""
 
-    method_names = (*DISTILLATION_METHODS, "pca_masked_reconstruction")
+    method_names = (
+        *DISTILLATION_METHODS,
+        "pca_masked_reconstruction",
+        "activation_subspace",
+    )
     optimizer_raw = {
         _normalize_method_name(name) if name in LEGACY_METHOD_ALIASES else name: value
         for name, value in raw.copy().items()

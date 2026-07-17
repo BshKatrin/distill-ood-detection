@@ -18,6 +18,12 @@ from distill_ood_detection.evaluation.ood_metrics import ood_detection_metrics
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_PATH = ROOT / "reports" / "outputs" / "latex" / "metrics_feature_denoising.tex"
 DEFAULT_JSON_OUTPUT = ROOT / "reports" / "outputs" / "json" / "feature_denoising_ood_metrics.json"
+SCORES = (
+    "default",
+    "relative_improvement",
+    "improvement",
+    "cosine_similarity",
+)
 
 DATASET_LABELS = {
     "cifar10_test": "CIFAR-10",
@@ -34,10 +40,25 @@ def main() -> None:
     parser.add_argument("configs", nargs="*", type=Path, default=[ROOT / "configs" / "students" / "feature_denoising"])
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--json-output", type=Path, default=DEFAULT_JSON_OUTPUT)
+    parser.add_argument(
+        "--score",
+        choices=SCORES,
+        default="default",
+        help=(
+            "Score to compute from Feature Denoising artifacts. "
+            "'default' uses the exported signed reconstruction score."
+        ),
+    )
+    parser.add_argument(
+        "--eps",
+        type=float,
+        default=1e-12,
+        help="Numerical floor for relative_improvement denominator.",
+    )
     args = parser.parse_args()
 
     configs = available_configs(expand_config_paths(args.configs))
-    rows = [metrics_for_config(config) for config in configs]
+    rows = [metrics_for_config(config, args.score, args.eps) for config in configs]
     write_json(args.json_output, {"version": 1, "runs": rows})
     write_latex(args.output, rows)
 
@@ -63,9 +84,9 @@ def available_configs(config_paths: Iterable[Path]) -> list[dict[str, Any]]:
     for path in config_paths:
         with path.open() as file:
             config = yaml.safe_load(file)
-        if config.get("strategy", {}).get("name") != "feature_denoising":
+        if config.get("strategy", {}).get("name") not in {"feature_denoising", "jepa"}:
             continue
-        if not (ROOT / config["run_dir"] / "feature_denoising_scores").is_dir():
+        if score_artifact_dir(config).is_none:
             print(f"Skipping {path}: missing Feature Denoising score artifacts", file=sys.stderr)
             continue
         config["_path"] = str(path)
@@ -73,19 +94,19 @@ def available_configs(config_paths: Iterable[Path]) -> list[dict[str, Any]]:
     return configs
 
 
-def metrics_for_config(config: dict[str, Any]) -> dict[str, Any]:
+def metrics_for_config(config: dict[str, Any], score: str, eps: float) -> dict[str, Any]:
     """Compute OOD metrics for one Feature Denoising run."""
 
     run_dir = ROOT / config["run_dir"]
+    score_dir = score_artifact_dir(config).path
     id_key = f"{config['dataset']['name']}_test"
-    id_artifact = load_score_artifact(run_dir / "feature_denoising_scores" / id_key / "student_best.pt")
-    id_scores = to_numpy(id_artifact["scores"])
-    score_name = id_artifact.get("metadata", {}).get("score", "feature_denoising_pca_reconstruction_error")
+    id_artifact = load_score_artifact(score_dir / id_key / "student_best.pt")
+    id_scores, score_name = artifact_scores(id_artifact, score, eps)
     ood_results = []
     for ood_dataset in config["dataset"].get("ood_datasets", []):
         ood_key = f"{ood_dataset['name']}_{ood_dataset['split']}"
-        ood_artifact = load_score_artifact(run_dir / "feature_denoising_scores" / ood_key / "student_best.pt")
-        ood_scores = to_numpy(ood_artifact["scores"])
+        ood_artifact = load_score_artifact(score_dir / ood_key / "student_best.pt")
+        ood_scores, _ = artifact_scores(ood_artifact, score, eps)
         labels = np.concatenate(
             [
                 np.ones_like(id_scores, dtype=int),
@@ -107,6 +128,55 @@ def metrics_for_config(config: dict[str, Any]) -> dict[str, Any]:
         "score": score_name,
         "ood": ood_results,
     }
+
+
+class ScoreArtifactDir:
+    """Resolved Feature Denoising score artifact directory."""
+
+    def __init__(self, path: Path | None) -> None:
+        self.path = path or Path()
+        self.is_none = path is None
+
+
+def score_artifact_dir(config: dict[str, Any]) -> ScoreArtifactDir:
+    """Return the available score artifact directory for new or legacy runs."""
+
+    run_dir = ROOT / config["run_dir"]
+    for name in ("feature_denoising_scores", "jepa_scores"):
+        path = run_dir / name
+        if path.is_dir():
+            return ScoreArtifactDir(path)
+    return ScoreArtifactDir(None)
+
+
+def artifact_scores(
+    artifact: dict[str, Any],
+    score: str,
+    eps: float,
+) -> tuple[np.ndarray, str]:
+    """Return one ID-oriented score vector from a score artifact."""
+
+    if score == "default":
+        score_name = artifact.get("metadata", {}).get("score", "feature_denoising_pca_reconstruction_error")
+        return to_numpy(artifact["scores"]), str(score_name)
+    if score == "relative_improvement":
+        identity_error = to_numpy(required_artifact_value(artifact, "identity_error"))
+        reconstruction_error = to_numpy(required_artifact_value(artifact, "raw_reconstruction_error"))
+        denominator = np.maximum(identity_error, eps)
+        return (identity_error - reconstruction_error) / denominator, "relative_improvement"
+    if score == "improvement":
+        return to_numpy(required_artifact_value(artifact, "improvement")), "improvement"
+    if score == "cosine_similarity":
+        return to_numpy(required_artifact_value(artifact, "cosine_similarity")), "cosine_similarity"
+    raise ValueError(f"Unsupported score: {score}")
+
+
+def required_artifact_value(artifact: dict[str, Any], key: str) -> Any:
+    """Return a required value from a Feature Denoising artifact."""
+
+    if key not in artifact:
+        raise KeyError(f"Artifact does not contain required score component: {key}")
+    return artifact[key]
 
 
 def load_score_artifact(path: Path) -> dict[str, Any]:

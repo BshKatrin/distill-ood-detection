@@ -1,0 +1,70 @@
+experiment_name: linear_layer4_pixel_augmentation_avg_clean_target_student_resnet50_cifar100
+run_dir: runs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_avg_clean_target
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: cifar10
+      split: test
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet50_cifar100
+  revision: main
+  num_classes: 100
+
+student:
+  kind: linear
+  feature_layer: layer4
+  input_shape: [2054]
+  num_classes: 100
+
+strategy:
+  name: perturbation
+  perturbation:
+    method: pixel_augmentation
+    teacher_target: clean
+    embedding_pool: avg
+    rotation_degrees: 10.0
+    translate_fraction: 0.10
+    scale_min: 0.80
+    scale_max: 1.20
+    brightness_delta: 0.30
+    contrast_delta: 0.30
+    evaluation_draws: 16
+
+optimizer:
+  mse_logits:
+    name: sgd
+    learning_rate: 0.005
+    momentum: 0.9
+    weight_decay: 0.001
+  cross_entropy:
+    name: sgd
+    learning_rate: 0.005
+    momentum: 0.9
+    weight_decay: 0.001
+
+training:
+  defaults:
+    epochs: 30
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+    cross_entropy:
+      temperature: 4.0
+      alpha: 0.8
+
+mlflow:
+  enabled: false
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db

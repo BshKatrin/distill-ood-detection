@@ -53,24 +53,24 @@ CIFAR-10 ID setting. `layer4` has the best macro ROC-AUC, but its FPR@95 is
 still very high. `layer2` has the best macro FPR@95 among raw reconstruction
 scores, mostly because of SVHN.
 
-## Improvement Score
+## Relative Improvement Score
 
 Score:
 
 ```text
-improvement = identity_error - reconstruction_error
+relative_improvement = (identity_error - reconstruction_error) / max(identity_error, eps)
 ```
 
 | Layer | MNIST ROC-AUC / FPR@95 | SVHN ROC-AUC / FPR@95 | CIFAR-10 ROC-AUC / FPR@95 | Macro ROC-AUC / FPR@95 |
 |---|---:|---:|---:|---:|
-| layer1 | 0.985 / 0.041 | 0.867 / 0.502 | 0.537 / 0.961 | 0.796 / 0.501 |
-| layer2 | 0.996 / 0.007 | 0.867 / 0.476 | 0.521 / 0.965 | 0.795 / 0.483 |
-| layer3 | 0.994 / 0.011 | 0.908 / 0.346 | 0.509 / 0.960 | 0.804 / 0.439 |
-| layer4 | 0.887 / 0.565 | 0.826 / 0.779 | 0.686 / 0.909 | 0.799 / 0.751 |
+| layer1 | 0.980 / 0.112 | 0.924 / 0.422 | 0.477 / 0.964 | 0.793 / 0.499 |
+| layer2 | 0.994 / 0.013 | 0.935 / 0.338 | 0.475 / 0.972 | 0.802 / 0.441 |
+| layer3 | 0.991 / 0.033 | 0.931 / 0.303 | 0.493 / 0.964 | 0.805 / 0.433 |
+| layer4 | 0.903 / 0.481 | 0.835 / 0.725 | 0.686 / 0.932 | 0.808 / 0.713 |
 
-Takeaway: `layer3` is again the best improvement-score layer by macro ROC-AUC
-and FPR@95. It is strongest on SVHN and comparable to layers 1-2 on MNIST.
-CIFAR-10 remains hard as near-OOD: every layer has FPR@95 above `0.90`.
+Takeaway: `layer4` has the best macro ROC-AUC, mostly due to near-OOD
+CIFAR-10, while `layer3` has the best macro FPR@95. CIFAR-10 remains hard as
+near-OOD: every layer has FPR@95 above `0.90`.
 
 ## Component Summary
 
@@ -78,25 +78,26 @@ CIFAR-10 remains hard as near-OOD: every layer has FPR@95 above `0.90`.
 |---|---:|---:|---|
 | `-raw_reconstruction_error` | layer4 | 0.666 / 0.941 | Best raw ROC-AUC, poor FPR@95. |
 | `-raw_reconstruction_error` | layer2 | 0.619 / 0.822 | Best raw FPR@95. |
-| `improvement` | layer3 | 0.804 / 0.439 | Best overall score. |
+| `relative_improvement` | layer4 | 0.808 / 0.713 | Best macro ROC-AUC. |
+| `relative_improvement` | layer3 | 0.805 / 0.433 | Best macro FPR@95. |
 | `cosine_similarity` | layer4 | 0.733 / 0.903 | Best cosine score, poor FPR@95. |
 | `-identity_error` | layer4 | 0.395 / 0.994 | Identity alone is not useful. |
 
 ## Comparison With CIFAR-10 ID
 
-- The best layer remains `layer3` with the `improvement` score.
+- The most stable relative-improvement layer remains `layer3` by macro FPR@95.
 - CIFAR-100 ID is harder overall because CIFAR-10 is near-OOD and remains
   difficult for all layer-wise scores.
-- Far-OOD behavior is still good under improvement: MNIST ROC-AUC is
-  `0.985-0.996` for layers 1-3.
-- SVHN is strongest at `layer3` under improvement, with ROC-AUC `0.908` and
-  FPR@95 `0.346`.
+- Far-OOD behavior is still good under relative improvement: MNIST ROC-AUC is
+  `0.980-0.994` for layers 1-3.
+- SVHN is strongest at `layer2` by ROC-AUC and `layer3` by FPR@95.
 
 ## Interpretation
 
 - Pixel augmentation remains promising across ID datasets, but performance is
   not symmetric between CIFAR-10 and CIFAR-100.
-- `improvement` is still the most useful score family.
-- `layer3` is the most stable single layer across both ID settings.
+- Relative improvement is still the most useful ResNet-18 score family.
+- `layer3` is the most stable single layer across both ID settings when FPR@95
+  is prioritized.
 - Near-OOD remains the main weakness. For CIFAR-100 ID, CIFAR-10 is not
   separated well enough by any single layer.

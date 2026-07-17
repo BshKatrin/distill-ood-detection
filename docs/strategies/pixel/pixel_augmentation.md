@@ -22,12 +22,16 @@ pixels. Images are unnormalized, transformed in pixel space, clamped to
 ## Student input and target
 
 The teacher extracts an embedding from the perturbed image at
-`student.feature_layer`. The student receives:
+`student.feature_layer`. `strategy.perturbation.embedding_pool` controls the
+embedding representation:
 
 ```text
-flatten(teacher_embedding_from_perturbed_image)
+pool(teacher_embedding_from_perturbed_image)
 + normalized [angle, tx, ty, scale, brightness, contrast]
 ```
+
+`flatten` preserves the existing behavior. `avg` globally averages the spatial
+dimensions before appending the six parameters.
 
 The six transformation parameters are normalized around identity, usually into
 approximately `[-1, 1]`. Raw parameter values are not appended.
@@ -57,6 +61,7 @@ strategy:
   perturbation:
     method: pixel_augmentation
     teacher_target: perturbed
+    embedding_pool: flatten
     rotation_degrees: 10.0
     translate_fraction: 0.10
     scale_min: 0.90
@@ -66,9 +71,10 @@ strategy:
     evaluation_draws: 16
 ```
 
-For a ResNet-50 `layer4` embedding on CIFAR images, use
-`student.input_shape: [32774]`: `2048 * 4 * 4` embedding values plus six
-normalized transform parameters.
+For a ResNet-50 `layer4` embedding on CIFAR images:
+
+- `embedding_pool: flatten` uses `student.input_shape: [32774]`.
+- `embedding_pool: avg` uses `student.input_shape: [2054]`.
 
 Example configs:
 

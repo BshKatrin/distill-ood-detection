@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from distill_ood_detection.config import PerturbationConfig
+from distill_ood_detection.config import ClippingLayerConfig, PerturbationConfig
 from distill_ood_detection.inference import collect_tree_model_outputs
 from distill_ood_detection.inference.outputs import (
     collect_feature_tree_model_outputs,
@@ -16,6 +16,7 @@ from distill_ood_detection.inference.outputs import (
     collect_perturbation_model_outputs,
     collect_perturbation_tree_model_outputs,
 )
+from distill_ood_detection.models.teacher import CifarResNet18, ResNetFeatureForwarder
 
 
 class _FixedPredictionModel:
@@ -82,7 +83,7 @@ class TreeInferenceOutputTests(unittest.TestCase):
     def test_perturbation_outputs_keep_draw_dimension(self) -> None:
         loader = _loader()
         forwarder = _PerturbationForwarder()
-        config = PerturbationConfig(evaluation_draws=3)
+        config = PerturbationConfig(method="mc_dropout", evaluation_draws=3)
         student = _PerturbationStudent()
 
         outputs = collect_perturbation_model_outputs(
@@ -110,7 +111,7 @@ class TreeInferenceOutputTests(unittest.TestCase):
     def test_perturbation_outputs_use_single_draw_without_apply_perturbation(self) -> None:
         loader = _loader()
         forwarder = _PerturbationForwarder()
-        config = PerturbationConfig(evaluation_draws=3)
+        config = PerturbationConfig(method="mc_dropout", evaluation_draws=3)
         student = _PerturbationStudent()
 
         outputs = collect_perturbation_model_outputs(
@@ -135,7 +136,7 @@ class TreeInferenceOutputTests(unittest.TestCase):
     def test_perturbation_tree_outputs_keep_draw_dimension(self) -> None:
         loader = _loader()
         forwarder = _PerturbationForwarder()
-        config = PerturbationConfig(evaluation_draws=3)
+        config = PerturbationConfig(method="mc_dropout", evaluation_draws=3)
         model = _FeatureShapeModel()
 
         outputs = collect_perturbation_tree_model_outputs(
@@ -151,6 +152,51 @@ class TreeInferenceOutputTests(unittest.TestCase):
         self.assertEqual(tuple(outputs.logits.shape), (2, 3, 2))
         self.assertEqual(tuple(outputs.probabilities.shape), (2, 3, 2))
         self.assertEqual(outputs.labels.tolist(), [0, 1])
+
+    def test_sequential_clipping_outputs_keep_draw_dimension(self) -> None:
+        loader = _loader()
+        forwarder = ResNetFeatureForwarder(
+            CifarResNet18(num_classes=2).eval(),
+            "layer4",
+        )
+        config = PerturbationConfig(
+            method="clipping",
+            teacher_target="perturbed",
+            embedding_pool="avg",
+            clipping_layers={
+                "layer3": ClippingLayerConfig(
+                    clipping_mode="constant",
+                    u_min=0.25,
+                    u_max=0.75,
+                ),
+                "layer4": ClippingLayerConfig(
+                    clipping_mode="channel_dependent",
+                    u_min=0.50,
+                    u_max=1.00,
+                ),
+            },
+            evaluation_draws=2,
+        )
+        student = _PerturbationStudent()
+
+        outputs = collect_perturbation_model_outputs(
+            student,
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+            apply_perturbation=True,
+        )
+        teacher_outputs = collect_perturbed_teacher_outputs(
+            forwarder,
+            config,
+            loader,
+            torch.device("cpu"),
+            apply_perturbation=True,
+        )
+
+        self.assertEqual(tuple(outputs.logits.shape), (2, 2, 2))
+        self.assertEqual(tuple(teacher_outputs.logits.shape), (2, 2, 2))
 
     def test_pixel_augmentation_outputs_keep_draw_dimension(self) -> None:
         loader = _loader()

@@ -47,6 +47,14 @@ where:
 - P_teacher is the teacher's output probability distribution (treated as the target distribution).
 - P_student is the student's output probability distribution.
 
+## Activation-subspace objectives
+
+The decisive projected-logit students use centered `mse_logits` or
+cross-entropy distillation against logits from the teacher's decisive
+activation projection. Coordinate-target autoencoders in either the decisive
+or insignificant component use ordinary feature MSE between reconstructed and
+input SVD coordinates.
+
 ## References
 
 - Hinton, Vinyals, Dean (2015), "Distilling the Knowledge in a Neural Network". URL: https://arxiv.org/abs/1503.02531

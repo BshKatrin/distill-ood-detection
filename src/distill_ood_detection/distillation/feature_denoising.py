@@ -20,9 +20,14 @@ from distill_ood_detection.config import (
     PerturbationConfig,
     ResolvedTrainingMethodConfig,
 )
+from distill_ood_detection.datasets.pixmix import PixMixMixingProvider
 from distill_ood_detection.distillation.perturbation import PcaProjector
 from distill_ood_detection.distillation.perturbation import sample_pixel_augmentation
+from distill_ood_detection.distillation.pixmix import sample_pixmix
 from distill_ood_detection.distillation.train import build_optimizer
+from distill_ood_detection.evaluation.activation_subspaces import (
+    feature_denoising_subspace_errors,
+)
 from distill_ood_detection.utils import write_json
 
 FEATURE_DENOISING_RECONSTRUCTION_METHOD = "pca_masked_reconstruction"
@@ -76,6 +81,7 @@ def train_feature_denoising_student(
     pca_projector: PcaProjector | None = None,
     feature_normalizer: FeatureNormalizer | None = None,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    pixmix_provider: PixMixMixingProvider | None = None,
     mlflow_enabled: bool = True,
 ) -> dict[str, float | int | str]:
     """Train a student to reconstruct clean teacher representations."""
@@ -108,6 +114,7 @@ def train_feature_denoising_student(
                     pca_projector,
                     feature_normalizer,
                     image_normalization,
+                    pixmix_provider,
                 )
             if not checked_student_input_shape:
                 _validate_student_input_shape(student, batch.student_inputs)
@@ -137,6 +144,7 @@ def train_feature_denoising_student(
             pca_projector,
             feature_normalizer,
             image_normalization,
+            pixmix_provider,
         )
         if validation_loss < best_validation_reconstruction_loss:
             best_validation_reconstruction_loss = validation_loss
@@ -175,6 +183,7 @@ def reconstruction_loss(
     pca_projector: PcaProjector | None = None,
     feature_normalizer: FeatureNormalizer | None = None,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    pixmix_provider: PixMixMixingProvider | None = None,
 ) -> float:
     """Return average hidden-component reconstruction loss for a loader."""
 
@@ -191,6 +200,7 @@ def reconstruction_loss(
                 pca_projector,
                 feature_normalizer,
                 image_normalization,
+                pixmix_provider,
             )
             predictions = student(batch.student_inputs)
             loss = hidden_component_mse(predictions, batch.targets, batch.keep_mask)
@@ -209,8 +219,22 @@ def collect_feature_denoising_reconstruction_scores(
     pca_projector: PcaProjector | None = None,
     feature_normalizer: FeatureNormalizer | None = None,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    pixmix_provider: PixMixMixingProvider | None = None,
+    activation_subspace_basis: torch.Tensor | None = None,
+    decisive_subspace_dimension: int | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Collect sign-adjusted reconstruction OOD scores for one dataset."""
+    """Collect sign-adjusted reconstruction OOD scores for one dataset.
+
+    When an activation-subspace basis and split dimension are supplied, the
+    function also averages exact per-draw reconstruction diagnostics over the
+    decisive and insignificant classifier subspaces.
+    """
+
+    if (activation_subspace_basis is None) != (decisive_subspace_dimension is None):
+        raise ValueError(
+            "activation_subspace_basis and decisive_subspace_dimension must be "
+            "provided together"
+        )
 
     student.eval()
     labels = []
@@ -223,6 +247,7 @@ def collect_feature_denoising_reconstruction_scores(
     contexts = []
     predicted_embeddings = []
     component_scores: dict[str, list[torch.Tensor]] = {}
+    subspace_scores: dict[str, list[torch.Tensor]] = {}
     with torch.no_grad():
         for images, batch_labels in loader:
             images = images.to(device)
@@ -244,8 +269,9 @@ def collect_feature_denoising_reconstruction_scores(
             draw_cosines = []
             draw_contexts = []
             draw_predictions = []
+            draw_targets = []
             draw_component_scores: dict[str, list[torch.Tensor]] = {}
-            batch_targets = None
+            draw_subspace_scores: dict[str, list[torch.Tensor]] = {}
             for _ in range(feature_denoising_config.evaluation_draws):
                 if feature_denoising_config.method == "pixel_masked_embedding_prediction":
                     batch = sample_pixel_masked_embedding_batch(
@@ -259,6 +285,7 @@ def collect_feature_denoising_reconstruction_scores(
                         perturbation_forwarder,
                         feature_denoising_config,
                         image_normalization,
+                        pixmix_provider,
                     )
                 elif feature_denoising_config.method == "pixel_masked_multilayer_prediction":
                     batch = sample_pixel_masked_multilayer_batch(
@@ -282,6 +309,21 @@ def collect_feature_denoising_reconstruction_scores(
                         feature_normalizer,
                     )
                 batch_predictions = student(batch.student_inputs)
+                if activation_subspace_basis is not None:
+                    if not isinstance(batch.student_inputs, torch.Tensor):
+                        raise ValueError(
+                            "Activation-subspace diagnostics require tensor student inputs"
+                        )
+                    assert decisive_subspace_dimension is not None
+                    diagnostics = feature_denoising_subspace_errors(
+                        right_basis=activation_subspace_basis,
+                        decisive_dimension=decisive_subspace_dimension,
+                        context=batch.student_inputs,
+                        prediction=batch_predictions,
+                        target=batch.targets,
+                    )
+                    for name, values in diagnostics.items():
+                        draw_subspace_scores.setdefault(name, []).append(values)
                 prediction_error = per_sample_hidden_component_mse(
                     batch_predictions,
                     batch.targets,
@@ -319,7 +361,7 @@ def collect_feature_denoising_reconstruction_scores(
                             draw_component_scores.setdefault(name, []).append(values)
                     draw_contexts.append(batch.student_inputs)
                     draw_predictions.append(batch_predictions)
-                    batch_targets = batch.targets
+                    draw_targets.append(batch.targets)
             batch_raw_errors = torch.stack(draw_errors, dim=1).mean(dim=1)
             labels.append(batch_labels.cpu())
             raw_errors.append(batch_raw_errors.cpu())
@@ -330,8 +372,8 @@ def collect_feature_denoising_reconstruction_scores(
                 cosine_similarities.append(torch.stack(draw_cosines, dim=1).mean(dim=1).cpu())
                 contexts.append(torch.stack(draw_contexts, dim=1).mean(dim=1).cpu())
                 predicted_embeddings.append(torch.stack(draw_predictions, dim=1).mean(dim=1).cpu())
-                if batch_targets is not None:
-                    targets.append(batch_targets.cpu())
+                if draw_targets:
+                    targets.append(torch.stack(draw_targets, dim=1).mean(dim=1).cpu())
             if draw_component_scores:
                 for name, values in draw_component_scores.items():
                     component_scores.setdefault(name, []).append(
@@ -339,8 +381,29 @@ def collect_feature_denoising_reconstruction_scores(
                     )
                 contexts.append(torch.stack(draw_contexts, dim=1).mean(dim=1).cpu())
                 predicted_embeddings.append(torch.stack(draw_predictions, dim=1).mean(dim=1).cpu())
-                if batch_targets is not None:
-                    targets.append(batch_targets.cpu())
+                if draw_targets:
+                    targets.append(torch.stack(draw_targets, dim=1).mean(dim=1).cpu())
+            batch_subspace_scores = {
+                name: torch.stack(values, dim=1).mean(dim=1)
+                for name, values in draw_subspace_scores.items()
+            }
+            for component in ("decisive", "insignificant"):
+                reconstruction_key = f"{component}_reconstruction_error"
+                identity_key = f"{component}_identity_error"
+                if reconstruction_key not in batch_subspace_scores:
+                    continue
+                reconstruction_error = batch_subspace_scores[reconstruction_key]
+                identity_error = batch_subspace_scores[identity_key]
+                batch_subspace_scores[f"{component}_improvement"] = (
+                    identity_error - reconstruction_error
+                )
+                batch_subspace_scores[f"{component}_relative_improvement"] = (
+                    identity_error - reconstruction_error
+                ) / identity_error.clamp_min(1.0e-12)
+            for name, values in batch_subspace_scores.items():
+                subspace_scores.setdefault(name, []).append(
+                    values.cpu()
+                )
     result = {
         "labels": torch.cat(labels, dim=0),
         "raw_reconstruction_error": torch.cat(raw_errors, dim=0),
@@ -371,6 +434,12 @@ def collect_feature_denoising_reconstruction_scores(
                 "z_target": torch.cat(targets, dim=0),
             }
         )
+    result.update(
+        {
+            name: torch.cat(values, dim=0)
+            for name, values in subspace_scores.items()
+        }
+    )
     return result
 
 
@@ -381,6 +450,7 @@ def sample_feature_denoising_batch(
     projector: PcaProjector | None = None,
     feature_normalizer: FeatureNormalizer | None = None,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    pixmix_provider: PixMixMixingProvider | None = None,
 ) -> FeatureDenoisingPcaBatch:
     """Sample one Feature Denoising training batch from normalized input images."""
 
@@ -396,6 +466,7 @@ def sample_feature_denoising_batch(
             perturbation_forwarder,
             config,
             image_normalization,
+            pixmix_provider,
         )
     if config.method == "pixel_masked_multilayer_prediction":
         return sample_pixel_masked_multilayer_batch(
@@ -561,6 +632,7 @@ def sample_pixel_augmented_embedding_batch(
     perturbation_forwarder: nn.Module,
     config: FeatureDenoisingConfig,
     image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+    pixmix_provider: PixMixMixingProvider | None = None,
 ) -> FeatureDenoisingPcaBatch:
     """Predict clean pooled teacher embeddings from pixel-augmented embeddings."""
 
@@ -572,12 +644,26 @@ def sample_pixel_augmented_embedding_batch(
         raise ValueError(
             "image_normalization is required for pixel_augmented_embedding_prediction"
         )
-    pixel_batch = sample_pixel_augmentation(
-        images,
-        feature_denoising_pixel_augmentation_config(config),
-        image_normalization,
+    if config.pixel_augmentation_method == "pixmix":
+        if pixmix_provider is None:
+            raise ValueError(
+                "pixmix_provider is required for PixMix Feature Denoising"
+            )
+        pixel_batch = sample_pixmix(
+            images,
+            pixmix_provider.sample(images.shape[0], images.device, images.dtype),
+            config.pixmix,
+            image_normalization,
+        )
+    else:
+        pixel_batch = sample_pixel_augmentation(
+            images,
+            feature_denoising_pixel_augmentation_config(config),
+            image_normalization,
+        )
+    target_features = perturbation_forwarder.forward_to_features(
+        pixel_batch.clean_images
     )
-    target_features = perturbation_forwarder.forward_to_features(images)
     context_features = perturbation_forwarder.forward_to_features(
         pixel_batch.perturbed_images
     )
