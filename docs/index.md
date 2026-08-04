@@ -10,6 +10,8 @@ Sections marked "Not implemented" describe planned work. All other sections corr
 - [Activation-Subspace Students](strategies/activation_subspace.md):
   self-contained ActSub paper background, project-specific student variant,
   training/inference/scoring workflow, and artifact contracts.
+- [Disjoint Subspace Ensembles](strategies/subspace_ensemble.md): channel and
+  whitened GAP-PCA ensembles with predictive-entropy and BALD OOD Scores.
 - [Configs](configs.md): Experiment configuration layout and naming conventions.
 - [Environments](envs.md): Focused `uv` environments for GPU jobs, notebooks, and tests.
 - [HPC](hpc/README.md): High-performance computing cluster access. Read this only when HPC or GPU cluster access is requested.

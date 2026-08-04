@@ -1,0 +1,54 @@
+experiment_name: feature_denoising_spatial_block_residual_layer4_resnet18_cifar10_block_1_mean
+run_dir: runs/students/feature_denoising/feature_masking/cifar_10/resnet18/residual_layer4_block_1_mean
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar100
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar10
+  revision: main
+  num_classes: 10
+
+student:
+  kind: feature_residual_denoiser
+  feature_layer: layer4
+  input_shape: [513, 4, 4]
+  num_classes: 512
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: spatial_block_residual_reconstruction
+    spatial_mask_block_sizes: [1]
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: false
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db

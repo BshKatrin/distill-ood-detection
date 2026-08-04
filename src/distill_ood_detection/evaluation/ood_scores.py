@@ -16,9 +16,23 @@ ENERGY_GAP = "energy_gap"
 ABSOLUTE_ENERGY_GAP = "absolute_energy_gap"
 STUDENT_MSP = "student_msp"
 STUDENT_ENERGY = "student_energy"
+ENSEMBLE_PREDICTIVE_ENTROPY = "ensemble_predictive_entropy"
+ENSEMBLE_BALD = "ensemble_bald"
 FEATURE_DENOISING_PCA_RECONSTRUCTION_ERROR = "feature_denoising_pca_reconstruction_error"
 FEATURE_DENOISING_SPATIAL_RECONSTRUCTION_ERROR = "feature_denoising_spatial_reconstruction_error"
+FEATURE_DENOISING_SPATIAL_BLOCK_RESIDUAL_RECONSTRUCTION_ERROR = (
+    "feature_denoising_spatial_block_residual_reconstruction_error"
+)
 FEATURE_DENOISING_CHANNEL_RECONSTRUCTION_ERROR = "feature_denoising_channel_reconstruction_error"
+FEATURE_DENOISING_CHANNEL_RESIDUAL_RECONSTRUCTION_ERROR = (
+    "feature_denoising_channel_residual_reconstruction_error"
+)
+FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RECONSTRUCTION_ERROR = (
+    "feature_denoising_confusion_channel_replacement_reconstruction_error"
+)
+FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RESIDUAL_RECONSTRUCTION_ERROR = (
+    "feature_denoising_confusion_channel_replacement_residual_reconstruction_error"
+)
 FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_ERROR = "feature_denoising_spatial_token_prediction_error"
 FEATURE_DENOISING_PIXEL_EMBEDDING_PREDICTION_ERROR = "feature_denoising_pixel_embedding_prediction_error"
 FEATURE_DENOISING_PIXEL_AUGMENTED_EMBEDDING_PREDICTION_ERROR = (
@@ -39,9 +53,15 @@ SIGNS: Mapping[str, int] = {
     ABSOLUTE_ENERGY_GAP: -1,
     STUDENT_MSP: +1,
     STUDENT_ENERGY: +1,
+    ENSEMBLE_PREDICTIVE_ENTROPY: -1,
+    ENSEMBLE_BALD: -1,
     FEATURE_DENOISING_PCA_RECONSTRUCTION_ERROR: -1,
     FEATURE_DENOISING_SPATIAL_RECONSTRUCTION_ERROR: -1,
+    FEATURE_DENOISING_SPATIAL_BLOCK_RESIDUAL_RECONSTRUCTION_ERROR: -1,
     FEATURE_DENOISING_CHANNEL_RECONSTRUCTION_ERROR: -1,
+    FEATURE_DENOISING_CHANNEL_RESIDUAL_RECONSTRUCTION_ERROR: -1,
+    FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RECONSTRUCTION_ERROR: -1,
+    FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RESIDUAL_RECONSTRUCTION_ERROR: -1,
     FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_ERROR: -1,
     FEATURE_DENOISING_PIXEL_EMBEDDING_PREDICTION_ERROR: -1,
     FEATURE_DENOISING_PIXEL_AUGMENTED_EMBEDDING_PREDICTION_ERROR: -1,
@@ -160,6 +180,81 @@ def _as_output_matrix(
         msg = f"{name} must contain only finite values."
         raise ValueError(msg)
     return array
+
+
+def _as_ensemble_probabilities(
+    probabilities: ArrayLike,
+) -> NDArray[np.float64]:
+    array = np.asarray(probabilities, dtype=float)
+    if array.ndim != 3:
+        raise ValueError(
+            "ensemble probabilities must have shape "
+            "(n_samples, n_members, n_classes)"
+        )
+    if array.shape[1] < 2:
+        raise ValueError("ensemble probabilities must contain at least two members")
+    if array.shape[2] == 0:
+        raise ValueError("ensemble probabilities must contain at least one class")
+    if not np.all(np.isfinite(array)):
+        raise ValueError("ensemble probabilities must contain only finite values")
+    if np.any(array < 0.0):
+        raise ValueError("ensemble probabilities must be non-negative")
+    if not np.allclose(array.sum(axis=2), 1.0, rtol=1.0e-6, atol=1.0e-8):
+        raise ValueError("ensemble probabilities must sum to one over classes")
+    return array
+
+
+def _entropy(probabilities: NDArray[np.float64]) -> NDArray[np.float64]:
+    terms = np.zeros_like(probabilities)
+    positive = probabilities > 0.0
+    terms[positive] = probabilities[positive] * np.log(probabilities[positive])
+    return -terms.sum(axis=-1)
+
+
+def ensemble_predictive_entropy(
+    student_probabilities: ArrayLike,
+    signed: bool = False,
+) -> NDArray[np.float64]:
+    """Compute entropy of the ensemble mean predictive distribution.
+
+    Args:
+        student_probabilities: Class probabilities with shape
+            ``(n_samples, n_members, n_classes)``.
+        signed: If True, negate entropy so higher values are more ID-like.
+
+    Returns:
+        One raw or sign-adjusted predictive entropy per sample.
+    """
+
+    probabilities = _as_ensemble_probabilities(student_probabilities)
+    scores = _entropy(probabilities.mean(axis=1))
+    return _maybe_signed(scores, ENSEMBLE_PREDICTIVE_ENTROPY, signed)
+
+
+def ensemble_bald(
+    student_probabilities: ArrayLike,
+    signed: bool = False,
+) -> NDArray[np.float64]:
+    """Compute BALD disagreement across ensemble members.
+
+    BALD is predictive entropy minus the mean entropy of the individual
+    members. The raw value is high when members are individually confident but
+    disagree with one another.
+
+    Args:
+        student_probabilities: Class probabilities with shape
+            ``(n_samples, n_members, n_classes)``.
+        signed: If True, negate BALD so higher values are more ID-like.
+
+    Returns:
+        One raw or sign-adjusted BALD value per sample.
+    """
+
+    probabilities = _as_ensemble_probabilities(student_probabilities)
+    predictive_entropy = _entropy(probabilities.mean(axis=1))
+    expected_member_entropy = _entropy(probabilities).mean(axis=1)
+    scores = np.maximum(predictive_entropy - expected_member_entropy, 0.0)
+    return _maybe_signed(scores, ENSEMBLE_BALD, signed)
 
 
 def _kl(p: ArrayLike, q: ArrayLike) -> NDArray[np.float64]:
@@ -283,6 +378,44 @@ def student_teacher_kl_divergence(
         student_probabilities,
     )
     scores = _maybe_average_draws(_kl(teacher, student), average_draws)
+    return _maybe_signed(scores, STUDENT_TEACHER_KL_DIVERGENCE, signed)
+
+
+def student_teacher_kl_divergence_from_logits(
+    teacher_logits: ArrayLike,
+    student_logits: ArrayLike,
+    signed: bool = False,
+    average_draws: bool = True,
+) -> NDArray[np.float64]:
+    """Compute KL(teacher || student) stably from logits.
+
+    This is mathematically equivalent to computing the divergence from
+    softmax probabilities, but avoids exact zeros caused by float32 softmax
+    underflow in saved probability artifacts.
+
+    Args:
+        teacher_logits: Teacher logits with shape ``(n_samples, n_classes)``.
+        student_logits: Student logits with shape ``(n_samples, n_classes)``.
+        signed: If True, apply this score's sign so higher values are more
+            ID-like.
+        average_draws: If True and inputs have shape
+            ``(n_samples, n_draws, n_classes)``, average per-draw scores for
+            each sample.
+
+    Returns:
+        One raw or signed divergence value per sample.
+    """
+
+    teacher, student = _logit_matrices(teacher_logits, student_logits)
+    teacher_log_probabilities = teacher - _logsumexp(teacher, axis=-1)[..., None]
+    student_log_probabilities = student - _logsumexp(student, axis=-1)[..., None]
+    teacher_probabilities = np.exp(teacher_log_probabilities)
+    scores = np.sum(
+        teacher_probabilities
+        * (teacher_log_probabilities - student_log_probabilities),
+        axis=-1,
+    )
+    scores = _maybe_average_draws(scores, average_draws)
     return _maybe_signed(scores, STUDENT_TEACHER_KL_DIVERGENCE, signed)
 
 

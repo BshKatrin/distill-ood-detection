@@ -168,7 +168,7 @@ def train_activation_subspace_student(
     optimizer_config: OptimizerConfig,
     training_config: ResolvedTrainingMethodConfig,
     output_dir: Path,
-    mlflow_enabled: bool = True,
+    mlflow_enabled: bool = False,
 ) -> dict[str, float | int | str]:
     """Train one fixed-input activation-subspace student and save checkpoints."""
 

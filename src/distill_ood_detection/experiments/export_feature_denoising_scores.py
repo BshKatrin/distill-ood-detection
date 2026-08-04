@@ -18,8 +18,12 @@ from distill_ood_detection.datasets.inference import (
 )
 from distill_ood_detection.datasets.pixmix import build_pixmix_mixing_provider
 from distill_ood_detection.distillation.feature_denoising import (
+    class_channel_corruption_path,
     collect_feature_denoising_reconstruction_scores,
     feature_denoising_metadata,
+    feature_normalizer_path,
+    load_class_channel_corruption_bank,
+    load_feature_normalizer,
 )
 from distill_ood_detection.distillation.perturbation import (
     load_pca_projector,
@@ -71,6 +75,37 @@ def run_feature_denoising_score_export(
     pca_projector = None
     if config.strategy.feature_denoising.method == "pca_masked_reconstruction":
         pca_projector = load_pca_projector(pca_projector_path(experiment_dir), device)
+    feature_normalizer = None
+    normalizer_path = feature_normalizer_path(experiment_dir)
+    if (
+        config.strategy.feature_denoising.method
+        == "spatial_block_residual_reconstruction"
+    ):
+        if not normalizer_path.exists():
+            raise FileNotFoundError(
+                f"Missing Feature Denoising normalizer artifact: {normalizer_path}"
+            )
+        feature_normalizer = load_feature_normalizer(normalizer_path, device)
+    class_channel_corruption = None
+    corruption_path = class_channel_corruption_path(experiment_dir)
+    if (
+        config.strategy.feature_denoising.method
+        in {
+            "confusion_channel_replacement_reconstruction",
+            "confusion_channel_replacement_residual_reconstruction",
+        }
+    ):
+        if not corruption_path.exists():
+            raise FileNotFoundError(
+                "Missing class-channel corruption artifact: "
+                f"{corruption_path}"
+            )
+        class_channel_corruption = load_class_channel_corruption_bank(
+            corruption_path,
+            expected_prototype_count=(
+                config.strategy.feature_denoising.prototype_count
+            ),
+        )
     student = build_student(config.student)
     checkpoint_path = _student_checkpoint_path(
         experiment_dir,
@@ -104,20 +139,27 @@ def run_feature_denoising_score_export(
             perturbation_forwarder=perturbation_forwarder,
             feature_denoising_config=config.strategy.feature_denoising,
             pca_projector=pca_projector,
+            feature_normalizer=feature_normalizer,
+            class_channel_corruption=class_channel_corruption,
             image_normalization=image_normalization,
             pixmix_provider=pixmix_provider,
         )
         path = output_dir / named_loader.name / f"student_{checkpoint}.pt"
         path.parent.mkdir(parents=True, exist_ok=True)
+        metadata = {
+            **feature_denoising_metadata(config, checkpoint=checkpoint),
+            "dataset": named_loader.name,
+            "split": named_loader.split,
+            "checkpoint_path": str(checkpoint_path),
+        }
+        if feature_normalizer is not None:
+            metadata["feature_normalizer_path"] = str(normalizer_path)
+        if class_channel_corruption is not None:
+            metadata["class_channel_corruption_path"] = str(corruption_path)
         torch.save(
             {
                 **scores,
-                "metadata": {
-                    **feature_denoising_metadata(config, checkpoint=checkpoint),
-                    "dataset": named_loader.name,
-                    "split": named_loader.split,
-                    "checkpoint_path": str(checkpoint_path),
-                },
+                "metadata": metadata,
             },
             path,
         )

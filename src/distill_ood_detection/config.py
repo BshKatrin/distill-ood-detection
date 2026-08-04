@@ -24,14 +24,25 @@ DistillationMethod = Literal[
 FeatureDenoisingMethod = Literal[
     "pca_masked_reconstruction",
     "spatial_masked_reconstruction",
+    "spatial_block_residual_reconstruction",
     "channel_masked_reconstruction",
+    "channel_masked_residual_reconstruction",
+    "confusion_channel_replacement_reconstruction",
+    "confusion_channel_replacement_residual_reconstruction",
     "spatial_token_prediction",
     "pixel_masked_embedding_prediction",
     "pixel_augmented_embedding_prediction",
     "pixel_masked_multilayer_prediction",
     "pixel_masked_multilayer_l234_prediction",
 ]
+ConfusionSplit = Literal["validation", "test"]
 EmbeddingPool = Literal["avg", "flatten"]
+SubspaceEnsembleMethod = Literal[
+    "channel_flatten",
+    "channel_gap",
+    "pca_gap",
+]
+SubspaceAssignment = Literal["ordered", "partitioned"]
 PixelAugmentationMethod = Literal["affine", "pixmix"]
 TreeDistillationMode = Literal["logits"]
 OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
@@ -40,6 +51,7 @@ StrategyName = Literal[
     "perturbation",
     "feature_denoising",
     "activation_subspace",
+    "subspace_ensemble",
 ]
 ActivationSubspaceComponent = Literal["decisive", "insignificant"]
 ActivationSubspaceTarget = Literal["projected_logits", "coordinates"]
@@ -166,6 +178,10 @@ class FeatureDenoisingConfig:
     method: FeatureDenoisingMethod = "pca_masked_reconstruction"
     activation_path: str | None = None
     mask_probability: float = 0.3
+    prototype_count: int = 50
+    class_statistics_epsilon: float = 1.0e-6
+    confusion_split: ConfusionSplit = "validation"
+    spatial_mask_block_sizes: tuple[int, ...] = (1,)
     target_block_count: int = 4
     target_block_scale_min: float = 0.15
     target_block_scale_max: float = 0.20
@@ -205,6 +221,23 @@ class ActivationSubspaceConfig:
 
 
 @dataclass(frozen=True)
+class SubspaceEnsembleConfig:
+    """Disjoint feature-subspace ensemble settings."""
+
+    method: SubspaceEnsembleMethod = "channel_gap"
+    assignment: SubspaceAssignment = "partitioned"
+    ensemble_size: int = 16
+    expected_feature_shape: tuple[int, int, int] = (512, 4, 4)
+    whitening_epsilon: float = 1.0e-6
+
+    @property
+    def subset_size(self) -> int:
+        """Return the derived number of channels or coordinates per student."""
+
+        return self.expected_feature_shape[0] // self.ensemble_size
+
+
+@dataclass(frozen=True)
 class StrategyConfig:
     """Distillation strategy settings."""
 
@@ -213,6 +246,9 @@ class StrategyConfig:
     feature_denoising: FeatureDenoisingConfig = field(default_factory=FeatureDenoisingConfig)
     activation_subspace: ActivationSubspaceConfig = field(
         default_factory=ActivationSubspaceConfig
+    )
+    subspace_ensemble: SubspaceEnsembleConfig = field(
+        default_factory=SubspaceEnsembleConfig
     )
 
 
@@ -372,7 +408,7 @@ class TrainingConfig:
 class MlflowConfig:
     """MLflow tracking settings."""
 
-    enabled: bool = True
+    enabled: bool = False
     experiment_name: str = "distill-ood-detection"
     tracking_uri: str = "sqlite:///mlflow.db"
 
@@ -407,6 +443,24 @@ class TeacherActivationConfig:
 
 
 @dataclass(frozen=True)
+class EmbeddingDistanceConfig:
+    """Configuration for exporting pooled embeddings and ID distances."""
+
+    experiment_name: str
+    run_dir: str
+    dataset: DatasetConfig = field(default_factory=DatasetConfig)
+    teacher: TeacherConfig = field(default_factory=TeacherConfig)
+    layers: tuple[str, ...] = ("layer1", "layer2", "layer3", "layer4")
+    k_neighbors: int = 10
+    embedding_shard_size: int = 4096
+    query_block_size: int = 1024
+    reference_block_size: int = 8192
+    standardization_epsilon: float = 1.0e-6
+    device: str = "auto"
+    seed: int = 123
+
+
+@dataclass(frozen=True)
 class TeacherProbabilityConfig:
     """Configuration for exporting deterministic teacher probabilities."""
 
@@ -432,6 +486,14 @@ def load_teacher_activation_config(path: Path) -> TeacherActivationConfig:
     with path.open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle) or {}
     return parse_teacher_activation_config(raw)
+
+
+def load_embedding_distance_config(path: Path) -> EmbeddingDistanceConfig:
+    """Load a pooled-embedding distance configuration from a YAML file."""
+
+    with path.open("r", encoding="utf-8") as handle:
+        raw = yaml.safe_load(handle) or {}
+    return parse_embedding_distance_config(raw)
 
 
 def load_teacher_probability_config(path: Path) -> TeacherProbabilityConfig:
@@ -463,6 +525,49 @@ def parse_teacher_activation_config(raw: dict[str, Any]) -> TeacherActivationCon
         raise ValueError("layers must contain at least one teacher layer")
     if any(not isinstance(layer, str) or not layer for layer in config.layers):
         raise ValueError("layers must contain non-empty layer names")
+    return config
+
+
+def parse_embedding_distance_config(raw: dict[str, Any]) -> EmbeddingDistanceConfig:
+    """Parse a pooled-embedding distance configuration."""
+
+    dataset = _parse_dataset_config(raw.get("dataset", {}))
+    teacher = TeacherConfig(**raw.get("teacher", {}))
+    layers = tuple(raw.get("layers", ("layer1", "layer2", "layer3", "layer4")))
+    config = EmbeddingDistanceConfig(
+        experiment_name=raw["experiment_name"],
+        run_dir=raw["run_dir"],
+        dataset=dataset,
+        teacher=teacher,
+        layers=layers,
+        k_neighbors=raw.get("k_neighbors", 10),
+        embedding_shard_size=raw.get("embedding_shard_size", 4096),
+        query_block_size=raw.get("query_block_size", 1024),
+        reference_block_size=raw.get("reference_block_size", 8192),
+        standardization_epsilon=raw.get("standardization_epsilon", 1.0e-6),
+        device=raw.get("device", "auto"),
+        seed=raw.get("seed", 123),
+    )
+    supported_layers = {"layer1", "layer2", "layer3", "layer4"}
+    if teacher.num_classes <= 0:
+        raise ValueError("teacher.num_classes must be positive")
+    if not config.layers:
+        raise ValueError("layers must contain at least one teacher layer")
+    if any(layer not in supported_layers for layer in config.layers):
+        unknown = sorted(set(config.layers) - supported_layers)
+        raise ValueError(f"Unsupported embedding-distance layers: {unknown}")
+    if len(set(config.layers)) != len(config.layers):
+        raise ValueError("layers must not contain duplicates")
+    for name in (
+        "k_neighbors",
+        "embedding_shard_size",
+        "query_block_size",
+        "reference_block_size",
+    ):
+        if getattr(config, name) <= 0:
+            raise ValueError(f"{name} must be positive")
+    if config.standardization_epsilon <= 0.0:
+        raise ValueError("standardization_epsilon must be positive")
     return config
 
 
@@ -498,6 +603,50 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     if "hidden_channels" in student_raw:
         student_raw["hidden_channels"] = tuple(student_raw["hidden_channels"])
     student = _parse_student_config(student_raw, strategy=strategy)
+    if strategy.name == "feature_denoising" and strategy.feature_denoising.method in {
+        "spatial_block_residual_reconstruction",
+        "channel_masked_residual_reconstruction",
+        "confusion_channel_replacement_reconstruction",
+        "confusion_channel_replacement_residual_reconstruction",
+    }:
+        residual_method = strategy.feature_denoising.method
+        if student.kind != "feature_residual_denoiser":
+            raise ValueError(
+                f"{residual_method} requires "
+                "student.kind: feature_residual_denoiser"
+            )
+        if len(student.input_shape) != 3:
+            raise ValueError(
+                "feature_residual_denoiser input_shape must contain channels, "
+                "height, and width"
+            )
+        input_channels, height, width = student.input_shape
+        expected_input_channels = student.num_classes + (
+            1 if residual_method == "spatial_block_residual_reconstruction" else 0
+        )
+        if input_channels != expected_input_channels:
+            expected_description = (
+                "student.num_classes + 1"
+                if residual_method == "spatial_block_residual_reconstruction"
+                else "student.num_classes"
+            )
+            raise ValueError(
+                "feature_residual_denoiser input channels must equal "
+                f"{expected_description} for {residual_method}"
+            )
+        if len(student.hidden_channels) > 1:
+            raise ValueError(
+                "feature_residual_denoiser student.hidden_channels must contain "
+                "at most one hidden width"
+            )
+        if residual_method == "spatial_block_residual_reconstruction" and any(
+            block_size > min(height, width)
+            for block_size in strategy.feature_denoising.spatial_mask_block_sizes
+        ):
+            raise ValueError(
+                "strategy.feature_denoising.spatial_mask_block_sizes must fit "
+                "student.input_shape"
+            )
     if strategy.name == "activation_subspace":
         activation_subspace = strategy.activation_subspace
         if activation_subspace.target == "projected_logits" and (
@@ -515,9 +664,27 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
             raise ValueError(
                 "activation-subspace coordinate targets require an autoencoder"
             )
+    if strategy.name == "subspace_ensemble" and student.kind != "linear":
+        raise ValueError("subspace-ensemble training currently requires a linear student")
+    if strategy.name == "subspace_ensemble":
+        ensemble = strategy.subspace_ensemble
+        expected_input_dimension = ensemble.subset_size
+        if ensemble.method == "channel_flatten":
+            _channels, height, width = ensemble.expected_feature_shape
+            expected_input_dimension *= height * width
+        if student.input_shape != (expected_input_dimension,):
+            raise ValueError(
+                "subspace-ensemble student.input_shape must match one member "
+                f"input: {student.input_shape} != {(expected_input_dimension,)}"
+            )
     if (
         strategy.name
-        in {"perturbation", "feature_denoising", "activation_subspace"}
+        in {
+            "perturbation",
+            "feature_denoising",
+            "activation_subspace",
+            "subspace_ensemble",
+        }
         and student.feature_layer is None
         and not (
             strategy.name == "perturbation"
@@ -526,7 +693,7 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     ):
         raise ValueError(
             "student.feature_layer is required for perturbation, Feature Denoising, "
-            "and activation-subspace strategies"
+            "activation-subspace, and subspace-ensemble strategies"
         )
     if (
         strategy.name == "perturbation"
@@ -542,8 +709,24 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
             and strategy.name not in {"feature_denoising", "activation_subspace"}
         ),
     )
+    if strategy.name == "subspace_ensemble":
+        unsupported_methods = set(training.enabled_methods()) - {
+            "mse_logits",
+            "kl_divergence",
+        }
+        if unsupported_methods:
+            methods = ", ".join(sorted(unsupported_methods))
+            raise ValueError(
+                "subspace-ensemble training supports only mse_logits and "
+                f"kl_divergence; got {methods}"
+            )
     tree = _parse_tree_config(raw.get("tree", {}))
     mlflow = MlflowConfig(**raw.get("mlflow", {}))
+    if mlflow.enabled:
+        raise ValueError(
+            "MLflow tracking is disabled for this project; "
+            "set mlflow.enabled to false"
+        )
 
     return ExperimentConfig(
         experiment_name=raw["experiment_name"],
@@ -585,6 +768,7 @@ def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> Stud
         "mlp",
         "random_forest",
         "feature_reconstructor",
+        "feature_residual_denoiser",
         "spatial_token_predictor",
         "autoencoder",
     }:
@@ -626,6 +810,7 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
     perturbation_raw = strategy_raw.pop("perturbation", {})
     feature_denoising_raw = strategy_raw.pop("feature_denoising", {})
     activation_subspace_raw = strategy_raw.pop("activation_subspace", {})
+    subspace_ensemble_raw = strategy_raw.pop("subspace_ensemble", {})
     strategy_name = strategy_raw.pop("name", "baseline")
     if (
         perturbation_raw.get("method") == "pixel_augmentation"
@@ -660,6 +845,10 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
     }
     perturbation_pixmix_raw = perturbation_raw.pop("pixmix", {})
     feature_denoising_pixmix_raw = feature_denoising_raw.pop("pixmix", {})
+    if "spatial_mask_block_sizes" in feature_denoising_raw:
+        feature_denoising_raw["spatial_mask_block_sizes"] = tuple(
+            feature_denoising_raw["spatial_mask_block_sizes"]
+        )
     perturbation_raw["pixmix"] = PixMixConfig(**perturbation_pixmix_raw)
     feature_denoising_raw["pixmix"] = PixMixConfig(**feature_denoising_pixmix_raw)
     perturbation = PerturbationConfig(
@@ -668,11 +857,17 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
     )
     feature_denoising = FeatureDenoisingConfig(**feature_denoising_raw)
     activation_subspace = ActivationSubspaceConfig(**activation_subspace_raw)
+    if "expected_feature_shape" in subspace_ensemble_raw:
+        subspace_ensemble_raw["expected_feature_shape"] = tuple(
+            subspace_ensemble_raw["expected_feature_shape"]
+        )
+    subspace_ensemble = SubspaceEnsembleConfig(**subspace_ensemble_raw)
     strategy = StrategyConfig(
         name=strategy_name,
         perturbation=perturbation,
         feature_denoising=feature_denoising,
         activation_subspace=activation_subspace,
+        subspace_ensemble=subspace_ensemble,
     )
     if strategy_raw:
         unknown = ", ".join(sorted(strategy_raw))
@@ -682,6 +877,7 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         "perturbation",
         "feature_denoising",
         "activation_subspace",
+        "subspace_ensemble",
     }:
         raise ValueError(f"Unsupported strategy: {strategy.name}")
     if perturbation.method not in {
@@ -764,7 +960,11 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
     if feature_denoising.method not in {
         "pca_masked_reconstruction",
         "spatial_masked_reconstruction",
+        "spatial_block_residual_reconstruction",
         "channel_masked_reconstruction",
+        "channel_masked_residual_reconstruction",
+        "confusion_channel_replacement_reconstruction",
+        "confusion_channel_replacement_residual_reconstruction",
         "spatial_token_prediction",
         "pixel_masked_embedding_prediction",
         "pixel_augmented_embedding_prediction",
@@ -774,6 +974,37 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         raise ValueError(f"Unsupported Feature Denoising method: {feature_denoising.method}")
     if not 0.0 < feature_denoising.mask_probability < 1.0:
         raise ValueError("strategy.feature_denoising.mask_probability requires 0 < p < 1")
+    if feature_denoising.prototype_count <= 0:
+        raise ValueError(
+            "strategy.feature_denoising.prototype_count must be positive"
+        )
+    if feature_denoising.class_statistics_epsilon <= 0.0:
+        raise ValueError(
+            "strategy.feature_denoising.class_statistics_epsilon must be positive"
+        )
+    if feature_denoising.confusion_split not in {"validation", "test"}:
+        raise ValueError(
+            "strategy.feature_denoising.confusion_split must be "
+            "'validation' or 'test'"
+        )
+    if not feature_denoising.spatial_mask_block_sizes:
+        raise ValueError(
+            "strategy.feature_denoising.spatial_mask_block_sizes must not be empty"
+        )
+    if any(
+        block_size <= 0
+        for block_size in feature_denoising.spatial_mask_block_sizes
+    ):
+        raise ValueError(
+            "strategy.feature_denoising.spatial_mask_block_sizes must be positive"
+        )
+    if len(set(feature_denoising.spatial_mask_block_sizes)) != len(
+        feature_denoising.spatial_mask_block_sizes
+    ):
+        raise ValueError(
+            "strategy.feature_denoising.spatial_mask_block_sizes must not "
+            "contain duplicates"
+        )
     if feature_denoising.target_block_count <= 0:
         raise ValueError("strategy.feature_denoising.target_block_count must be positive")
     if not 0.0 < feature_denoising.target_block_scale_min <= feature_denoising.target_block_scale_max <= 1.0:
@@ -850,6 +1081,42 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
     if activation_subspace.embedding_pool != "avg":
         raise ValueError(
             "strategy.activation_subspace.embedding_pool currently supports only avg"
+        )
+    if subspace_ensemble.method not in {
+        "channel_flatten",
+        "channel_gap",
+        "pca_gap",
+    }:
+        raise ValueError(
+            "strategy.subspace_ensemble.method must be channel_flatten, "
+            "channel_gap, or pca_gap"
+        )
+    if subspace_ensemble.assignment not in {"ordered", "partitioned"}:
+        raise ValueError(
+            "strategy.subspace_ensemble.assignment must be ordered or partitioned"
+        )
+    if subspace_ensemble.ensemble_size <= 1:
+        raise ValueError(
+            "strategy.subspace_ensemble.ensemble_size must be greater than one"
+        )
+    if len(subspace_ensemble.expected_feature_shape) != 3:
+        raise ValueError(
+            "strategy.subspace_ensemble.expected_feature_shape must contain "
+            "channels, height, and width"
+        )
+    if any(dimension <= 0 for dimension in subspace_ensemble.expected_feature_shape):
+        raise ValueError(
+            "strategy.subspace_ensemble.expected_feature_shape values must be positive"
+        )
+    channel_count = subspace_ensemble.expected_feature_shape[0]
+    if channel_count % subspace_ensemble.ensemble_size != 0:
+        raise ValueError(
+            "strategy.subspace_ensemble expected channel count must be divisible "
+            "by ensemble_size"
+        )
+    if subspace_ensemble.whitening_epsilon <= 0.0:
+        raise ValueError(
+            "strategy.subspace_ensemble.whitening_epsilon must be positive"
         )
     return strategy
 

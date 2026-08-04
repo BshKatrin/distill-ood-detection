@@ -31,6 +31,7 @@ TREE_MODE="${TREE_MODE:-}"
 INCLUDE_TRAIN="${INCLUDE_TRAIN:-0}"
 INCLUDE_VALIDATION="${INCLUDE_VALIDATION:-0}"
 APPLY_PERTURBATION="${APPLY_PERTURBATION:-0}"
+SKIP_UV_SYNC="${SKIP_UV_SYNC:-0}"
 
 configs=("$@")
 
@@ -63,9 +64,13 @@ case "${MODE}" in
     ;;
 esac
 
-echo "[$(date --iso-8601=seconds)] Syncing uv GPU environment"
 uv --version
-uv sync --project envs/gpu --locked
+if [ "${SKIP_UV_SYNC}" = "1" ]; then
+  echo "[$(date --iso-8601=seconds)] Reusing existing uv GPU environment"
+else
+  echo "[$(date --iso-8601=seconds)] Syncing uv GPU environment"
+  uv sync --project envs/gpu --locked
+fi
 
 run_distill_ood() {
   uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli "$@"
@@ -105,6 +110,11 @@ is_feature_denoising_config() {
   [[ "${config}" == configs/students/feature_denoising/* ]]
 }
 
+is_subspace_ensemble_config() {
+  local config="$1"
+  [[ "${config}" == configs/students/subspace_ensemble/* ]]
+}
+
 train_config() {
   local config="$1"
 
@@ -127,6 +137,20 @@ train_config() {
 
 infer_config() {
   local config="$1"
+  if is_subspace_ensemble_config "${config}"; then
+    echo "[$(date --iso-8601=seconds)] Exporting subspace-ensemble predictions: ${config}"
+    run_distill_ood \
+      export-subspace-ensemble-inference \
+      --config "${config}" \
+      --checkpoint "${CHECKPOINT}"
+    echo "[$(date --iso-8601=seconds)] Exporting subspace-ensemble OOD Scores: ${config}"
+    run_distill_ood \
+      export-subspace-ensemble-scores \
+      --config "${config}" \
+      --checkpoint "${CHECKPOINT}"
+    return
+  fi
+
   if is_feature_denoising_config "${config}"; then
     local args=(export-feature-denoising-scores --config "${config}" --checkpoint "${CHECKPOINT}")
 

@@ -1,0 +1,61 @@
+experiment_name: subspace_ensemble_pca_gap_ordered_linear_resnet18_cifar10
+run_dir: runs/students/subspace_ensemble/pca_gap/cifar_10/resnet18/linear/ordered
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar100
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar10
+  revision: main
+  num_classes: 10
+
+student:
+  kind: linear
+  feature_layer: layer4
+  input_shape: [32]
+  num_classes: 10
+
+strategy:
+  name: subspace_ensemble
+  subspace_ensemble:
+    method: pca_gap
+    assignment: ordered
+    ensemble_size: 16
+    expected_feature_shape: [512, 4, 4]
+    whitening_epsilon: 0.000001
+
+optimizer:
+  mse_logits:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+  kl_divergence:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+    kl_divergence: {}
+
+mlflow:
+  enabled: false
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///runs/students/subspace_ensemble/pca_gap/cifar_10/resnet18/linear/ordered/mlflow.db

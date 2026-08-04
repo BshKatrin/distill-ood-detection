@@ -14,6 +14,24 @@ from distill_ood_detection.models.student import MLPStudent, build_student
 class StudentModelTests(unittest.TestCase):
     """Validate configurable PyTorch student models."""
 
+    def test_mlflow_is_disabled_and_cannot_be_enabled(self) -> None:
+        config = parse_config(
+            {
+                "experiment_name": "mlflow_disabled",
+                "run_dir": "runs/tests/mlflow_disabled",
+            }
+        )
+        self.assertFalse(config.mlflow.enabled)
+
+        with self.assertRaisesRegex(ValueError, "MLflow tracking is disabled"):
+            parse_config(
+                {
+                    "experiment_name": "mlflow_enabled",
+                    "run_dir": "runs/tests/mlflow_enabled",
+                    "mlflow": {"enabled": True},
+                }
+            )
+
     def test_loads_mlp_config(self) -> None:
         config = load_config(Path("configs/students/baseline/cifar_10/resnet18/mlp.yaml"))
 

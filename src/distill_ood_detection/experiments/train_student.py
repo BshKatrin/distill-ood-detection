@@ -9,7 +9,11 @@ import mlflow
 import torch
 
 from distill_ood_detection.config import DistillationMethod, ExperimentConfig
-from distill_ood_detection.datasets.inference import build_id_loaders, dataset_normalization
+from distill_ood_detection.datasets.inference import (
+    build_id_loaders,
+    build_in_distribution_train_loader,
+    dataset_normalization,
+)
 from distill_ood_detection.datasets.pixmix import build_pixmix_mixing_provider
 from distill_ood_detection.distillation.train import train_student
 from distill_ood_detection.distillation.activation_subspace import (
@@ -24,8 +28,19 @@ from distill_ood_detection.distillation.perturbation import (
     pca_projector_path,
     save_pca_projector,
 )
+from distill_ood_detection.distillation.subspace_ensemble import (
+    fit_subspace_ensemble,
+    save_fitted_subspace_ensemble,
+    train_subspace_ensemble,
+)
 from distill_ood_detection.distillation.feature_denoising import (
+    class_channel_corruption_path,
+    feature_normalizer_path,
+    fit_class_channel_corruption_bank,
+    fit_feature_normalizer_from_loader,
     reconstruction_loss,
+    save_class_channel_corruption_bank,
+    save_feature_normalizer,
     train_feature_denoising_student,
 )
 from distill_ood_detection.evaluation.metrics import accuracy, distillation_metrics
@@ -41,7 +56,7 @@ from distill_ood_detection.utils import resolve_device, set_seed, write_json
 def run_experiment(
     config: ExperimentConfig,
     method: DistillationMethod | None = None,
-) -> list[dict[str, float | int | str]]:
+) -> list[dict[str, object]]:
     """Run one or all student distillation methods from an experiment config."""
 
     training_defaults = config.training.defaults
@@ -139,6 +154,7 @@ def run_experiment(
         "perturbation",
         "feature_denoising",
         "activation_subspace",
+        "subspace_ensemble",
     }:
         if config.student.feature_layer is None:
             raise ValueError("student.feature_layer is required for this strategy")
@@ -148,6 +164,109 @@ def run_experiment(
         )
     else:
         perturbation_forwarder = None
+    feature_normalizer = None
+    if (
+        config.strategy.name == "feature_denoising"
+        and config.strategy.feature_denoising.method
+        == "spatial_block_residual_reconstruction"
+    ):
+        if perturbation_forwarder is None:
+            raise ValueError(
+                "Spatial block residual reconstruction requires a feature forwarder"
+            )
+        statistics_loader = build_in_distribution_train_loader(
+            config.dataset,
+            training_defaults.seed,
+        )
+        feature_normalizer = fit_feature_normalizer_from_loader(
+            statistics_loader.loader,
+            perturbation_forwarder,
+            device,
+        ).to(device)
+        normalizer_artifact_path = feature_normalizer_path(experiment_dir)
+        save_feature_normalizer(
+            normalizer_artifact_path,
+            feature_normalizer,
+            {
+                "dataset": statistics_loader.name,
+                "split": statistics_loader.split,
+                "source": "student_training_subset",
+                "sample_count": len(statistics_loader.loader.dataset),
+                "validation_fraction": config.dataset.validation_fraction,
+                "split_seed": training_defaults.seed,
+                "feature_layer": config.student.feature_layer,
+                "strategy": config.strategy.name,
+                "method": config.strategy.feature_denoising.method,
+            },
+        )
+        set_seed(training_defaults.seed)
+    class_channel_corruption = None
+    if (
+        config.strategy.name == "feature_denoising"
+        and config.strategy.feature_denoising.method
+        in {
+            "confusion_channel_replacement_reconstruction",
+            "confusion_channel_replacement_residual_reconstruction",
+        }
+    ):
+        if perturbation_forwarder is None:
+            raise ValueError(
+                "Confusion-channel replacement requires a feature forwarder"
+            )
+        prototype_loader = build_in_distribution_train_loader(
+            config.dataset,
+            training_defaults.seed,
+        )
+        corruption_config = config.strategy.feature_denoising
+        confusion_loader = (
+            loaders.test
+            if corruption_config.confusion_split == "test"
+            else loaders.validation
+        )
+        class_channel_corruption = fit_class_channel_corruption_bank(
+            validation_loader=loaders.validation,
+            confusion_loader=confusion_loader,
+            prototype_loader=prototype_loader.loader,
+            perturbation_forwarder=perturbation_forwarder,
+            device=device,
+            num_classes=config.teacher.num_classes,
+            prototype_count=corruption_config.prototype_count,
+        )
+        corruption_artifact_path = class_channel_corruption_path(
+            experiment_dir
+        )
+        save_class_channel_corruption_bank(
+            corruption_artifact_path,
+            class_channel_corruption,
+            {
+                "artifact_version": 1,
+                "validation_dataset": f"{config.dataset.name}_validation",
+                "validation_split": "validation",
+                "validation_sample_count": len(loaders.validation.dataset),
+                "confusion_dataset": (
+                    f"{config.dataset.name}_{corruption_config.confusion_split}"
+                ),
+                "confusion_split": corruption_config.confusion_split,
+                "confusion_sample_count": len(confusion_loader.dataset),
+                "prototype_dataset": prototype_loader.name,
+                "prototype_split": prototype_loader.split,
+                "prototype_sample_count": len(prototype_loader.loader.dataset),
+                "prototype_count_per_class": corruption_config.prototype_count,
+                "prototype_source_index_kind": (
+                    "deterministic_subset_loader_offset"
+                ),
+                "validation_fraction": config.dataset.validation_fraction,
+                "split_seed": training_defaults.seed,
+                "feature_layer": config.student.feature_layer,
+                "teacher": asdict(config.teacher),
+                "strategy": config.strategy.name,
+                "method": corruption_config.method,
+                "class_statistics_epsilon": (
+                    corruption_config.class_statistics_epsilon
+                ),
+            },
+        )
+        set_seed(training_defaults.seed)
     feature_extractor = (
         TeacherFeatureExtractor(teacher, config.student.feature_layer)
         if config.student.feature_layer is not None and perturbation_forwarder is None
@@ -159,7 +278,7 @@ def run_experiment(
     }
     write_json(experiment_dir / "teacher_metrics.json", teacher_metrics)
 
-    summaries: list[dict[str, float | int | str]] = []
+    summaries: list[dict[str, object]] = []
     with _mlflow_parent_run(config):
         if config.mlflow.enabled:
             mlflow.log_params(_flatten_config(asdict(config)))
@@ -329,6 +448,94 @@ def run_experiment(
             write_json(experiment_dir / "summary.json", {"methods": summaries})
             return summaries
 
+        if config.strategy.name == "subspace_ensemble":
+            if perturbation_forwarder is None:
+                raise ValueError(
+                    "Subspace-ensemble training requires a feature forwarder"
+                )
+            ensemble_config = config.strategy.subspace_ensemble
+            fitted = fit_subspace_ensemble(
+                config=ensemble_config,
+                forwarder=perturbation_forwarder,
+                train_loader=loaders.train,
+                device=device,
+                seed=training_defaults.seed,
+            )
+            subspace_path = experiment_dir / "subspace_ensemble.pt"
+            save_fitted_subspace_ensemble(subspace_path, fitted)
+            input_dimension = ensemble_config.subset_size
+            if ensemble_config.method == "channel_flatten":
+                _channels, height, width = ensemble_config.expected_feature_shape
+                input_dimension *= height * width
+            if config.student.input_shape != (input_dimension,):
+                raise ValueError(
+                    "student.input_shape must match one ensemble member input: "
+                    f"{config.student.input_shape} != {(input_dimension,)}"
+                )
+            for current_method in methods:
+                if current_method not in {"mse_logits", "kl_divergence"}:
+                    raise ValueError(
+                        "Subspace ensembles support only mse_logits and "
+                        "kl_divergence"
+                    )
+                # Reset once per objective so both objectives start from the
+                # same reproducible sequence of 16 distinct initializations.
+                set_seed(training_defaults.seed)
+                students = torch.nn.ModuleList(
+                    [
+                        build_student(config.student)
+                        for _ in range(ensemble_config.ensemble_size)
+                    ]
+                )
+                output_dir = experiment_dir / current_method
+                method_training_config = config.training.for_method(current_method)
+                with _mlflow_method_run(config, current_method):
+                    if config.mlflow.enabled:
+                        mlflow.log_param("distillation_method", current_method)
+                        mlflow.log_param(
+                            "distillation_strategy",
+                            config.strategy.name,
+                        )
+                        mlflow.log_param(
+                            "subspace_method",
+                            ensemble_config.method,
+                        )
+                        mlflow.log_param(
+                            "ensemble_size",
+                            ensemble_config.ensemble_size,
+                        )
+                        mlflow.log_param(
+                            "subspace_assignment",
+                            ensemble_config.assignment,
+                        )
+                        mlflow.log_param(
+                            "subset_size",
+                            ensemble_config.subset_size,
+                        )
+                    summary = train_subspace_ensemble(
+                        students=students,
+                        fitted=fitted,
+                        method=current_method,
+                        forwarder=perturbation_forwarder,
+                        train_loader=loaders.train,
+                        validation_loader=loaders.validation,
+                        test_loader=loaders.test,
+                        device=device,
+                        optimizer_config=config.optimizer.for_method(current_method),
+                        training_config=method_training_config,
+                        output_dir=output_dir,
+                        mlflow_enabled=config.mlflow.enabled,
+                    )
+                    summary["subspace_path"] = str(subspace_path)
+                    write_json(output_dir / "metrics.json", summary)
+                    if config.mlflow.enabled:
+                        mlflow.log_artifact(str(output_dir / "metrics.json"))
+                        mlflow.log_artifact(str(output_dir / "history.json"))
+                        mlflow.log_artifact(str(subspace_path))
+                    summaries.append(summary)
+            write_json(experiment_dir / "summary.json", {"methods": summaries})
+            return summaries
+
         if config.strategy.name == "feature_denoising":
             if perturbation_forwarder is None:
                 raise ValueError("Feature Denoising training requires a feature forwarder")
@@ -351,9 +558,19 @@ def run_experiment(
                     perturbation_forwarder=perturbation_forwarder,
                     feature_denoising_config=config.strategy.feature_denoising,
                     pca_projector=pca_projector,
+                    feature_normalizer=feature_normalizer,
+                    class_channel_corruption=class_channel_corruption,
                     image_normalization=image_normalization,
                     pixmix_provider=feature_denoising_pixmix_provider,
                 )
+                if feature_normalizer is not None:
+                    summary["feature_normalizer_path"] = str(
+                        feature_normalizer_path(experiment_dir)
+                    )
+                if class_channel_corruption is not None:
+                    summary["class_channel_corruption_path"] = str(
+                        class_channel_corruption_path(experiment_dir)
+                    )
                 best_checkpoint_path = Path(str(summary["best_checkpoint_path"]))
                 student.load_state_dict(
                     torch.load(
@@ -369,6 +586,8 @@ def run_experiment(
                     perturbation_forwarder=perturbation_forwarder,
                     feature_denoising_config=config.strategy.feature_denoising,
                     pca_projector=pca_projector,
+                    feature_normalizer=feature_normalizer,
+                    class_channel_corruption=class_channel_corruption,
                     image_normalization=image_normalization,
                     pixmix_provider=feature_denoising_pixmix_provider,
                 )
@@ -378,6 +597,14 @@ def run_experiment(
                     mlflow.log_metric("test_reconstruction_loss", test_reconstruction_loss)
                     mlflow.log_artifact(str(output_dir / "metrics.json"))
                     mlflow.log_artifact(str(output_dir / "history.json"))
+                    if feature_normalizer is not None:
+                        mlflow.log_artifact(
+                            str(feature_normalizer_path(experiment_dir))
+                        )
+                    if class_channel_corruption is not None:
+                        mlflow.log_artifact(
+                            str(class_channel_corruption_path(experiment_dir))
+                        )
                 summaries.append(summary)
             write_json(experiment_dir / "summary.json", {"methods": summaries})
             return summaries

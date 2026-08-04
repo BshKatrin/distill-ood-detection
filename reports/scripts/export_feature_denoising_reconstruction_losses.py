@@ -14,7 +14,6 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_PATH = ROOT / "reports" / "outputs" / "latex" / "metrics_test_feature_denoising.tex"
 DEFAULT_JSON_OUTPUT = ROOT / "reports" / "outputs" / "json" / "feature_denoising_reconstruction_losses.json"
-METHOD_DIR = "pca_masked_reconstruction"
 
 
 def main() -> None:
@@ -54,11 +53,11 @@ def available_configs(config_paths: Iterable[Path]) -> list[dict[str, Any]]:
             config = yaml.safe_load(file)
         if config.get("strategy", {}).get("name") != "feature_denoising":
             continue
-        metrics_path = ROOT / config["run_dir"] / METHOD_DIR / "metrics.json"
+        metrics_path = metrics_path_for_config(config)
         if not metrics_path.exists():
             print(f"Skipping {path}: missing Feature Denoising reconstruction metrics", file=sys.stderr)
             continue
-        config["_path"] = str(path)
+        config["_path"] = str(path.relative_to(ROOT))
         configs.append(config)
     return configs
 
@@ -66,7 +65,7 @@ def available_configs(config_paths: Iterable[Path]) -> list[dict[str, Any]]:
 def losses_for_config(config: dict[str, Any]) -> dict[str, Any]:
     """Load final reconstruction losses for one config."""
 
-    metrics_path = ROOT / config["run_dir"] / METHOD_DIR / "metrics.json"
+    metrics_path = metrics_path_for_config(config)
     with metrics_path.open(encoding="utf-8") as file:
         metrics = json.load(file)
     return {
@@ -77,6 +76,15 @@ def losses_for_config(config: dict[str, Any]) -> dict[str, Any]:
         "final_validation_reconstruction_loss": metrics.get("final_validation_reconstruction_loss"),
         "test_reconstruction_loss": metrics.get("test_reconstruction_loss"),
     }
+
+
+def metrics_path_for_config(config: dict[str, Any]) -> Path:
+    """Resolve the method-specific Feature Denoising metrics artifact."""
+
+    method = config.get("strategy", {}).get("feature_denoising", {}).get("method")
+    if not isinstance(method, str) or not method:
+        raise ValueError("Feature Denoising config is missing strategy.feature_denoising.method")
+    return ROOT / config["run_dir"] / method / "metrics.json"
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:

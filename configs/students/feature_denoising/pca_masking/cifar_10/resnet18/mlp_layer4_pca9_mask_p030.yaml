@@ -52,6 +52,6 @@ training:
     mse_logits: {}
 
 mlflow:
-  enabled: true
+  enabled: false
   experiment_name: distill-ood-detection
   tracking_uri: sqlite:///mlflow.db

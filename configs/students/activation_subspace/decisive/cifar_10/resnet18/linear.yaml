@@ -50,6 +50,6 @@ training:
     mse_logits: {}
 
 mlflow:
-  enabled: true
+  enabled: false
   experiment_name: distill-ood-detection
   tracking_uri: sqlite:///runs/students/activation_subspace/decisive/cifar_10/resnet18/linear/mlflow.db

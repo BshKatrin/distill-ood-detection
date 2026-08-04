@@ -20,6 +20,7 @@ DEFAULT_OUTPUT_PATH = ROOT / "reports" / "outputs" / "latex" / "metrics_feature_
 DEFAULT_JSON_OUTPUT = ROOT / "reports" / "outputs" / "json" / "feature_denoising_ood_metrics.json"
 SCORES = (
     "default",
+    "negative_identity_error",
     "relative_improvement",
     "improvement",
     "cosine_similarity",
@@ -89,7 +90,7 @@ def available_configs(config_paths: Iterable[Path]) -> list[dict[str, Any]]:
         if score_artifact_dir(config).is_none:
             print(f"Skipping {path}: missing Feature Denoising score artifacts", file=sys.stderr)
             continue
-        config["_path"] = str(path)
+        config["_path"] = str(path.relative_to(ROOT))
         configs.append(config)
     return configs
 
@@ -159,6 +160,8 @@ def artifact_scores(
     if score == "default":
         score_name = artifact.get("metadata", {}).get("score", "feature_denoising_pca_reconstruction_error")
         return to_numpy(artifact["scores"]), str(score_name)
+    if score == "negative_identity_error":
+        return -to_numpy(required_artifact_value(artifact, "identity_error")), "negative_identity_error"
     if score == "relative_improvement":
         identity_error = to_numpy(required_artifact_value(artifact, "identity_error"))
         reconstruction_error = to_numpy(required_artifact_value(artifact, "raw_reconstruction_error"))

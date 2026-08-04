@@ -16,6 +16,7 @@ from distill_ood_detection.evaluation import (
     student_energy,
     student_msp,
     student_teacher_kl_divergence,
+    student_teacher_kl_divergence_from_logits,
 )
 from distill_ood_detection.evaluation.ood_scores import SIGNS
 
@@ -54,6 +55,37 @@ class OODScoreTests(unittest.TestCase):
                 ]
             ),
         )
+
+    def test_student_teacher_kl_divergence_from_logits(self) -> None:
+        teacher_logits = np.array([[2.0, 1.0], [-1.0, 3.0]])
+        student_logits = np.array([[1.0, 2.0], [0.0, 2.0]])
+        teacher = np.exp(teacher_logits) / np.exp(teacher_logits).sum(
+            axis=-1,
+            keepdims=True,
+        )
+        student = np.exp(student_logits) / np.exp(student_logits).sum(
+            axis=-1,
+            keepdims=True,
+        )
+
+        np.testing.assert_allclose(
+            student_teacher_kl_divergence_from_logits(
+                teacher_logits,
+                student_logits,
+            ),
+            student_teacher_kl_divergence(teacher, student),
+        )
+
+    def test_logit_kl_remains_finite_after_probability_underflow(self) -> None:
+        teacher_logits = np.array([[0.0, -10.0]])
+        student_logits = np.array([[0.0, -1000.0]])
+
+        divergence = student_teacher_kl_divergence_from_logits(
+            teacher_logits,
+            student_logits,
+        )
+
+        self.assertTrue(np.isfinite(divergence).all())
 
     def test_logit_l2_distance_uses_centered_logits(self) -> None:
         teacher = np.array([[1.0, 2.0, 3.0], [0.0, 4.0, 8.0]])
@@ -148,12 +180,18 @@ class OODScoreTests(unittest.TestCase):
                 "student_energy",
                 "feature_denoising_pca_reconstruction_error",
                 "feature_denoising_spatial_reconstruction_error",
+                "feature_denoising_spatial_block_residual_reconstruction_error",
                 "feature_denoising_channel_reconstruction_error",
+                "feature_denoising_channel_residual_reconstruction_error",
+                "feature_denoising_confusion_channel_replacement_reconstruction_error",
+                "feature_denoising_confusion_channel_replacement_residual_reconstruction_error",
                 "feature_denoising_spatial_token_prediction_error",
                 "feature_denoising_pixel_embedding_prediction_error",
                 "feature_denoising_pixel_augmented_embedding_prediction_error",
                 "feature_denoising_pixel_multilayer_prediction_error",
                 "feature_denoising_pixel_multilayer_l234_prediction_error",
+                "ensemble_predictive_entropy",
+                "ensemble_bald",
             },
         )
 

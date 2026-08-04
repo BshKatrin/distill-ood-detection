@@ -20,6 +20,11 @@ By default, each config runs a train-then-infer pipeline. Configs whose path
 contains `random_forest` use `train-tree-student`; all other configs use
 `train-student`.
 
+Configs below `configs/students/subspace_ensemble/` use the specialized
+ensemble inference and score exporters after training. Their `train-infer`
+pipeline therefore finishes with predictive-entropy and BALD OOD metrics
+rather than the generic single-student probability export.
+
 ## Modes
 
 Set `MODE` to choose the pipeline:
@@ -79,6 +84,8 @@ The script maps these environment variables to CLI flags:
 - `INCLUDE_TRAIN=1`: add `infer-probabilities --include-train`.
 - `INCLUDE_VALIDATION=1`: add `infer-probabilities --include-validation`.
 - `APPLY_PERTURBATION=1`: add `infer-probabilities --apply-perturbation`.
+- `SKIP_UV_SYNC=1`: reuse an already-synchronized GPU environment. Use this
+  only when the environment has been preflighted for the current checkout.
 
 ## Teacher-only probability exports
 
@@ -106,6 +113,22 @@ Teacher logit/probability artifacts are written under:
 ```text
 <run_dir>/teacher_probabilities/
 ```
+
+## Layerwise embedding distances
+
+Use `slurm_scripts/export_embedding_distances.sbatch` with one config under
+`configs/embedding_distances/`. The job extracts GAP embeddings from all four
+ResNet stages, selects exact top-k ID training neighbors in bounded blocks, and
+computes classifier-based OOD Scores from their mean probabilities and logits:
+
+```bash
+sbatch --exclude=daft \
+  slurm_scripts/export_embedding_distances.sbatch \
+  configs/embedding_distances/cifar_10/resnet50.yaml
+```
+
+Artifacts are written below
+`runs/embedding_distances/<id_dataset>/<teacher_architecture>/`.
 
 ## Report tables
 

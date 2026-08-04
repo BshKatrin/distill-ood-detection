@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from distill_ood_detection.config import (
+    load_embedding_distance_config,
     load_config,
     load_teacher_activation_config,
     load_teacher_probability_config,
@@ -92,6 +93,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("configs/teachers/cifar_10/resnet18.yaml"),
         help="Path to a YAML teacher activation export config.",
+    )
+    embedding_distances_parser = subparsers.add_parser(
+        "export-embedding-distances",
+        help="Export pooled teacher embeddings and exact ID-reference distances.",
+    )
+    embedding_distances_parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a YAML embedding-distance config.",
     )
     probabilities_parser = subparsers.add_parser("export-teacher-probabilities")
     probabilities_parser.add_argument(
@@ -187,6 +198,38 @@ def build_parser() -> argparse.ArgumentParser:
         default="best",
         help="Student inference checkpoint to score. Defaults to best.",
     )
+    subspace_ensemble_inference_parser = subparsers.add_parser(
+        "export-subspace-ensemble-inference",
+        help="Export per-member logits and probabilities for a subspace ensemble.",
+    )
+    subspace_ensemble_inference_parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a subspace-ensemble experiment config.",
+    )
+    subspace_ensemble_inference_parser.add_argument(
+        "--checkpoint",
+        choices=("best", "latest"),
+        default="best",
+        help="Ensemble checkpoint to use. Defaults to best.",
+    )
+    subspace_ensemble_scores_parser = subparsers.add_parser(
+        "export-subspace-ensemble-scores",
+        help="Export predictive-entropy and BALD OOD Scores.",
+    )
+    subspace_ensemble_scores_parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a subspace-ensemble experiment config.",
+    )
+    subspace_ensemble_scores_parser.add_argument(
+        "--checkpoint",
+        choices=("best", "latest"),
+        default="best",
+        help="Ensemble inference checkpoint to score. Defaults to best.",
+    )
     return parser
 
 
@@ -234,6 +277,13 @@ def main() -> None:
 
         config = load_teacher_probability_config(args.config)
         run_teacher_probability_export(config)
+    if args.command == "export-embedding-distances":
+        from distill_ood_detection.experiments.export_embedding_distances import (
+            run_embedding_distance_export,
+        )
+
+        config = load_embedding_distance_config(args.config)
+        run_embedding_distance_export(config)
     if args.command == "export-feature-denoising-scores":
         from distill_ood_detection.experiments.export_feature_denoising_scores import (
             run_feature_denoising_score_export,
@@ -276,6 +326,26 @@ def main() -> None:
         run_activation_subspace_score_export(
             configs,
             teacher_embedding_dir=args.teacher_embedding_dir,
+            checkpoint=args.checkpoint,
+        )
+    if args.command == "export-subspace-ensemble-inference":
+        from distill_ood_detection.experiments.export_subspace_ensemble_inference import (
+            run_subspace_ensemble_inference_export,
+        )
+
+        config = load_config(args.config)
+        run_subspace_ensemble_inference_export(
+            config,
+            checkpoint=args.checkpoint,
+        )
+    if args.command == "export-subspace-ensemble-scores":
+        from distill_ood_detection.experiments.export_subspace_ensemble_scores import (
+            run_subspace_ensemble_score_export,
+        )
+
+        config = load_config(args.config)
+        run_subspace_ensemble_score_export(
+            config,
             checkpoint=args.checkpoint,
         )
 

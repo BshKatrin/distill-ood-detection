@@ -1,7 +1,6 @@
 # PixMix Pixel-Augmented Embedding Prediction: ResNet-18
 
-Status: training completed for CIFAR-10 and CIFAR-100 ID; OOD score export in
-progress.
+Status: completed for CIFAR-10 and CIFAR-100 ID.
 
 This Feature Denoising variant predicts the clean pooled teacher embedding
 from a PixMix-corrupted view:
@@ -79,10 +78,57 @@ are more ID-like.
 
 ## OOD Results
 
-Pending completion of Feature Denoising score-export job `406350`.
+All tables report `ROC-AUC / FPR@95`.
 
-Tables will report `ROC-AUC / FPR@95` for raw reconstruction error, relative
-improvement, and cosine similarity on every OOD dataset and as a macro average.
+### CIFAR-10 ID
+
+| Score | MNIST | SVHN | CIFAR-100 | Macro |
+|---|---:|---:|---:|---:|
+| Raw reconstruction error | 0.517 / 0.996 | 0.684 / 0.923 | 0.678 / 0.951 | 0.626 / 0.957 |
+| Relative improvement | 0.772 / 0.838 | 0.686 / 0.928 | 0.742 / 0.781 | 0.733 / 0.849 |
+| Cosine similarity | 0.705 / 0.944 | 0.853 / 0.737 | 0.759 / 0.875 | 0.772 / 0.852 |
+
+Cosine similarity has the best macro ROC-AUC (`0.772`), while relative
+improvement has a marginally better macro FPR@95 (`0.849` versus `0.852`).
+Cosine similarity is strongest on SVHN, whereas relative improvement is
+stronger on MNIST and has the best CIFAR-100 FPR@95. Raw reconstruction error
+is weak, particularly at the 95% TPR operating point.
+
+### CIFAR-100 ID
+
+| Score | CIFAR-10 | MNIST | SVHN | Macro |
+|---|---:|---:|---:|---:|
+| Raw reconstruction error | 0.445 / 0.993 | 0.458 / 0.992 | 0.596 / 0.965 | 0.500 / 0.983 |
+| Relative improvement | 0.570 / 0.919 | 0.758 / 0.858 | 0.664 / 0.918 | 0.664 / 0.898 |
+| Cosine similarity | 0.628 / 0.933 | 0.539 / 0.961 | 0.856 / 0.621 | 0.674 / 0.838 |
+
+Cosine similarity is strongest overall at macro `0.674 / 0.838`, driven by
+SVHN (`0.856 / 0.621`). Relative improvement is better on MNIST but weaker in
+aggregate. Near-OOD CIFAR-10 remains difficult, with FPR@95 above `0.90` for
+all three scores.
+
+## Comparison With Affine Pixel Augmentation
+
+- For CIFAR-10 ID, the previously tested affine layer4 student is stronger:
+  relative improvement reaches macro `0.886 / 0.542`, compared with
+  `0.733 / 0.849` for PixMix.
+- For CIFAR-100 ID, affine relative improvement also remains stronger at
+  `0.808 / 0.713`, compared with `0.664 / 0.898`.
+- PixMix cosine similarity improves CIFAR-100 macro FPR@95 relative to the
+  affine layer4 cosine score (`0.838` versus `0.903`), but its ROC-AUC is
+  lower (`0.674` versus `0.733`).
+
+## Interpretation
+
+- The raw PixMix reconstruction magnitude is not a useful OOD score.
+- Normalizing by corruption difficulty or measuring angular agreement
+  recovers a meaningful signal.
+- Cosine similarity is the best aggregate PixMix Feature Denoising score,
+  although relative improvement is preferable for CIFAR-10 ID when FPR@95 is
+  prioritized.
+- This layer4 PixMix variant does not outperform the existing affine
+  pixel-augmentation Feature Denoising student.
+- Near-OOD separation remains the main weakness for CIFAR-100 ID.
 
 ## Artifacts
 
@@ -95,4 +141,12 @@ Score artifacts:
 ```
 
 Training job: `406156`.
+Score-export job: `406350`.
 
+Numeric metric exports:
+
+```text
+reports/outputs/json/pixmix_feature_denoising_default_ood_metrics.json
+reports/outputs/json/pixmix_feature_denoising_relative_improvement_ood_metrics.json
+reports/outputs/json/pixmix_feature_denoising_cosine_similarity_ood_metrics.json
+```

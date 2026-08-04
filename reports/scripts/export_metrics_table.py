@@ -32,7 +32,7 @@ from distill_ood_detection.evaluation.ood_scores import (
     energy_gap,
     logit_l2_distance,
     max_probability_difference,
-    student_teacher_kl_divergence,
+    student_teacher_kl_divergence_from_logits,
     student_energy,
     student_msp,
 )
@@ -105,6 +105,7 @@ TEACHER_SCORE_LABELS = {
 }
 
 LOGIT_SCORE_KEYS = {
+    STUDENT_TEACHER_KL_DIVERGENCE,
     LOGIT_L2_DISTANCE,
     ENERGY_GAP,
     ABSOLUTE_ENERGY_GAP,
@@ -128,11 +129,6 @@ PROBABILITY_SCORE_FUNCTIONS: dict[
             student,
             signed=True,
         )
-    ),
-    STUDENT_TEACHER_KL_DIVERGENCE: lambda teacher, student: student_teacher_kl_divergence(
-        teacher,
-        student,
-        signed=True,
     ),
 }
 
@@ -186,8 +182,23 @@ def load_artifact(path: Path) -> dict[str, Any]:
     return torch.load(path, map_location="cpu")
 
 
-def load_artifact_array(path: Path, key: str) -> np.ndarray:
-    """Load one array from a saved probability artifact on CPU."""
+def load_artifact_array(
+    path: Path,
+    key: str,
+    artifact_cache: dict[Path, dict[str, Any]] | None = None,
+) -> np.ndarray:
+    """Load one array from a saved probability artifact on CPU.
+
+    A scoped cache lets several OOD Scores reuse probabilities and logits from
+    the same artifact without retaining artifacts across dataset pairs.
+    """
+
+    if artifact_cache is not None:
+        artifact = artifact_cache.get(path)
+        if artifact is None:
+            artifact = load_artifact(path)
+            artifact_cache[path] = artifact
+        return to_numpy(artifact[key])
 
     artifact = load_artifact(path)
     try:
@@ -813,6 +824,7 @@ def student_scores_for_dataset(
     dataset_key: str,
     method_key: str,
     score_key: str,
+    artifact_cache: dict[Path, dict[str, Any]] | None = None,
 ) -> np.ndarray:
     """Compute student-teacher OOD scores for one dataset artifact pair."""
 
@@ -820,6 +832,7 @@ def student_scores_for_dataset(
     student_values = load_artifact_array(
         run.student_artifact_path(dataset_key, method_key),
         artifact_key,
+        artifact_cache,
     )
     if score_key == STUDENT_MSP:
         try:
@@ -834,8 +847,15 @@ def student_scores_for_dataset(
     teacher_values = load_artifact_array(
         run.teacher_artifact_path(dataset_key),
         artifact_key,
+        artifact_cache,
     )
     try:
+        if score_key == STUDENT_TEACHER_KL_DIVERGENCE:
+            return student_teacher_kl_divergence_from_logits(
+                teacher_values,
+                student_values,
+                signed=True,
+            )
         if score_key == LOGIT_L2_DISTANCE:
             return logit_l2_distance(teacher_values, student_values, signed=True)
         if score_key == ENERGY_GAP:
@@ -854,6 +874,7 @@ def student_metric_values(
     score_key: str,
     ood_dataset_key: str,
     metric_cache: MetricCache,
+    artifact_cache: dict[Path, dict[str, Any]] | None = None,
 ) -> dict[str, float]:
     """Compute numeric OOD metrics for one run, method, score, and OOD dataset."""
 
@@ -894,12 +915,14 @@ def student_metric_values(
         id_dataset_key,
         method_key,
         score_key,
+        artifact_cache,
     )
     ood_scores = student_scores_for_dataset(
         run,
         ood_dataset_key,
         method_key,
         score_key,
+        artifact_cache,
     )
     try:
         metrics = metric_for_scores(id_scores, ood_scores)
@@ -1364,39 +1387,49 @@ def export_run_metrics(
             raise FileNotFoundError(f"Missing probability artifacts for {run_name!r}")
         records: list[dict[str, str | float]] = []
         for run in probability_runs:
-            for method_key in run.method_keys:
-                for ood_dataset_key in run.ood_dataset_keys:
-                    if not run.has_student_artifact(run.id_dataset_key, method_key) or not (
-                        run.has_student_artifact(ood_dataset_key, method_key)
-                    ):
-                        progress(
-                            f"skipping incomplete artifacts for {run_name}, {method_key}, "
-                            f"{ood_dataset_key}"
-                        )
-                        continue
-                    for score_key in score_keys:
-                        progress(
-                            f"exporting {run_name}, {method_key}, {score_key}, "
-                            f"{run.id_dataset_key} vs {ood_dataset_key}"
-                        )
-                        metrics = student_metric_values(
-                            run,
+            artifact_cache: dict[Path, dict[str, Any]] = {}
+            try:
+                for method_key in run.method_keys:
+                    for ood_dataset_key in run.ood_dataset_keys:
+                        if not run.has_student_artifact(
+                            run.id_dataset_key,
                             method_key,
-                            score_key,
+                        ) or not run.has_student_artifact(
                             ood_dataset_key,
-                            metric_cache,
-                        )
-                        records.append(
-                            {
-                                "probability_mode": run.probability_mode,
-                                "method": method_key,
-                                "ood_score": score_key,
-                                "id_dataset": run.id_dataset_key,
-                                "ood_dataset": ood_dataset_key,
-                                "roc_auc": metrics["roc_auc"],
-                                "fpr_at_95_tpr": metrics["fpr_at_95_tpr"],
-                            }
-                        )
+                            method_key,
+                        ):
+                            progress(
+                                f"skipping incomplete artifacts for {run_name}, "
+                                f"{method_key}, {ood_dataset_key}"
+                            )
+                            continue
+                        for score_key in score_keys:
+                            progress(
+                                f"exporting {run_name}, {method_key}, {score_key}, "
+                                f"{run.id_dataset_key} vs {ood_dataset_key}"
+                            )
+                            metrics = student_metric_values(
+                                run,
+                                method_key,
+                                score_key,
+                                ood_dataset_key,
+                                metric_cache,
+                                artifact_cache,
+                            )
+                            records.append(
+                                {
+                                    "probability_mode": run.probability_mode,
+                                    "method": method_key,
+                                    "ood_score": score_key,
+                                    "id_dataset": run.id_dataset_key,
+                                    "ood_dataset": ood_dataset_key,
+                                    "roc_auc": metrics["roc_auc"],
+                                    "fpr_at_95_tpr": metrics["fpr_at_95_tpr"],
+                                }
+                            )
+            finally:
+                artifact_cache.clear()
+                gc.collect()
         first_run = probability_runs[0]
         run_payload: dict[str, Any] = {
             "run_name": first_run.run_name,

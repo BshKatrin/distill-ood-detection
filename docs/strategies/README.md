@@ -14,6 +14,9 @@ This directory contains different distillation (student-training) strategies.
   insignificant classical autoencoding over classifier-SVD coordinates. This
   is a project-specific extension, not a reproduction of the paper's combined
   detector.
+- [Disjoint Subspace Ensembles](subspace_ensemble.md): 16 linear students
+  trained on ordered or seeded-partitioned channel or whitened GAP-PCA
+  subspaces, scored with predictive entropy and BALD.
 
 ## Implementation Links
 
@@ -25,3 +28,5 @@ This directory contains different distillation (student-training) strategies.
 - Activation-subspace training is implemented in
   [activation_subspace.py](../../src/distill_ood_detection/distillation/activation_subspace.py)
   and the PyTorch training entrypoint.
+- Random-subspace selection, PCA, training, and inference are implemented in
+  [subspace_ensemble.py](../../src/distill_ood_detection/distillation/subspace_ensemble.py).

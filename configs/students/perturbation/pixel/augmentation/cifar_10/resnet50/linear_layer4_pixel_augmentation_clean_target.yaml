@@ -64,6 +64,6 @@ training:
       alpha: 0.8
 
 mlflow:
-  enabled: true
+  enabled: false
   experiment_name: distill-ood-detection
   tracking_uri: sqlite:///mlflow.db

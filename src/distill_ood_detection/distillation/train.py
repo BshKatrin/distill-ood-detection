@@ -47,7 +47,7 @@ def train_student(
     optimizer_config: OptimizerConfig,
     training_config: ResolvedTrainingMethodConfig,
     output_dir: Path,
-    mlflow_enabled: bool = True,
+    mlflow_enabled: bool = False,
     feature_extractor: nn.Module | None = None,
     perturbation_forwarder: nn.Module | None = None,
     perturbation_config: PerturbationConfig | None = None,

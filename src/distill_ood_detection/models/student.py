@@ -119,6 +119,46 @@ class FeatureReconstructorStudent(nn.Module):
         return features + residual
 
 
+class FeatureResidualDenoiserStudent(nn.Module):
+    """Predict residual corrections for masked teacher feature maps."""
+
+    def __init__(
+        self,
+        input_shape: tuple[int, ...],
+        output_channels: int,
+        hidden_channels: tuple[int, ...],
+    ) -> None:
+        super().__init__()
+        if len(input_shape) != 3:
+            raise ValueError(
+                "feature_residual_denoiser input_shape must contain channels, "
+                "height, and width"
+            )
+        input_channels = input_shape[0]
+        if input_channels not in {output_channels, output_channels + 1}:
+            raise ValueError(
+                "feature_residual_denoiser expects the feature channels, with "
+                "an optional additional mask channel"
+            )
+        hidden_width = (
+            hidden_channels[0]
+            if hidden_channels
+            else max(16, output_channels // 4)
+        )
+        self.denoiser = nn.Sequential(
+            nn.Conv2d(input_channels, hidden_width, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(hidden_width, hidden_width, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(hidden_width, output_channels, kernel_size=3, padding=1),
+        )
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """Return a residual correction for the corrupted feature map."""
+
+        return self.denoiser(inputs)
+
+
 class SpatialTokenPredictorStudent(nn.Module):
     """Transformer predictor from visible feature tokens to target feature tokens."""
 
@@ -212,6 +252,12 @@ def build_student(config: StudentConfig) -> nn.Module:
     if config.kind == "feature_reconstructor":
         return FeatureReconstructorStudent(
             input_shape=config.input_shape,
+            hidden_channels=config.hidden_channels,
+        )
+    if config.kind == "feature_residual_denoiser":
+        return FeatureResidualDenoiserStudent(
+            input_shape=config.input_shape,
+            output_channels=config.num_classes,
             hidden_channels=config.hidden_channels,
         )
     if config.kind == "spatial_token_predictor":

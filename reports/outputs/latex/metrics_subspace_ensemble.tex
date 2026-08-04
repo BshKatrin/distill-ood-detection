@@ -1,0 +1,67 @@
+\documentclass[border=2pt]{standalone}
+\usepackage{booktabs}
+
+\begin{document}
+
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llllcccccccc}
+\multicolumn{12}{c}{\textbf{Subspace ensemble OOD detection (16 students)}}\\[4pt]
+& & & & \multicolumn{4}{c}{\textbf{CIFAR-10 (ID)}} & \multicolumn{4}{c}{\textbf{CIFAR-100 (ID)}} \\
+\cmidrule(lr){5-8}\cmidrule(lr){9-12}
+\textbf{Subspace} & \textbf{Student input} & \textbf{Objective} & \textbf{OOD Score}
+& \textbf{MNIST} & \textbf{SVHN} & \textbf{CIFAR-100} & \textbf{Macro}
+& \textbf{CIFAR-10} & \textbf{MNIST} & \textbf{SVHN} & \textbf{Macro} \\
+\midrule
+Teacher & -- & -- & MSP
+& 0.92/0.56 & 0.90/0.60 & 0.88/0.62 & 0.90/0.59
+& 0.79/0.79 & 0.70/0.96 & 0.81/0.81 & 0.77/0.85 \\
+Teacher & -- & -- & Energy
+& 0.96/0.26 & 0.92/0.41 & 0.88/0.51 & 0.92/0.39
+& 0.80/0.80 & 0.70/0.97 & 0.83/0.77 & 0.77/0.85 \\
+\midrule
+Channels & Flattened & Logit MSE & Predictive entropy
+& 0.93/0.51 & 0.91/0.57 & 0.88/0.61 & 0.91/0.56
+& 0.80/0.79 & 0.71/0.97 & 0.83/0.78 & 0.78/0.85 \\
+& & & BALD
+& 0.91/0.61 & 0.90/0.67 & 0.88/0.63 & 0.90/0.64
+& 0.76/0.89 & 0.77/0.74 & 0.80/0.86 & 0.77/0.83 \\
+\addlinespace
+& Flattened & KL divergence & Predictive entropy
+& 0.93/0.51 & 0.91/0.56 & 0.88/0.60 & 0.91/0.56
+& 0.80/0.79 & 0.70/0.97 & 0.82/0.79 & 0.77/0.85 \\
+& & & BALD
+& 0.92/0.53 & 0.91/0.55 & 0.88/0.61 & 0.91/0.56
+& 0.76/0.90 & 0.75/0.84 & 0.79/0.89 & 0.77/0.87 \\
+\midrule
+Channels & GAP & Logit MSE & Predictive entropy
+& 0.93/0.51 & 0.91/0.56 & 0.88/0.60 & 0.91/0.56
+& 0.80/0.79 & 0.70/0.97 & 0.82/0.78 & 0.77/0.85 \\
+& & & BALD
+& 0.91/0.61 & 0.90/0.67 & 0.88/0.64 & 0.90/0.64
+& 0.75/0.89 & 0.76/0.74 & 0.80/0.83 & 0.77/0.82 \\
+\addlinespace
+& GAP & KL divergence & Predictive entropy
+& 0.93/0.51 & 0.91/0.57 & 0.88/0.61 & 0.91/0.56
+& 0.80/0.79 & 0.70/0.97 & 0.82/0.79 & 0.77/0.85 \\
+& & & BALD
+& 0.92/0.54 & 0.91/0.58 & 0.88/0.60 & 0.90/0.57
+& 0.78/0.85 & 0.76/0.77 & 0.82/0.75 & 0.79/0.79 \\
+\midrule
+Whitened PCA & GAP projection & Logit MSE & Predictive entropy
+& 0.84/0.68 & 0.68/0.92 & 0.69/0.79 & 0.74/0.80
+& 0.78/0.83 & 0.73/0.96 & 0.84/0.74 & 0.78/0.84 \\
+& & & BALD
+& 0.07/1.00 & 0.16/1.00 & 0.24/0.99 & 0.15/1.00
+& 0.23/1.00 & 0.28/1.00 & 0.17/1.00 & 0.23/1.00 \\
+\addlinespace
+& GAP projection & KL divergence & Predictive entropy
+& 0.87/0.58 & 0.85/0.62 & 0.85/0.60 & 0.85/0.60
+& 0.79/0.80 & 0.73/0.96 & 0.82/0.79 & 0.78/0.85 \\
+& & & BALD
+& 0.73/0.87 & 0.79/0.82 & 0.80/0.69 & 0.77/0.79
+& 0.78/0.84 & 0.78/0.71 & 0.81/0.80 & 0.79/0.79 \\
+\bottomrule
+\end{tabular}
+
+\end{document}

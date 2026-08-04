@@ -11,3 +11,13 @@
 - OOD Score: A scalar measure of confidence used for OOD detection. Higher values indicate ID samples; lower values indicate OOD samples.
 
 - MSP (Maximum Softmax Probability): An OOD score defined as the maximum softmax probability of the teacher model. MSP is a baseline for OOD detection.
+
+- GAP : Global Average Pooling
+
+- PCA (Principal Component Analysis): An orthogonal change of basis ordered by
+  variance. Whitened PCA additionally divides each coordinate by its ID
+  training-set standard deviation.
+
+- BALD (Bayesian Active Learning by Disagreement): Predictive entropy minus
+  expected individual-model entropy. In this project, the model distribution
+  is approximated by the 16 subspace students.

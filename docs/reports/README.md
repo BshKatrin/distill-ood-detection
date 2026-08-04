@@ -20,6 +20,8 @@ that import `distill_ood_detection` directly from `src/` also set `PYTHONPATH`.
   loss tables or numeric JSON.
 - [Analysis notebooks](notebooks.md): generate probability, teacher-activation,
   and PCA explained-variance notebooks.
+- [Recap reports](recap.md): maintain dated LaTeX progress recaps under
+  `reports/recap/`.
 
 ## Generated artifacts
 
