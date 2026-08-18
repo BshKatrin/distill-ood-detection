@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Minimal GPU-cluster runtime environment for distill-ood-detection."
 requires-python = ">=3.13"
 dependencies = [
+    "faiss-gpu-cu12==1.14.1.post1 ; platform_machine == 'x86_64' and sys_platform == 'linux'",
     "huggingface-hub>=1.17.0",
     "mlflow>=3.13.0",
     "numpy>=2.4.6",
@@ -15,6 +16,8 @@ dependencies = [
     "torchvision>=0.26.0,<0.27.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "transformers>=4.57.0",
     "tqdm>=4.67.3",
+    "scipy>=1.17.1",
+    "matplotlib>=3.10.9",
 ]
 
 [tool.uv]
