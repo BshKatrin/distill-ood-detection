@@ -4,6 +4,39 @@ The OOD metric exporter computes ROC-AUC and FPR@95 from saved probability
 artifacts under student `run_dir` paths. It uses experiment configs for report
 metadata and writes one LaTeX report per strategy.
 
+## Group-balanced macro metrics
+
+When a report aggregates results across Near-OOD and Far-OOD datasets, compute
+the mean inside each group first and then combine the two group means:
+
+\[
+M_\lambda(m)
+= \lambda\frac{1}{|\mathcal N|}\sum_{d\in\mathcal N}m_d
++ (1-\lambda)\frac{1}{|\mathcal F|}\sum_{d\in\mathcal F}m_d,
+\qquad \lambda=0.5,
+\]
+
+where `m` is either ROC-AUC or FPR@95, `N` is the set of Near-OOD datasets,
+and `F` is the set of Far-OOD datasets. Thus Near-OOD and Far-OOD each
+contribute half of the macro, regardless of how many datasets are present in
+either group. Each Near-OOD dataset has weight `1 / (2 * |N|)` and each
+Far-OOD dataset has weight `1 / (2 * |F|)`.
+
+With the current evaluation suite, the opposite CIFAR dataset is the only
+Near-OOD dataset and MNIST and SVHN are Far-OOD. The macro therefore assigns
+weights `1/2`, `1/4`, and `1/4`, respectively. Apply this aggregation
+independently to ROC-AUC and FPR@95. If a report uses the scalar compromise for
+selection, define it from the group-balanced metrics:
+
+\[
+C = \frac{1}{2}\left(M_{0.5}(\mathrm{ROC\mbox{-}AUC})
++ 1 - M_{0.5}(\mathrm{FPR@95})\right).
+\]
+
+Do not average all OOD datasets directly: that would make the relative
+importance of Near-OOD and Far-OOD depend on how many datasets happen to be
+included in each group.
+
 ## Strategy tables
 
 Run the exporter with its default config directories:

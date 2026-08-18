@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from distill_ood_detection.config import (
+    load_channel_grouping_config,
     load_embedding_distance_config,
     load_config,
     load_teacher_activation_config,
@@ -94,9 +95,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("configs/teachers/cifar_10/resnet18.yaml"),
         help="Path to a YAML teacher activation export config.",
     )
+    channel_groups_parser = subparsers.add_parser(
+        "build-channel-groups",
+        help="Build correlation-based hierarchical teacher-channel groups.",
+    )
+    channel_groups_parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a channel-grouping YAML config.",
+    )
     embedding_distances_parser = subparsers.add_parser(
         "export-embedding-distances",
-        help="Export pooled teacher embeddings and exact ID-reference distances.",
+        help="Export layer4 embeddings and exact FAISS ID-reference scores.",
     )
     embedding_distances_parser.add_argument(
         "--config",
@@ -120,6 +131,47 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("configs/students/feature_denoising/pca_masking/cifar_10/resnet18/linear_layer4_pca9_mask_p030.yaml"),
         help="Path to a YAML Feature Denoising experiment config.",
     )
+    audit_manifest_parser = subparsers.add_parser(
+        "build-channel-cluster-audit-manifest",
+        help="Expand dataset-level audit configs into stable specialist tasks.",
+    )
+    audit_manifest_parser.add_argument(
+        "--config",
+        type=Path,
+        action="append",
+        required=True,
+        help="Dataset-level audit config; repeat for both CIFAR datasets.",
+    )
+    audit_manifest_parser.add_argument("--output", type=Path, required=True)
+    audit_task_parser = subparsers.add_parser(
+        "run-channel-cluster-audit-task",
+        help="Run one restartable specialist task from an audit manifest.",
+    )
+    audit_task_parser.add_argument("--manifest", type=Path, required=True)
+    audit_task_parser.add_argument("--task-index", type=int, required=True)
+    audit_task_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Run even if the task already has complete artifacts.",
+    )
+    audit_metadata_parser = subparsers.add_parser(
+        "export-channel-cluster-audit-metadata",
+        help="Export shared class and teacher metadata for one audit dataset.",
+    )
+    audit_metadata_parser.add_argument("--config", type=Path, required=True)
+    audit_summary_parser = subparsers.add_parser(
+        "summarize-channel-cluster-audit",
+        help="Build compact Parquet summaries for the audit dashboard.",
+    )
+    audit_summary_parser.add_argument("--manifest", type=Path, required=True)
+    audit_summary_parser.add_argument("--output-dir", type=Path, required=True)
+    audit_summary_parser.add_argument("--require-complete", action="store_true")
+    audit_status_parser = subparsers.add_parser(
+        "channel-cluster-audit-status",
+        help="Print missing task indices as a SLURM array expression.",
+    )
+    audit_status_parser.add_argument("--manifest", type=Path, required=True)
+    audit_status_parser.add_argument("--deep", action="store_true")
     feature_denoising_scores_parser.add_argument(
         "--checkpoint",
         choices=("best", "latest"),
@@ -135,6 +187,38 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-validation",
         action="store_true",
         help="Also export the deterministic ID validation split.",
+    )
+    global_cluster_distributions_parser = subparsers.add_parser(
+        "export-global-channel-cluster-distributions",
+        help="Export per-image cluster improvements for one global student.",
+    )
+    global_cluster_distributions_parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to a global stratified channel-group student config.",
+    )
+    global_cluster_distributions_parser.add_argument(
+        "--checkpoint",
+        choices=("best", "latest"),
+        default="best",
+    )
+    global_cluster_summary_parser = subparsers.add_parser(
+        "summarize-global-channel-cluster-distributions",
+        help="Build boxplot summaries for the global-student dashboard.",
+    )
+    global_cluster_summary_parser.add_argument(
+        "--config",
+        type=Path,
+        action="append",
+        required=True,
+        help="Global student config; repeat for every model, dataset, and layer.",
+    )
+    global_cluster_summary_parser.add_argument("--output-dir", type=Path, required=True)
+    global_cluster_summary_parser.add_argument(
+        "--checkpoint",
+        choices=("best", "latest"),
+        default="best",
     )
     feature_denoising_subspaces_parser = subparsers.add_parser(
         "export-feature-denoising-subspace-errors",
@@ -270,6 +354,13 @@ def main() -> None:
 
         config = load_teacher_activation_config(args.config)
         run_teacher_activation_export(config)
+    if args.command == "build-channel-groups":
+        from distill_ood_detection.experiments.build_channel_groups import (
+            run_channel_grouping,
+        )
+
+        config = load_channel_grouping_config(args.config)
+        run_channel_grouping(config)
     if args.command == "export-teacher-probabilities":
         from distill_ood_detection.experiments.export_teacher_probabilities import (
             run_teacher_probability_export,
@@ -296,6 +387,52 @@ def main() -> None:
             include_train=args.include_train,
             include_validation=args.include_validation,
         )
+    if args.command == "build-channel-cluster-audit-manifest":
+        from distill_ood_detection.experiments.channel_cluster_audit import (
+            write_channel_cluster_audit_manifest,
+        )
+
+        write_channel_cluster_audit_manifest(args.config, args.output)
+    if args.command == "run-channel-cluster-audit-task":
+        from distill_ood_detection.experiments.channel_cluster_audit import (
+            run_channel_cluster_audit_task,
+        )
+
+        run_channel_cluster_audit_task(
+            args.manifest,
+            args.task_index,
+            skip_complete=not args.force,
+        )
+    if args.command == "export-channel-cluster-audit-metadata":
+        from distill_ood_detection.experiments.channel_cluster_audit import (
+            export_channel_cluster_audit_sample_metadata,
+        )
+
+        export_channel_cluster_audit_sample_metadata(args.config)
+    if args.command == "summarize-channel-cluster-audit":
+        from distill_ood_detection.experiments.summarize_channel_cluster_audit import (
+            summarize_channel_cluster_audit,
+        )
+
+        summarize_channel_cluster_audit(
+            args.manifest,
+            args.output_dir,
+            require_complete=args.require_complete,
+        )
+    if args.command == "channel-cluster-audit-status":
+        from distill_ood_detection.experiments.channel_cluster_audit import (
+            incomplete_channel_cluster_task_indices,
+            slurm_array_spec,
+        )
+
+        print(
+            slurm_array_spec(
+                incomplete_channel_cluster_task_indices(
+                    args.manifest,
+                    deep=args.deep,
+                )
+            )
+        )
     if args.command == "export-feature-denoising-subspace-errors":
         from distill_ood_detection.experiments.export_feature_denoising_subspace_errors import (
             run_feature_denoising_subspace_error_export,
@@ -304,6 +441,26 @@ def main() -> None:
         config = load_config(args.config)
         run_feature_denoising_subspace_error_export(
             config,
+            checkpoint=args.checkpoint,
+        )
+    if args.command == "export-global-channel-cluster-distributions":
+        from distill_ood_detection.experiments.global_channel_cluster_distributions import (
+            run_global_channel_cluster_distribution_export,
+        )
+
+        config = load_config(args.config)
+        run_global_channel_cluster_distribution_export(
+            config,
+            checkpoint=args.checkpoint,
+        )
+    if args.command == "summarize-global-channel-cluster-distributions":
+        from distill_ood_detection.experiments.global_channel_cluster_distributions import (
+            summarize_global_channel_cluster_distributions,
+        )
+
+        summarize_global_channel_cluster_distributions(
+            args.config,
+            args.output_dir,
             checkpoint=args.checkpoint,
         )
     if args.command == "export-activation-subspace-inference":

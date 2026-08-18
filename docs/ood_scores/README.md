@@ -30,7 +30,7 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
   `T * logsumexp(logits / T)` so that higher values are more ID-like.
   - `sign: +1`
 
-- KL (teacher || student): KL divergence from the teacher probability distribution to the student probability distribution.
+- KL (teacher \ student): KL divergence from the teacher probability distribution to the student probability distribution.
   When logits are available, reports compute the equivalent log-softmax form
   to avoid zeros caused by floating-point softmax underflow.
   - `sign: -1`
@@ -67,16 +67,16 @@ Score. For each query and embedding space (raw or ID-standardized), it averages
 the selected neighbors' teacher probabilities and teacher logits separately.
 The query teacher output is then compared with these neighbor means as follows:
 
-- Probability mean: KL (teacher || neighbor mean), absolute max probability
-  difference, and Student MSP of the neighbor mean.
-- Logit mean: absolute energy gap and Student energy of the neighbor mean.
+- Probability mean: KL (teacher || neighbor mean), max probability difference,
+  absolute max probability difference, and Student MSP.
+- Logit mean: centered-logit L2 distance, energy gap, absolute energy gap, and
+  Student energy.
 - Neighbor distributions: predictive entropy of the mean neighbor probability
   distribution and BALD,
   `H(mean_j p_j) - mean_j H(p_j)`. Both raw quantities are negated because
   higher uncertainty or disagreement is more OOD-like.
-
-These seven values are the complete k-NN score set; other classifier scores and
-query-only baselines are not exported by this variant.
+- Query-only baselines: teacher MSP and teacher energy. These are exported with
+  every layer for a complete, directly comparable score set.
 
 Here the selected ID neighbors act as a local ensemble. Predictive entropy is
 high when their mean prediction is uncertain. BALD is high when individual
@@ -114,6 +114,11 @@ project convention that higher values are more ID-like.
 - Feature Denoising channel residual reconstruction error: Hidden-channel
   reconstruction error after adding the residual CNN correction to the
   zero-filled teacher feature map.
+  - `sign: -1`
+
+- Feature Denoising NMF concept residual reconstruction error: Full-map error
+  after the residual CNN reconstructs the clean `S P` projection from a
+  concept-masked `S' P` projection. The raw error is negated for the OOD Score.
   - `sign: -1`
 
 - Feature Denoising spatial token prediction error: Target-token prediction error in raw

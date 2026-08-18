@@ -1,10 +1,10 @@
-"""Feature Denoising PCA reconstruction training and scoring."""
+"""Feature Denoising reconstruction training and scoring."""
 
 from __future__ import annotations
 
+import math
 import time
-from dataclasses import dataclass
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import mlflow
@@ -21,24 +21,50 @@ from distill_ood_detection.config import (
     ResolvedTrainingMethodConfig,
 )
 from distill_ood_detection.datasets.pixmix import PixMixMixingProvider
-from distill_ood_detection.distillation.perturbation import PcaProjector
-from distill_ood_detection.distillation.perturbation import sample_pixel_augmentation
+from distill_ood_detection.distillation.perturbation import (
+    PcaProjector,
+    sample_pixel_augmentation,
+)
+from distill_ood_detection.distillation.nmf import NmfConceptProjector
 from distill_ood_detection.distillation.pixmix import sample_pixmix
 from distill_ood_detection.distillation.train import build_optimizer
 from distill_ood_detection.evaluation.activation_subspaces import (
     feature_denoising_subspace_errors,
 )
+from distill_ood_detection.evaluation.channel_grouping import flat_channel_groups
+from distill_ood_detection.evaluation.nearest_neighbors import (
+    MaskedChannelExactL2Index,
+)
 from distill_ood_detection.utils import write_json
 
 FEATURE_DENOISING_RECONSTRUCTION_METHOD = "pca_masked_reconstruction"
 FEATURE_DENOISING_RECONSTRUCTION_SCORE = "feature_denoising_pca_reconstruction_error"
-FEATURE_DENOISING_SPATIAL_RECONSTRUCTION_SCORE = "feature_denoising_spatial_reconstruction_error"
+FEATURE_DENOISING_SPATIAL_RECONSTRUCTION_SCORE = (
+    "feature_denoising_spatial_reconstruction_error"
+)
 FEATURE_DENOISING_SPATIAL_BLOCK_RESIDUAL_RECONSTRUCTION_SCORE = (
     "feature_denoising_spatial_block_residual_reconstruction_error"
 )
-FEATURE_DENOISING_CHANNEL_RECONSTRUCTION_SCORE = "feature_denoising_channel_reconstruction_error"
+FEATURE_DENOISING_CHANNEL_RECONSTRUCTION_SCORE = (
+    "feature_denoising_channel_reconstruction_error"
+)
 FEATURE_DENOISING_CHANNEL_RESIDUAL_RECONSTRUCTION_SCORE = (
     "feature_denoising_channel_residual_reconstruction_error"
+)
+FEATURE_DENOISING_CHANNEL_GROUP_RESIDUAL_RECONSTRUCTION_SCORE = (
+    "feature_denoising_channel_group_residual_reconstruction_error"
+)
+FEATURE_DENOISING_CHANNEL_GROUP_STRATIFIED_RESIDUAL_RECONSTRUCTION_SCORE = (
+    "feature_denoising_channel_group_stratified_residual_reconstruction_error"
+)
+FEATURE_DENOISING_NMF_CONCEPT_RESIDUAL_RECONSTRUCTION_SCORE = (
+    "feature_denoising_nmf_concept_residual_reconstruction_error"
+)
+FEATURE_DENOISING_CHANNEL_KNN_RECONSTRUCTION_SCORE = (
+    "feature_denoising_channel_knn_reconstruction_error"
+)
+FEATURE_DENOISING_CHANNEL_GROUP_KNN_RECONSTRUCTION_SCORE = (
+    "feature_denoising_channel_group_knn_reconstruction_error"
 )
 FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RECONSTRUCTION_SCORE = (
     "feature_denoising_confusion_channel_replacement_reconstruction_error"
@@ -46,12 +72,18 @@ FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RECONSTRUCTION_SCORE = (
 FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RESIDUAL_RECONSTRUCTION_SCORE = (
     "feature_denoising_confusion_channel_replacement_residual_reconstruction_error"
 )
-FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_SCORE = "feature_denoising_spatial_token_prediction_error"
-FEATURE_DENOISING_PIXEL_EMBEDDING_PREDICTION_SCORE = "feature_denoising_pixel_embedding_prediction_error"
+FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_SCORE = (
+    "feature_denoising_spatial_token_prediction_error"
+)
+FEATURE_DENOISING_PIXEL_EMBEDDING_PREDICTION_SCORE = (
+    "feature_denoising_pixel_embedding_prediction_error"
+)
 FEATURE_DENOISING_PIXEL_AUGMENTED_EMBEDDING_PREDICTION_SCORE = (
     "feature_denoising_pixel_augmented_embedding_prediction_error"
 )
-FEATURE_DENOISING_PIXEL_MULTILAYER_PREDICTION_SCORE = "feature_denoising_pixel_multilayer_prediction_error"
+FEATURE_DENOISING_PIXEL_MULTILAYER_PREDICTION_SCORE = (
+    "feature_denoising_pixel_multilayer_prediction_error"
+)
 FEATURE_DENOISING_PIXEL_MULTILAYER_L234_PREDICTION_SCORE = (
     "feature_denoising_pixel_multilayer_l234_prediction_error"
 )
@@ -81,6 +113,42 @@ class FeatureNormalizer:
 
 
 @dataclass(frozen=True)
+class ChannelGroups:
+    """Disjoint channel groups cut from one fitted hierarchy."""
+
+    membership: torch.Tensor
+    distance_threshold: float
+    source_path: str
+
+    @property
+    def group_count(self) -> int:
+        """Return the number of channel groups."""
+
+        return self.membership.shape[0]
+
+    @property
+    def channel_count(self) -> int:
+        """Return the number of covered feature channels."""
+
+        return self.membership.shape[1]
+
+    @property
+    def group_sizes(self) -> torch.Tensor:
+        """Return the number of channels in every group."""
+
+        return self.membership.sum(dim=1)
+
+    def to(self, device: torch.device) -> ChannelGroups:
+        """Move the membership matrix to a device."""
+
+        return ChannelGroups(
+            membership=self.membership.to(device),
+            distance_threshold=self.distance_threshold,
+            source_path=self.source_path,
+        )
+
+
+@dataclass(frozen=True)
 class ClassChannelCorruptionBank:
     """Class statistics, confusion pairs, and activation-map prototypes."""
 
@@ -107,8 +175,11 @@ def train_feature_denoising_student(
     pca_projector: PcaProjector | None = None,
     feature_normalizer: FeatureNormalizer | None = None,
     class_channel_corruption: ClassChannelCorruptionBank | None = None,
-    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]]
+    | None = None,
     pixmix_provider: PixMixMixingProvider | None = None,
+    channel_groups: ChannelGroups | None = None,
+    nmf_projector: NmfConceptProjector | None = None,
     mlflow_enabled: bool = False,
 ) -> dict[str, float | int | str]:
     """Train a student to reconstruct clean teacher representations."""
@@ -129,7 +200,11 @@ def train_feature_denoising_student(
         student.train()
         total_loss = 0.0
         total_examples = 0
-        progress = tqdm(train_loader, desc=f"{feature_denoising_config.method} epoch {epoch}", leave=False)
+        progress = tqdm(
+            train_loader,
+            desc=f"{feature_denoising_config.method} epoch {epoch}",
+            leave=False,
+        )
         for step, (images, labels) in enumerate(progress, start=1):
             images = images.to(device)
             optimizer.zero_grad(set_to_none=True)
@@ -144,6 +219,8 @@ def train_feature_denoising_student(
                     labels,
                     image_normalization,
                     pixmix_provider,
+                    channel_groups,
+                    nmf_projector,
                 )
             if not checked_student_input_shape:
                 _validate_student_input_shape(student, batch.student_inputs)
@@ -179,6 +256,8 @@ def train_feature_denoising_student(
             class_channel_corruption,
             image_normalization,
             pixmix_provider,
+            channel_groups,
+            nmf_projector,
         )
         if validation_loss < best_validation_reconstruction_loss:
             best_validation_reconstruction_loss = validation_loss
@@ -198,7 +277,9 @@ def train_feature_denoising_student(
         "method": feature_denoising_config.method,
         "epochs": training_config.epochs,
         "best_validation_reconstruction_loss": best_validation_reconstruction_loss,
-        "final_validation_reconstruction_loss": history[-1]["validation_reconstruction_loss"],
+        "final_validation_reconstruction_loss": history[-1][
+            "validation_reconstruction_loss"
+        ],
         "latest_checkpoint_path": str(checkpoint_path),
         "best_checkpoint_path": str(best_checkpoint_path),
         "checkpoint_path": str(checkpoint_path),
@@ -217,8 +298,11 @@ def reconstruction_loss(
     pca_projector: PcaProjector | None = None,
     feature_normalizer: FeatureNormalizer | None = None,
     class_channel_corruption: ClassChannelCorruptionBank | None = None,
-    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]]
+    | None = None,
     pixmix_provider: PixMixMixingProvider | None = None,
+    channel_groups: ChannelGroups | None = None,
+    nmf_projector: NmfConceptProjector | None = None,
 ) -> float:
     """Return average hidden-component reconstruction loss for a loader."""
 
@@ -238,6 +322,8 @@ def reconstruction_loss(
                 labels,
                 image_normalization,
                 pixmix_provider,
+                channel_groups,
+                nmf_projector,
             )
             predictions = feature_denoising_predictions(
                 student,
@@ -260,10 +346,13 @@ def collect_feature_denoising_reconstruction_scores(
     pca_projector: PcaProjector | None = None,
     feature_normalizer: FeatureNormalizer | None = None,
     class_channel_corruption: ClassChannelCorruptionBank | None = None,
-    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]]
+    | None = None,
     pixmix_provider: PixMixMixingProvider | None = None,
     activation_subspace_basis: torch.Tensor | None = None,
     decisive_subspace_dimension: int | None = None,
+    channel_groups: ChannelGroups | None = None,
+    nmf_projector: NmfConceptProjector | None = None,
 ) -> dict[str, torch.Tensor]:
     """Collect sign-adjusted reconstruction OOD scores for one dataset.
 
@@ -284,10 +373,12 @@ def collect_feature_denoising_reconstruction_scores(
     scores = []
     identity_errors = []
     improvements = []
+    relative_improvements = []
     cosine_similarities = []
     targets = []
     contexts = []
     predicted_embeddings = []
+    sampled_channel_group_indices = []
     component_scores: dict[str, list[torch.Tensor]] = {}
     subspace_scores: dict[str, list[torch.Tensor]] = {}
     with torch.no_grad():
@@ -308,13 +399,10 @@ def collect_feature_denoising_reconstruction_scores(
                 }
                 else _teacher_features(perturbation_forwarder, images)
             )
-            if (
-                feature_denoising_config.method
-                in {
-                    "confusion_channel_replacement_reconstruction",
-                    "confusion_channel_replacement_residual_reconstruction",
-                }
-            ):
+            if feature_denoising_config.method in {
+                "confusion_channel_replacement_reconstruction",
+                "confusion_channel_replacement_residual_reconstruction",
+            }:
                 teacher_logits, features = perturbation_forwarder(images)
                 inference_class_ids = teacher_logits.argmax(dim=1)
             draw_errors = []
@@ -324,16 +412,23 @@ def collect_feature_denoising_reconstruction_scores(
             draw_contexts = []
             draw_predictions = []
             draw_targets = []
+            draw_channel_group_indices = []
             draw_component_scores: dict[str, list[torch.Tensor]] = {}
             draw_subspace_scores: dict[str, list[torch.Tensor]] = {}
             for _ in range(feature_denoising_config.evaluation_draws):
-                if feature_denoising_config.method == "pixel_masked_embedding_prediction":
+                if (
+                    feature_denoising_config.method
+                    == "pixel_masked_embedding_prediction"
+                ):
                     batch = sample_pixel_masked_embedding_batch(
                         images,
                         perturbation_forwarder,
                         feature_denoising_config,
                     )
-                elif feature_denoising_config.method == "pixel_augmented_embedding_prediction":
+                elif (
+                    feature_denoising_config.method
+                    == "pixel_augmented_embedding_prediction"
+                ):
                     batch = sample_pixel_augmented_embedding_batch(
                         images,
                         perturbation_forwarder,
@@ -341,13 +436,19 @@ def collect_feature_denoising_reconstruction_scores(
                         image_normalization,
                         pixmix_provider,
                     )
-                elif feature_denoising_config.method == "pixel_masked_multilayer_prediction":
+                elif (
+                    feature_denoising_config.method
+                    == "pixel_masked_multilayer_prediction"
+                ):
                     batch = sample_pixel_masked_multilayer_batch(
                         images,
                         perturbation_forwarder,
                         feature_denoising_config,
                     )
-                elif feature_denoising_config.method == "pixel_masked_multilayer_l234_prediction":
+                elif (
+                    feature_denoising_config.method
+                    == "pixel_masked_multilayer_l234_prediction"
+                ):
                     batch = sample_pixel_masked_multilayer_l234_batch(
                         images,
                         perturbation_forwarder,
@@ -363,12 +464,18 @@ def collect_feature_denoising_reconstruction_scores(
                         feature_normalizer,
                         class_channel_corruption,
                         inference_class_ids,
+                        channel_groups,
+                        nmf_projector,
                     )
                 batch_predictions = feature_denoising_predictions(
                     student,
                     batch,
                     feature_denoising_config,
                 )
+                if batch.sampled_channel_group_indices is not None:
+                    draw_channel_group_indices.append(
+                        batch.sampled_channel_group_indices
+                    )
                 if activation_subspace_basis is not None:
                     if not isinstance(batch.student_inputs, torch.Tensor):
                         raise ValueError(
@@ -393,6 +500,9 @@ def collect_feature_denoising_reconstruction_scores(
                 if feature_denoising_config.method in {
                     "spatial_block_residual_reconstruction",
                     "channel_masked_residual_reconstruction",
+                    "channel_group_masked_residual_reconstruction",
+                    "channel_group_stratified_masked_residual_reconstruction",
+                    "nmf_concept_masked_residual_reconstruction",
                     "confusion_channel_replacement_reconstruction",
                     "confusion_channel_replacement_residual_reconstruction",
                 }:
@@ -407,16 +517,12 @@ def collect_feature_denoising_reconstruction_scores(
                     )
                     draw_identity_errors.append(identity_error)
                     draw_improvements.append(identity_error - prediction_error)
-                if (
-                    feature_denoising_config.method
-                    in {
-                        "pixel_masked_embedding_prediction",
-                        "pixel_augmented_embedding_prediction",
-                        "pixel_masked_multilayer_prediction",
-                        "pixel_masked_multilayer_l234_prediction",
-                    }
-                    and isinstance(batch.student_inputs, torch.Tensor)
-                ):
+                if feature_denoising_config.method in {
+                    "pixel_masked_embedding_prediction",
+                    "pixel_augmented_embedding_prediction",
+                    "pixel_masked_multilayer_prediction",
+                    "pixel_masked_multilayer_l234_prediction",
+                } and isinstance(batch.student_inputs, torch.Tensor):
                     if batch.student_inputs.shape == batch.targets.shape:
                         identity_error = per_sample_hidden_component_mse(
                             batch.student_inputs,
@@ -426,7 +532,9 @@ def collect_feature_denoising_reconstruction_scores(
                         draw_identity_errors.append(identity_error)
                         draw_improvements.append(identity_error - prediction_error)
                         draw_cosines.append(
-                            per_sample_cosine_similarity(batch_predictions, batch.targets)
+                            per_sample_cosine_similarity(
+                                batch_predictions, batch.targets
+                            )
                         )
                     else:
                         components = multilayer_component_scores(
@@ -444,21 +552,59 @@ def collect_feature_denoising_reconstruction_scores(
             raw_errors.append(batch_raw_errors.cpu())
             scores.append((-batch_raw_errors).cpu())
             if draw_identity_errors:
-                identity_errors.append(torch.stack(draw_identity_errors, dim=1).mean(dim=1).cpu())
-                improvements.append(torch.stack(draw_improvements, dim=1).mean(dim=1).cpu())
+                batch_identity_errors = torch.stack(
+                    draw_identity_errors, dim=1
+                ).mean(dim=1)
+                batch_improvements = torch.stack(draw_improvements, dim=1).mean(dim=1)
+                improvements.append(batch_improvements.cpu())
+                batch_relative_improvements = torch.stack(
+                    [
+                        improvement / identity.clamp_min(1.0e-12)
+                        for improvement, identity in zip(
+                            draw_improvements,
+                            draw_identity_errors,
+                            strict=True,
+                        )
+                    ],
+                    dim=1,
+                ).mean(dim=1)
+                if (
+                    feature_denoising_config.method
+                    == "nmf_concept_masked_residual_reconstruction"
+                ):
+                    relative_improvements.append(batch_relative_improvements.cpu())
+                else:
+                    identity_errors.append(batch_identity_errors.cpu())
+                    relative_improvements.append(batch_relative_improvements.cpu())
             if draw_cosines:
-                cosine_similarities.append(torch.stack(draw_cosines, dim=1).mean(dim=1).cpu())
+                cosine_similarities.append(
+                    torch.stack(draw_cosines, dim=1).mean(dim=1).cpu()
+                )
                 contexts.append(torch.stack(draw_contexts, dim=1).mean(dim=1).cpu())
-                predicted_embeddings.append(torch.stack(draw_predictions, dim=1).mean(dim=1).cpu())
+                predicted_embeddings.append(
+                    torch.stack(draw_predictions, dim=1).mean(dim=1).cpu()
+                )
                 if draw_targets:
                     targets.append(torch.stack(draw_targets, dim=1).mean(dim=1).cpu())
+            if draw_channel_group_indices:
+                if len(draw_channel_group_indices) != (
+                    feature_denoising_config.evaluation_draws
+                ):
+                    raise RuntimeError(
+                        "Every inference draw must record a sampled channel group"
+                    )
+                sampled_channel_group_indices.append(
+                    torch.stack(draw_channel_group_indices, dim=1).cpu()
+                )
             if draw_component_scores:
                 for name, values in draw_component_scores.items():
                     component_scores.setdefault(name, []).append(
                         torch.stack(values, dim=1).mean(dim=1).cpu()
                     )
                 contexts.append(torch.stack(draw_contexts, dim=1).mean(dim=1).cpu())
-                predicted_embeddings.append(torch.stack(draw_predictions, dim=1).mean(dim=1).cpu())
+                predicted_embeddings.append(
+                    torch.stack(draw_predictions, dim=1).mean(dim=1).cpu()
+                )
                 if draw_targets:
                     targets.append(torch.stack(draw_targets, dim=1).mean(dim=1).cpu())
             batch_subspace_scores = {
@@ -479,20 +625,19 @@ def collect_feature_denoising_reconstruction_scores(
                     identity_error - reconstruction_error
                 ) / identity_error.clamp_min(1.0e-12)
             for name, values in batch_subspace_scores.items():
-                subspace_scores.setdefault(name, []).append(
-                    values.cpu()
-                )
+                subspace_scores.setdefault(name, []).append(values.cpu())
     result = {
         "labels": torch.cat(labels, dim=0),
         "raw_reconstruction_error": torch.cat(raw_errors, dim=0),
         "scores": torch.cat(scores, dim=0),
     }
     if identity_errors:
-        result.update(
-            {
-                "identity_error": torch.cat(identity_errors, dim=0),
-                "improvement": torch.cat(improvements, dim=0),
-            }
+        result["identity_error"] = torch.cat(identity_errors, dim=0)
+    if improvements:
+        result["improvement"] = torch.cat(improvements, dim=0)
+    if relative_improvements:
+        result["relative_improvement"] = torch.cat(
+            relative_improvements, dim=0
         )
     if cosine_similarities:
         result.update(
@@ -517,13 +662,258 @@ def collect_feature_denoising_reconstruction_scores(
                 "z_target": torch.cat(targets, dim=0),
             }
         )
+    if sampled_channel_group_indices:
+        result["sampled_channel_group_indices"] = torch.cat(
+            sampled_channel_group_indices,
+            dim=0,
+        )
     result.update(
-        {
-            name: torch.cat(values, dim=0)
-            for name, values in subspace_scores.items()
-        }
+        {name: torch.cat(values, dim=0) for name, values in subspace_scores.items()}
     )
     return result
+
+
+@torch.no_grad()
+def collect_channel_knn_reconstruction_scores(
+    loader: DataLoader[tuple[torch.Tensor, int]],
+    device: torch.device,
+    perturbation_forwarder: nn.Module,
+    feature_denoising_config: FeatureDenoisingConfig,
+    index: MaskedChannelExactL2Index,
+    channel_groups: ChannelGroups | None = None,
+) -> dict[str, torch.Tensor]:
+    """Collect channel-masked k-NN reconstruction scores for one dataset."""
+
+    if feature_denoising_config.method not in {
+        "channel_masked_knn_reconstruction",
+        "channel_group_masked_knn_reconstruction",
+    }:
+        raise ValueError(
+            "k-NN score collection requires a channel-masked k-NN method"
+        )
+    uses_channel_groups = (
+        feature_denoising_config.method
+        == "channel_group_masked_knn_reconstruction"
+    )
+    if uses_channel_groups and channel_groups is None:
+        raise ValueError("Cluster-masked k-NN requires channel_groups")
+    perturbation_forwarder.to(device)
+    perturbation_forwarder.eval()
+    labels: list[torch.Tensor] = []
+    raw_errors: list[torch.Tensor] = []
+    identity_errors: list[torch.Tensor] = []
+    neighbor_indices: list[torch.Tensor] = []
+    neighbor_squared_distances: list[torch.Tensor] = []
+    visible_channel_counts: list[torch.Tensor] = []
+    sampled_channel_group_indices: list[torch.Tensor] = []
+
+    for images, batch_labels in loader:
+        features = _teacher_features(perturbation_forwarder, images.to(device))
+        if tuple(features.shape[1:]) != index.feature_shape:
+            raise ValueError(
+                "Query feature shape does not match the k-NN reference bank: "
+                f"{tuple(features.shape[1:])} != {index.feature_shape}"
+            )
+        draw_errors: list[torch.Tensor] = []
+        draw_identity_errors: list[torch.Tensor] = []
+        draw_indices: list[torch.Tensor] = []
+        draw_distances: list[torch.Tensor] = []
+        draw_visible_counts: list[torch.Tensor] = []
+        draw_channel_group_indices: list[torch.Tensor] = []
+        for _ in range(feature_denoising_config.evaluation_draws):
+            if uses_channel_groups:
+                assert channel_groups is not None
+                keep_mask, sampled_groups = sample_channel_group_keep_mask(
+                    features,
+                    channel_groups,
+                )
+                draw_channel_group_indices.append(sampled_groups.cpu())
+            else:
+                keep_mask = sample_channel_keep_mask(
+                    features,
+                    feature_denoising_config.mask_probability,
+                )
+            distances, indices = index.search(
+                features,
+                keep_mask,
+                k=feature_denoising_config.k_neighbors,
+                query_batch_size=feature_denoising_config.knn_query_batch_size,
+                reference_chunk_size=(
+                    feature_denoising_config.knn_reference_chunk_size
+                ),
+            )
+            predictions = index.reconstruct_hidden_channels(
+                features,
+                keep_mask,
+                indices,
+            )
+            corrupted_features = features * keep_mask
+            draw_errors.append(
+                per_sample_hidden_component_mse(
+                    predictions,
+                    features,
+                    keep_mask,
+                )
+            )
+            draw_identity_errors.append(
+                per_sample_hidden_component_mse(
+                    corrupted_features,
+                    features,
+                    keep_mask,
+                )
+            )
+            draw_indices.append(indices.cpu())
+            draw_distances.append(distances.cpu())
+            draw_visible_counts.append(
+                keep_mask[:, :, 0, 0].sum(dim=1).to(dtype=torch.int32).cpu()
+            )
+
+        batch_errors = torch.stack(draw_errors, dim=1).mean(dim=1)
+        batch_identity_errors = torch.stack(draw_identity_errors, dim=1).mean(dim=1)
+        labels.append(batch_labels.cpu())
+        raw_errors.append(batch_errors.cpu())
+        identity_errors.append(batch_identity_errors.cpu())
+        neighbor_indices.append(torch.stack(draw_indices, dim=1))
+        neighbor_squared_distances.append(torch.stack(draw_distances, dim=1))
+        visible_channel_counts.append(torch.stack(draw_visible_counts, dim=1))
+        if draw_channel_group_indices:
+            sampled_channel_group_indices.append(
+                torch.stack(draw_channel_group_indices, dim=1)
+            )
+
+    raw_error_tensor = torch.cat(raw_errors, dim=0)
+    identity_error_tensor = torch.cat(identity_errors, dim=0)
+    result = {
+        "labels": torch.cat(labels, dim=0),
+        "raw_reconstruction_error": raw_error_tensor,
+        "scores": -raw_error_tensor,
+        "identity_error": identity_error_tensor,
+        "improvement": identity_error_tensor - raw_error_tensor,
+        "neighbor_indices": torch.cat(neighbor_indices, dim=0),
+        "neighbor_squared_distances": torch.cat(
+            neighbor_squared_distances,
+            dim=0,
+        ),
+        "visible_channel_counts": torch.cat(visible_channel_counts, dim=0),
+    }
+    if sampled_channel_group_indices:
+        result["sampled_channel_group_indices"] = torch.cat(
+            sampled_channel_group_indices,
+            dim=0,
+        )
+    return result
+
+
+def load_channel_knn_index(
+    activation_path: Path,
+    device: torch.device,
+    *,
+    expected_dataset: str,
+    expected_layer: str,
+    expected_feature_shape: tuple[int, int, int],
+) -> MaskedChannelExactL2Index:
+    """Load and validate clean ID training maps for masked k-NN search."""
+
+    artifact = torch.load(activation_path, map_location="cpu", weights_only=False)
+    if artifact.get("dataset") != expected_dataset or artifact.get("split") != "train":
+        raise ValueError(
+            "k-NN references must be the complete ID training activation artifact "
+            f"{expected_dataset!r}; got dataset={artifact.get('dataset')!r}, "
+            f"split={artifact.get('split')!r}: {activation_path}"
+        )
+    if artifact.get("layer") != expected_layer:
+        raise ValueError(
+            "k-NN reference layer does not match the configured feature layer: "
+            f"{artifact.get('layer')!r} != {expected_layer!r}"
+        )
+    activations = artifact.get("activations")
+    if not torch.is_tensor(activations) or activations.ndim != 4:
+        raise ValueError(
+            f"Activation artifact is missing 4D tensor 'activations': {activation_path}"
+        )
+    if tuple(activations.shape[1:]) != expected_feature_shape:
+        raise ValueError(
+            "k-NN reference feature shape does not match the config: "
+            f"{tuple(activations.shape[1:])} != {expected_feature_shape}"
+        )
+    return MaskedChannelExactL2Index(activations, device)
+
+
+def load_channel_groups(
+    artifact_path: Path,
+    device: torch.device,
+    *,
+    distance_threshold: float,
+    expected_dataset: str,
+    expected_layer: str,
+    expected_feature_shape: tuple[int, int, int],
+) -> ChannelGroups:
+    """Load and validate a disjoint hierarchy cut for channel masking."""
+
+    artifact = torch.load(artifact_path, map_location="cpu", weights_only=False)
+    if artifact.get("dataset") != expected_dataset or artifact.get("split") != "train":
+        raise ValueError(
+            "Channel groups must come from the complete ID training split "
+            f"{expected_dataset!r}; got dataset={artifact.get('dataset')!r}, "
+            f"split={artifact.get('split')!r}: {artifact_path}"
+        )
+    if artifact.get("layer") != expected_layer:
+        raise ValueError(
+            "Channel-group layer does not match the configured feature layer: "
+            f"{artifact.get('layer')!r} != {expected_layer!r}"
+        )
+    if tuple(artifact.get("feature_shape", ())) != expected_feature_shape:
+        raise ValueError(
+            "Channel-group feature shape does not match the config: "
+            f"{artifact.get('feature_shape')!r} != {expected_feature_shape!r}"
+        )
+    threshold_key = f"{distance_threshold:g}"
+    cut_groups = artifact.get("cut_groups")
+    groups = cut_groups.get(threshold_key) if isinstance(cut_groups, dict) else None
+    if groups is None and artifact.get("method") == "nmf_latent_cosine":
+        linkage_matrix = artifact.get("linkage")
+        if not torch.is_tensor(linkage_matrix):
+            raise ValueError(
+                "NMF channel-group artifact is missing tensor 'linkage': "
+                f"{artifact_path}"
+            )
+        expected_linkage_shape = (expected_feature_shape[0] - 1, 4)
+        if tuple(linkage_matrix.shape) != expected_linkage_shape:
+            raise ValueError(
+                "NMF channel-group linkage shape does not match the feature width: "
+                f"{tuple(linkage_matrix.shape)} != {expected_linkage_shape}"
+            )
+        groups = flat_channel_groups(
+            linkage_matrix.detach().cpu().numpy(),
+            distance_threshold,
+        )
+    if not isinstance(groups, list) or not groups:
+        raise ValueError(
+            f"Channel-group artifact has no cut at distance {threshold_key}: "
+            f"{artifact_path}"
+        )
+    channel_count = expected_feature_shape[0]
+    membership = torch.zeros((len(groups), channel_count), dtype=torch.bool)
+    for group_index, channels in enumerate(groups):
+        if not isinstance(channels, list) or not channels:
+            raise ValueError(f"Channel group {group_index} is empty or invalid")
+        if any(not isinstance(channel, int) for channel in channels):
+            raise ValueError(f"Channel group {group_index} contains a non-integer")
+        if len(set(channels)) != len(channels):
+            raise ValueError(f"Channel group {group_index} contains duplicates")
+        if min(channels) < 0 or max(channels) >= channel_count:
+            raise ValueError(f"Channel group {group_index} contains an invalid index")
+        membership[group_index, channels] = True
+    coverage = membership.sum(dim=0)
+    if not torch.all(coverage == 1):
+        raise ValueError("Channel groups must partition every channel exactly once")
+    if membership.shape[0] < 2:
+        raise ValueError("Channel masking requires at least two groups")
+    return ChannelGroups(
+        membership=membership.to(device),
+        distance_threshold=distance_threshold,
+        source_path=str(artifact_path),
+    )
 
 
 def sample_feature_denoising_batch(
@@ -534,8 +924,11 @@ def sample_feature_denoising_batch(
     feature_normalizer: FeatureNormalizer | None = None,
     class_channel_corruption: ClassChannelCorruptionBank | None = None,
     class_ids: torch.Tensor | None = None,
-    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]]
+    | None = None,
     pixmix_provider: PixMixMixingProvider | None = None,
+    channel_groups: ChannelGroups | None = None,
+    nmf_projector: NmfConceptProjector | None = None,
 ) -> FeatureDenoisingPcaBatch:
     """Sample one Feature Denoising training batch from normalized input images."""
 
@@ -572,6 +965,8 @@ def sample_feature_denoising_batch(
         feature_normalizer,
         class_channel_corruption,
         class_ids,
+        channel_groups,
+        nmf_projector,
     )
 
 
@@ -582,14 +977,20 @@ def sample_feature_denoising_pca_batch(
     feature_normalizer: FeatureNormalizer | None = None,
     class_channel_corruption: ClassChannelCorruptionBank | None = None,
     class_ids: torch.Tensor | None = None,
+    channel_groups: ChannelGroups | None = None,
+    nmf_projector: NmfConceptProjector | None = None,
 ) -> FeatureDenoisingPcaBatch:
     """Sample a masked reconstruction batch for the configured Feature Denoising method."""
 
     if config.method == "pca_masked_reconstruction":
         if projector is None:
-            raise ValueError("pca_projector is required for PCA Feature Denoising reconstruction")
+            raise ValueError(
+                "pca_projector is required for PCA Feature Denoising reconstruction"
+            )
         targets = projector.whitened_transform(features)
-        keep_mask = sample_feature_denoising_keep_mask(targets, config.pca_mask_probability)
+        keep_mask = sample_feature_denoising_keep_mask(
+            targets, config.pca_mask_probability
+        )
     elif config.method == "spatial_masked_reconstruction":
         targets = features
         keep_mask = sample_spatial_keep_mask(targets, config.mask_probability)
@@ -638,22 +1039,78 @@ def sample_feature_denoising_pca_batch(
             keep_mask=keep_mask,
             corrupted_features=corrupted_features,
         )
-    elif (
-        config.method
-        in {
-            "confusion_channel_replacement_reconstruction",
-            "confusion_channel_replacement_residual_reconstruction",
-        }
-    ):
+    elif config.method == "channel_group_masked_residual_reconstruction":
+        if channel_groups is None:
+            raise ValueError(
+                "channel_groups are required for channel-group masked reconstruction"
+            )
+        targets = features
+        keep_mask, sampled_group_indices = sample_channel_group_keep_mask(
+            targets,
+            channel_groups,
+            group_index=config.channel_group_index,
+        )
+        corrupted_features = targets * keep_mask
+        return FeatureDenoisingPcaBatch(
+            student_inputs=corrupted_features,
+            targets=targets,
+            keep_mask=keep_mask,
+            corrupted_features=corrupted_features,
+            sampled_channel_group_indices=sampled_group_indices,
+        )
+    elif config.method == "channel_group_stratified_masked_residual_reconstruction":
+        if channel_groups is None:
+            raise ValueError(
+                "channel_groups are required for stratified channel-group masking"
+            )
+        targets = features
+        keep_mask = sample_channel_group_stratified_keep_mask(
+            targets,
+            channel_groups,
+            min_group_size=config.channel_group_min_size,
+            mask_fraction=config.channel_group_mask_fraction,
+            group_index=config.channel_group_index,
+        )
+        corrupted_features = targets * keep_mask
+        return FeatureDenoisingPcaBatch(
+            student_inputs=corrupted_features,
+            targets=targets,
+            keep_mask=keep_mask,
+            corrupted_features=corrupted_features,
+        )
+    elif config.method == "nmf_concept_masked_residual_reconstruction":
+        if nmf_projector is None:
+            raise ValueError(
+                "nmf_projector is required for NMF concept-masked reconstruction"
+            )
+        concept_scores = nmf_projector.transform(features)
+        concept_keep_mask = sample_nmf_concept_keep_mask(
+            concept_scores,
+            config.nmf_mask_probability,
+        )
+        targets = nmf_projector.inverse_transform(concept_scores)
+        corrupted_features = nmf_projector.inverse_transform(
+            concept_scores * concept_keep_mask
+        )
+        full_reconstruction_mask = features.new_zeros(
+            (features.shape[0], 1, 1, 1)
+        )
+        return FeatureDenoisingPcaBatch(
+            student_inputs=corrupted_features,
+            targets=targets,
+            keep_mask=full_reconstruction_mask,
+            corrupted_features=corrupted_features,
+        )
+    elif config.method in {
+        "confusion_channel_replacement_reconstruction",
+        "confusion_channel_replacement_residual_reconstruction",
+    }:
         if class_channel_corruption is None:
             raise ValueError(
-                "class_channel_corruption is required for confusion-channel "
-                "replacement"
+                "class_channel_corruption is required for confusion-channel replacement"
             )
         if class_ids is None:
-            raise ValueError(
-                "class_ids are required for confusion-channel replacement"
-            )
+            raise ValueError("class_ids are required for confusion-channel replacement")
         return sample_confusion_channel_replacement_batch(
             features=features,
             class_ids=class_ids,
@@ -680,11 +1137,13 @@ class FeatureDenoisingPcaBatch:
         targets: torch.Tensor,
         keep_mask: torch.Tensor,
         corrupted_features: torch.Tensor | None = None,
+        sampled_channel_group_indices: torch.Tensor | None = None,
     ) -> None:
         self.student_inputs = student_inputs
         self.targets = targets
         self.keep_mask = keep_mask
         self.corrupted_features = corrupted_features
+        self.sampled_channel_group_indices = sampled_channel_group_indices
 
 
 def sample_spatial_token_prediction_batch(
@@ -694,7 +1153,9 @@ def sample_spatial_token_prediction_batch(
     """Sample visible context and target tokens for spatial token prediction."""
 
     if features.ndim != 4:
-        raise ValueError("spatial token Feature Denoising expects features with shape (B, C, H, W)")
+        raise ValueError(
+            "spatial token Feature Denoising expects features with shape (B, C, H, W)"
+        )
     batch_size, channels, height, width = features.shape
     token_count = height * width
     flat_features = features.flatten(start_dim=2).transpose(1, 2)
@@ -786,7 +1247,8 @@ def sample_pixel_augmented_embedding_batch(
     images: torch.Tensor,
     perturbation_forwarder: nn.Module,
     config: FeatureDenoisingConfig,
-    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None,
+    image_normalization: tuple[tuple[float, float, float], tuple[float, float, float]]
+    | None,
     pixmix_provider: PixMixMixingProvider | None = None,
 ) -> FeatureDenoisingPcaBatch:
     """Predict clean pooled teacher embeddings from pixel-augmented embeddings."""
@@ -801,9 +1263,7 @@ def sample_pixel_augmented_embedding_batch(
         )
     if config.pixel_augmentation_method == "pixmix":
         if pixmix_provider is None:
-            raise ValueError(
-                "pixmix_provider is required for PixMix Feature Denoising"
-            )
+            raise ValueError("pixmix_provider is required for PixMix Feature Denoising")
         pixel_batch = sample_pixmix(
             images,
             pixmix_provider.sample(images.shape[0], images.device, images.dtype),
@@ -831,7 +1291,9 @@ def sample_pixel_augmented_embedding_batch(
     )
 
 
-def feature_denoising_pixel_augmentation_config(config: FeatureDenoisingConfig) -> PerturbationConfig:
+def feature_denoising_pixel_augmentation_config(
+    config: FeatureDenoisingConfig,
+) -> PerturbationConfig:
     """Build a pixel-augmentation config from Feature Denoising augmentation fields."""
 
     return PerturbationConfig(
@@ -948,9 +1410,7 @@ def forward_multilayer_teacher_state(
     centered_logits = logits - logits.mean(dim=1, keepdim=True)
     return MultilayerTeacherState(
         layer2=(
-            pool_teacher_features(layer2_features, config)
-            if include_layer2
-            else None
+            pool_teacher_features(layer2_features, config) if include_layer2 else None
         ),
         layer3=pool_teacher_features(layer3_features, config),
         layer4=pool_teacher_features(layer4_features, config),
@@ -995,7 +1455,9 @@ def sample_pixel_block_keep_mask(
     return keep_mask
 
 
-def pool_teacher_features(features: torch.Tensor, config: FeatureDenoisingConfig) -> torch.Tensor:
+def pool_teacher_features(
+    features: torch.Tensor, config: FeatureDenoisingConfig
+) -> torch.Tensor:
     """Pool teacher feature maps according to the Feature Denoising embedding settings."""
 
     if config.embedding_pool == "cls":
@@ -1003,7 +1465,9 @@ def pool_teacher_features(features: torch.Tensor, config: FeatureDenoisingConfig
             raise ValueError("cls embedding pooling expects CLS feature vectors")
         return features
     if config.embedding_pool != "avg":
-        raise ValueError("Only avg and cls pooling are supported for Feature Denoising embeddings")
+        raise ValueError(
+            "Only avg and cls pooling are supported for Feature Denoising embeddings"
+        )
     if features.ndim != 4:
         raise ValueError("avg embedding pooling expects feature maps")
     return features.mean(dim=(2, 3))
@@ -1067,11 +1531,15 @@ def sample_spatial_token_indices(
     return target_positions, context_positions.sort().values
 
 
-def _resolve_target_token_count(config: FeatureDenoisingConfig, token_count: int) -> int:
+def _resolve_target_token_count(
+    config: FeatureDenoisingConfig, token_count: int
+) -> int:
     if config.target_token_count > 0:
         requested = config.target_token_count
     else:
-        average_scale = (config.target_block_scale_min + config.target_block_scale_max) / 2.0
+        average_scale = (
+            config.target_block_scale_min + config.target_block_scale_max
+        ) / 2.0
         requested = round(config.target_block_count * average_scale * token_count)
     return max(1, min(token_count - 1, requested))
 
@@ -1093,8 +1561,12 @@ def _sample_rectangle(
     rectangle_width = int(round((target_area * ratio) ** 0.5))
     rectangle_height = max(1, min(height, rectangle_height))
     rectangle_width = max(1, min(width, rectangle_width))
-    top = int(torch.randint(0, height - rectangle_height + 1, (1,), device=device).item())
-    left = int(torch.randint(0, width - rectangle_width + 1, (1,), device=device).item())
+    top = int(
+        torch.randint(0, height - rectangle_height + 1, (1,), device=device).item()
+    )
+    left = int(
+        torch.randint(0, width - rectangle_width + 1, (1,), device=device).item()
+    )
     return top, left, rectangle_height, rectangle_width
 
 
@@ -1117,7 +1589,9 @@ def _uniform(min_value: float, max_value: float, device: torch.device) -> float:
     return float(sample.item())
 
 
-def sample_feature_denoising_keep_mask(projected: torch.Tensor, mask_probability: float) -> torch.Tensor:
+def sample_feature_denoising_keep_mask(
+    projected: torch.Tensor, mask_probability: float
+) -> torch.Tensor:
     """Sample keep masks, forcing at least one hidden component per sample."""
 
     keep_mask = torch.empty_like(projected).bernoulli_(1.0 - mask_probability)
@@ -1134,11 +1608,50 @@ def sample_feature_denoising_keep_mask(projected: torch.Tensor, mask_probability
     return keep_mask
 
 
-def sample_spatial_keep_mask(features: torch.Tensor, mask_probability: float) -> torch.Tensor:
+def sample_nmf_concept_keep_mask(
+    concept_scores: torch.Tensor,
+    mask_probability: float,
+) -> torch.Tensor:
+    """Sample one Bernoulli concept mask per image, shared by all positions."""
+
+    if concept_scores.ndim != 4:
+        raise ValueError("NMF concept scores must have shape (B, H, W, K)")
+    if not 0.0 < mask_probability < 1.0:
+        raise ValueError("NMF concept mask probability must satisfy 0 < p < 1")
+    batch_size, _, _, concept_count = concept_scores.shape
+    if concept_count <= 0:
+        raise ValueError("NMF concept scores must contain at least one concept")
+    keep_mask = (
+        torch.rand(
+            batch_size,
+            1,
+            1,
+            concept_count,
+            device=concept_scores.device,
+        )
+        >= mask_probability
+    ).to(dtype=concept_scores.dtype)
+    all_kept = keep_mask.flatten(start_dim=1).all(dim=1)
+    if all_kept.any():
+        rows = all_kept.nonzero(as_tuple=False).flatten()
+        hidden_indices = torch.randint(
+            concept_count,
+            (rows.numel(),),
+            device=concept_scores.device,
+        )
+        keep_mask[rows, 0, 0, hidden_indices] = 0.0
+    return keep_mask
+
+
+def sample_spatial_keep_mask(
+    features: torch.Tensor, mask_probability: float
+) -> torch.Tensor:
     """Sample spatial keep masks, forcing at least one hidden location."""
 
     if features.ndim != 4:
-        raise ValueError("spatial Feature Denoising masking expects features with shape (B, C, H, W)")
+        raise ValueError(
+            "spatial Feature Denoising masking expects features with shape (B, C, H, W)"
+        )
     keep_mask = torch.empty(
         (features.shape[0], 1, features.shape[2], features.shape[3]),
         device=features.device,
@@ -1166,8 +1679,7 @@ def sample_spatial_block_hidden_mask(
 
     if features.ndim != 4:
         raise ValueError(
-            "spatial block Feature Denoising expects features with shape "
-            "(B, C, H, W)"
+            "spatial block Feature Denoising expects features with shape (B, C, H, W)"
         )
     if not block_sizes or any(block_size <= 0 for block_size in block_sizes):
         raise ValueError("spatial block sizes must contain positive integers")
@@ -1213,11 +1725,15 @@ def sample_spatial_block_hidden_mask(
     return hidden_mask
 
 
-def sample_channel_keep_mask(features: torch.Tensor, mask_probability: float) -> torch.Tensor:
-    """Sample channel keep masks, forcing at least one hidden channel."""
+def sample_channel_keep_mask(
+    features: torch.Tensor, mask_probability: float
+) -> torch.Tensor:
+    """Sample channel keep masks, forcing hidden and visible channels."""
 
     if features.ndim != 4:
-        raise ValueError("channel Feature Denoising masking expects features with shape (B, C, H, W)")
+        raise ValueError(
+            "channel Feature Denoising masking expects features with shape (B, C, H, W)"
+        )
     keep_mask = torch.empty(
         (features.shape[0], features.shape[1], 1, 1),
         device=features.device,
@@ -1234,7 +1750,224 @@ def sample_channel_keep_mask(features: torch.Tensor, mask_probability: float) ->
             device=flat.device,
         )
         flat[rows, columns] = 0.0
+    all_hidden = ~flat.bool().any(dim=1)
+    if all_hidden.any() and flat.shape[1] > 1:
+        rows = all_hidden.nonzero(as_tuple=False).flatten()
+        columns = torch.randint(
+            low=0,
+            high=flat.shape[1],
+            size=(rows.shape[0],),
+            device=flat.device,
+        )
+        flat[rows, columns] = 1.0
     return flat.reshape_as(keep_mask)
+
+
+def sample_channel_group_keep_mask(
+    features: torch.Tensor,
+    channel_groups: ChannelGroups,
+    *,
+    group_index: int | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Hide one complete channel group per example, optionally a fixed group."""
+
+    if features.ndim != 4:
+        raise ValueError(
+            "channel-group masking expects features with shape (B, C, H, W)"
+        )
+    if channel_groups.channel_count != features.shape[1]:
+        raise ValueError(
+            "Channel-group width does not match features: "
+            f"{channel_groups.channel_count} != {features.shape[1]}"
+        )
+    if group_index is not None and not 0 <= group_index < channel_groups.group_count:
+        raise ValueError(
+            f"channel-group index {group_index} is outside "
+            f"[0, {channel_groups.group_count})"
+        )
+    sampled_group_indices = (
+        torch.full(
+            (features.shape[0],),
+            group_index,
+            dtype=torch.long,
+            device=features.device,
+        )
+        if group_index is not None
+        else torch.randint(
+            low=0,
+            high=channel_groups.group_count,
+            size=(features.shape[0],),
+            device=features.device,
+        )
+    )
+    membership = channel_groups.membership.to(device=features.device)
+    hidden_mask = membership[sampled_group_indices].to(dtype=features.dtype)
+    keep_mask = 1.0 - hidden_mask.reshape(features.shape[0], features.shape[1], 1, 1)
+    return keep_mask, sampled_group_indices
+
+
+def sample_channel_group_stratified_keep_mask(
+    features: torch.Tensor,
+    channel_groups: ChannelGroups,
+    *,
+    min_group_size: int,
+    mask_fraction: float,
+    group_index: int | None = None,
+) -> torch.Tensor:
+    """Hide a random fraction in one group or every eligible group."""
+
+    if features.ndim != 4:
+        raise ValueError(
+            "stratified channel-group masking expects features with shape (B, C, H, W)"
+        )
+    if channel_groups.channel_count != features.shape[1]:
+        raise ValueError(
+            "Channel-group width does not match features: "
+            f"{channel_groups.channel_count} != {features.shape[1]}"
+        )
+    if min_group_size <= 0:
+        raise ValueError("min_group_size must be positive")
+    if not 0.0 < mask_fraction <= 1.0:
+        raise ValueError("mask_fraction must satisfy 0 < fraction <= 1")
+    if group_index is not None and not 0 <= group_index < channel_groups.group_count:
+        raise ValueError(
+            f"channel-group index {group_index} is outside "
+            f"[0, {channel_groups.group_count})"
+        )
+
+    membership = channel_groups.membership.to(device=features.device)
+    hidden_mask = torch.zeros(
+        (features.shape[0], features.shape[1]),
+        dtype=torch.bool,
+        device=features.device,
+    )
+    batch_rows = torch.arange(features.shape[0], device=features.device)[:, None]
+    eligible_group_count = 0
+    group_indices = (
+        range(channel_groups.group_count)
+        if group_index is None
+        else (group_index,)
+    )
+    for current_group_index in group_indices:
+        group_membership = membership[current_group_index]
+        channels = group_membership.nonzero(as_tuple=False).flatten()
+        group_size = channels.numel()
+        if group_size < min_group_size:
+            continue
+        eligible_group_count += 1
+        mask_count = max(1, math.floor(mask_fraction * group_size + 0.5))
+        selected_offsets = torch.rand(
+            (features.shape[0], group_size),
+            device=features.device,
+        ).topk(mask_count, dim=1, largest=False).indices
+        selected_channels = channels[selected_offsets]
+        hidden_mask[batch_rows, selected_channels] = True
+    if eligible_group_count == 0:
+        raise ValueError(
+            f"No channel group contains at least {min_group_size} channels"
+        )
+    return (1.0 - hidden_mask.to(dtype=features.dtype)).reshape(
+        features.shape[0],
+        features.shape[1],
+        1,
+        1,
+    )
+
+
+def per_sample_channel_group_hidden_mse(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    keep_mask: torch.Tensor,
+    channel_groups: ChannelGroups,
+) -> torch.Tensor:
+    """Return masked-channel MSE per sample and disjoint channel group."""
+
+    if predictions.shape != targets.shape or predictions.ndim != 4:
+        raise ValueError("Cluster MSE expects matching four-dimensional feature maps")
+    if keep_mask.shape != (targets.shape[0], targets.shape[1], 1, 1):
+        raise ValueError("Cluster MSE keep mask must have shape (B, C, 1, 1)")
+    if channel_groups.channel_count != targets.shape[1]:
+        raise ValueError("Cluster MSE group width does not match feature channels")
+    hidden = (1.0 - keep_mask[:, :, 0, 0]).to(dtype=targets.dtype)
+    membership = channel_groups.membership.to(
+        device=targets.device,
+        dtype=targets.dtype,
+    )
+    selected = hidden[:, None, :] * membership[None, :, :]
+    selected_count = selected.sum(dim=2)
+    if bool((selected_count <= 0).any()):
+        raise ValueError("Every exported channel group must mask at least one channel")
+    per_channel_mse = (predictions - targets).pow(2).mean(dim=(2, 3))
+    return torch.einsum("bc,bgc->bg", per_channel_mse, selected) / selected_count
+
+
+@torch.no_grad()
+def collect_channel_group_cluster_improvements(
+    student: nn.Module,
+    loader: DataLoader[tuple[torch.Tensor, int]],
+    device: torch.device,
+    perturbation_forwarder: nn.Module,
+    feature_denoising_config: FeatureDenoisingConfig,
+    channel_groups: ChannelGroups,
+) -> dict[str, torch.Tensor]:
+    """Collect draw-averaged improvements for every eligible channel group."""
+
+    if (
+        feature_denoising_config.method
+        != "channel_group_stratified_masked_residual_reconstruction"
+    ):
+        raise ValueError("Cluster distributions require stratified group masking")
+    if feature_denoising_config.channel_group_index is not None:
+        raise ValueError("Cluster distributions require one global student")
+    student.eval()
+    perturbation_forwarder.eval()
+    labels: list[torch.Tensor] = []
+    absolute_improvements: list[torch.Tensor] = []
+    relative_improvements: list[torch.Tensor] = []
+    for images, batch_labels in loader:
+        features = _teacher_features(perturbation_forwarder, images.to(device))
+        draw_absolute: list[torch.Tensor] = []
+        draw_relative: list[torch.Tensor] = []
+        for _ in range(feature_denoising_config.evaluation_draws):
+            batch = sample_feature_denoising_pca_batch(
+                features,
+                feature_denoising_config,
+                channel_groups=channel_groups,
+            )
+            predictions = feature_denoising_predictions(
+                student,
+                batch,
+                feature_denoising_config,
+            )
+            if batch.corrupted_features is None:
+                raise RuntimeError("Cluster distribution batch has no corrupted features")
+            raw_error = per_sample_channel_group_hidden_mse(
+                predictions,
+                batch.targets,
+                batch.keep_mask,
+                channel_groups,
+            )
+            identity_error = per_sample_channel_group_hidden_mse(
+                batch.corrupted_features,
+                batch.targets,
+                batch.keep_mask,
+                channel_groups,
+            )
+            improvement = identity_error - raw_error
+            draw_absolute.append(improvement)
+            draw_relative.append(improvement / identity_error.clamp_min(1.0e-12))
+        labels.append(batch_labels.cpu())
+        absolute_improvements.append(
+            torch.stack(draw_absolute, dim=1).mean(dim=1).cpu()
+        )
+        relative_improvements.append(
+            torch.stack(draw_relative, dim=1).mean(dim=1).cpu()
+        )
+    return {
+        "labels": torch.cat(labels, dim=0),
+        "absolute_improvement": torch.cat(absolute_improvements, dim=0),
+        "relative_improvement": torch.cat(relative_improvements, dim=0),
+    }
 
 
 def sample_confusion_channel_replacement_batch(
@@ -1247,20 +1980,15 @@ def sample_confusion_channel_replacement_batch(
 
     if features.ndim != 4:
         raise ValueError(
-            "confusion-channel replacement expects features with shape "
-            "(B, C, H, W)"
+            "confusion-channel replacement expects features with shape (B, C, H, W)"
         )
     batch_size, channel_count, height, width = features.shape
     class_ids_cpu = class_ids.detach().long().flatten().cpu()
     if class_ids_cpu.shape[0] != batch_size:
         raise ValueError("class_ids must contain one class per feature map")
     num_classes = bank.confusing_class.shape[0]
-    if (
-        class_ids_cpu.numel() > 0
-        and (
-            int(class_ids_cpu.min()) < 0
-            or int(class_ids_cpu.max()) >= num_classes
-        )
+    if class_ids_cpu.numel() > 0 and (
+        int(class_ids_cpu.min()) < 0 or int(class_ids_cpu.max()) >= num_classes
     ):
         raise ValueError("class_ids contain a class outside the corruption bank")
     expected_shape = (channel_count, height, width)
@@ -1276,11 +2004,15 @@ def sample_confusion_channel_replacement_batch(
 
     replacement_count = max(1, round(config.mask_probability * channel_count))
     replacement_count = min(channel_count, replacement_count)
-    selected_channels = torch.rand(batch_size, channel_count).topk(
-        replacement_count,
-        dim=1,
-        largest=False,
-    ).indices
+    selected_channels = (
+        torch.rand(batch_size, channel_count)
+        .topk(
+            replacement_count,
+            dim=1,
+            largest=False,
+        )
+        .indices
+    )
     prototype_indices = torch.randint(
         low=0,
         high=bank.prototypes.shape[1],
@@ -1441,6 +2173,9 @@ def feature_denoising_predictions(
     if config.method not in {
         "spatial_block_residual_reconstruction",
         "channel_masked_residual_reconstruction",
+        "channel_group_masked_residual_reconstruction",
+        "channel_group_stratified_masked_residual_reconstruction",
+        "nmf_concept_masked_residual_reconstruction",
         "confusion_channel_replacement_residual_reconstruction",
     }:
         return outputs
@@ -1451,7 +2186,9 @@ def feature_denoising_predictions(
     return batch.corrupted_features + outputs
 
 
-def feature_denoising_metadata(config: ExperimentConfig, checkpoint: str | None = None) -> dict[str, object]:
+def feature_denoising_metadata(
+    config: ExperimentConfig, checkpoint: str | None = None
+) -> dict[str, object]:
     """Return common metadata for Feature Denoising reconstruction artifacts."""
 
     metadata = {
@@ -1481,14 +2218,20 @@ def feature_denoising_score_name(method: str) -> str:
         return FEATURE_DENOISING_CHANNEL_RECONSTRUCTION_SCORE
     if method == "channel_masked_residual_reconstruction":
         return FEATURE_DENOISING_CHANNEL_RESIDUAL_RECONSTRUCTION_SCORE
+    if method == "channel_group_masked_residual_reconstruction":
+        return FEATURE_DENOISING_CHANNEL_GROUP_RESIDUAL_RECONSTRUCTION_SCORE
+    if method == "channel_group_stratified_masked_residual_reconstruction":
+        return FEATURE_DENOISING_CHANNEL_GROUP_STRATIFIED_RESIDUAL_RECONSTRUCTION_SCORE
+    if method == "nmf_concept_masked_residual_reconstruction":
+        return FEATURE_DENOISING_NMF_CONCEPT_RESIDUAL_RECONSTRUCTION_SCORE
+    if method == "channel_masked_knn_reconstruction":
+        return FEATURE_DENOISING_CHANNEL_KNN_RECONSTRUCTION_SCORE
+    if method == "channel_group_masked_knn_reconstruction":
+        return FEATURE_DENOISING_CHANNEL_GROUP_KNN_RECONSTRUCTION_SCORE
     if method == "confusion_channel_replacement_reconstruction":
-        return (
-            FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RECONSTRUCTION_SCORE
-        )
+        return FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RECONSTRUCTION_SCORE
     if method == "confusion_channel_replacement_residual_reconstruction":
-        return (
-            FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RESIDUAL_RECONSTRUCTION_SCORE
-        )
+        return FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RESIDUAL_RECONSTRUCTION_SCORE
     if method == "spatial_token_prediction":
         return FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_SCORE
     if method == "pixel_masked_embedding_prediction":
@@ -1531,12 +2274,8 @@ def fit_class_channel_corruption_bank(
         labels_cpu = labels.detach().long().flatten().cpu()
         if labels_cpu.shape[0] != images.shape[0]:
             raise ValueError("Validation labels must match the image batch")
-        if (
-            labels_cpu.numel() > 0
-            and (
-                int(labels_cpu.min()) < 0
-                or int(labels_cpu.max()) >= num_classes
-            )
+        if labels_cpu.numel() > 0 and (
+            int(labels_cpu.min()) < 0 or int(labels_cpu.max()) >= num_classes
         ):
             raise ValueError("Validation labels contain an unknown class")
         features = perturbation_forwarder.forward_to_features(images.to(device))
@@ -1566,25 +2305,21 @@ def fit_class_channel_corruption_bank(
             validation_class_counts[class_id] += example_count
             assert value_sum is not None
             assert squared_value_sum is not None
-            value_sum[class_id] += class_features.sum(
-                dim=(0, 2, 3)
-            ).double().cpu()
-            squared_value_sum[class_id] += class_features.square().sum(
-                dim=(0, 2, 3)
-            ).double().cpu()
+            value_sum[class_id] += class_features.sum(dim=(0, 2, 3)).double().cpu()
+            squared_value_sum[class_id] += (
+                class_features.square().sum(dim=(0, 2, 3)).double().cpu()
+            )
             value_count[class_id] += (
                 example_count * class_features.shape[2] * class_features.shape[3]
             )
 
-    if (
-        feature_shape is None
-        or value_sum is None
-        or squared_value_sum is None
-    ):
-        raise ValueError("Cannot fit class-channel corruption from an empty validation loader")
+    if feature_shape is None or value_sum is None or squared_value_sum is None:
+        raise ValueError(
+            "Cannot fit class-channel corruption from an empty validation loader"
+        )
     missing_validation_classes = (
-        validation_class_counts == 0
-    ).nonzero(as_tuple=False).flatten()
+        (validation_class_counts == 0).nonzero(as_tuple=False).flatten()
+    )
     if missing_validation_classes.numel() > 0:
         raise ValueError(
             "Validation split is missing classes required for class-channel "
@@ -1613,19 +2348,13 @@ def fit_class_channel_corruption_bank(
         labels_cpu = labels.detach().long().flatten().cpu()
         if labels_cpu.shape[0] != images.shape[0]:
             raise ValueError("Confusion labels must match the image batch")
-        if (
-            labels_cpu.numel() > 0
-            and (
-                int(labels_cpu.min()) < 0
-                or int(labels_cpu.max()) >= num_classes
-            )
+        if labels_cpu.numel() > 0 and (
+            int(labels_cpu.min()) < 0 or int(labels_cpu.max()) >= num_classes
         ):
             raise ValueError("Confusion labels contain an unknown class")
         logits, _features = perturbation_forwarder(images.to(device))
         if logits.ndim != 2 or logits.shape[1] != num_classes:
-            raise ValueError(
-                "Teacher logits do not match the configured class count"
-            )
+            raise ValueError("Teacher logits do not match the configured class count")
         predictions = logits.argmax(dim=1).detach().cpu()
         flat_pairs = labels_cpu * num_classes + predictions
         confusion_matrix += torch.bincount(
@@ -1639,12 +2368,12 @@ def fit_class_channel_corruption_bank(
             class_mask = labels_device == class_id
             example_count = int(class_mask.sum())
             confusion_class_counts[class_id] += example_count
-            probability_sum[class_id] += probabilities[class_mask].sum(
-                dim=0
-            ).double().cpu()
+            probability_sum[class_id] += (
+                probabilities[class_mask].sum(dim=0).double().cpu()
+            )
     missing_confusion_classes = (
-        confusion_class_counts == 0
-    ).nonzero(as_tuple=False).flatten()
+        (confusion_class_counts == 0).nonzero(as_tuple=False).flatten()
+    )
     if missing_confusion_classes.numel() > 0:
         raise ValueError(
             "Confusion split is missing classes required for class-channel "
@@ -1661,18 +2390,12 @@ def fit_class_channel_corruption_bank(
         if int(off_diagonal_counts.max()) > 0:
             confusing_class[class_id] = off_diagonal_counts.argmax()
         else:
-            fallback_probabilities = mean_teacher_probabilities[
-                class_id
-            ].clone()
+            fallback_probabilities = mean_teacher_probabilities[class_id].clone()
             fallback_probabilities[class_id] = -torch.inf
             confusing_class[class_id] = fallback_probabilities.argmax()
 
-    prototypes_by_class: list[list[torch.Tensor]] = [
-        [] for _ in range(num_classes)
-    ]
-    source_indices_by_class: list[list[int]] = [
-        [] for _ in range(num_classes)
-    ]
+    prototypes_by_class: list[list[torch.Tensor]] = [[] for _ in range(num_classes)]
+    source_indices_by_class: list[list[int]] = [[] for _ in range(num_classes)]
     source_offset = 0
     for images, labels in prototype_loader:
         features = perturbation_forwarder.forward_to_features(images.to(device))
@@ -1749,9 +2472,7 @@ def save_class_channel_corruption_bank(
             "prototypes": bank.prototypes.cpu(),
             "prototype_source_indices": bank.prototype_source_indices.cpu(),
             "validation_class_counts": bank.validation_class_counts.cpu(),
-            "mean_teacher_probabilities": (
-                bank.mean_teacher_probabilities.cpu()
-            ),
+            "mean_teacher_probabilities": (bank.mean_teacher_probabilities.cpu()),
         },
         path,
     )
@@ -1783,8 +2504,7 @@ def load_class_channel_corruption_bank(
         value = artifact.get(name)
         if not torch.is_tensor(value):
             raise ValueError(
-                f"Class-channel corruption artifact is missing tensor {name!r}: "
-                f"{path}"
+                f"Class-channel corruption artifact is missing tensor {name!r}: {path}"
             )
         tensors[name] = value
     num_classes = tensors["confusing_class"].shape[0]
@@ -1815,9 +2535,7 @@ def load_class_channel_corruption_bank(
         raise ValueError(f"Invalid class-statistics shape in {path}")
     if tensors["class_std"].shape != tensors["class_mean"].shape:
         raise ValueError(f"Class mean/std shapes differ in {path}")
-    if tuple(tensors["prototype_source_indices"].shape) != tuple(
-        prototypes.shape[:2]
-    ):
+    if tuple(tensors["prototype_source_indices"].shape) != tuple(prototypes.shape[:2]):
         raise ValueError(f"Invalid prototype source-index shape in {path}")
     if tuple(tensors["validation_class_counts"].shape) != (num_classes,):
         raise ValueError(f"Invalid validation class-count shape in {path}")
@@ -1827,9 +2545,7 @@ def load_class_channel_corruption_bank(
         or confusing_class.numel() != num_classes
         or int(confusing_class.min()) < 0
         or int(confusing_class.max()) >= num_classes
-        or torch.any(
-            confusing_class == torch.arange(num_classes, dtype=torch.long)
-        )
+        or torch.any(confusing_class == torch.arange(num_classes, dtype=torch.long))
     ):
         raise ValueError(f"Invalid confusing-class mapping in {path}")
     return ClassChannelCorruptionBank(
@@ -1840,9 +2556,7 @@ def load_class_channel_corruption_bank(
         prototypes=prototypes.float(),
         prototype_source_indices=tensors["prototype_source_indices"].long(),
         validation_class_counts=tensors["validation_class_counts"].long(),
-        mean_teacher_probabilities=tensors[
-            "mean_teacher_probabilities"
-        ].float(),
+        mean_teacher_probabilities=tensors["mean_teacher_probabilities"].float(),
     )
 
 
@@ -1860,7 +2574,10 @@ def fit_feature_normalizer_from_activations(
 
     artifact = torch.load(activation_path, map_location="cpu", weights_only=False)
     if expected_dataset is not None:
-        if artifact.get("dataset") != expected_dataset or artifact.get("split") != "train":
+        if (
+            artifact.get("dataset") != expected_dataset
+            or artifact.get("split") != "train"
+        ):
             raise ValueError(
                 "Feature normalization must be fitted from the complete ID "
                 f"training-split activation artifact {expected_dataset!r}; got "
@@ -1897,9 +2614,7 @@ def fit_feature_normalizer_from_loader(
                 images.to(device),
             )
             batch_sum = features.sum(dim=(0, 2, 3)).double().cpu()
-            batch_squared_sum = (
-                features.square().sum(dim=(0, 2, 3)).double().cpu()
-            )
+            batch_squared_sum = features.square().sum(dim=(0, 2, 3)).double().cpu()
             if value_sum is None:
                 value_sum = torch.zeros_like(batch_sum)
                 squared_value_sum = torch.zeros_like(batch_squared_sum)

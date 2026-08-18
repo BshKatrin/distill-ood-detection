@@ -16,15 +16,24 @@ from distill_ood_detection.evaluation.ood_scores import (
     student_teacher_kl_divergence,
     student_teacher_kl_divergence_from_logits,
 )
+from distill_ood_detection.evaluation.score_composition import (
+    ScoreStandardization,
+    compose_standardized_scores,
+    fit_score_standardization,
+    standardize_score,
+)
 
 __all__ = [
     "SIGNS",
+    "ScoreStandardization",
     "absolute_energy_gap",
     "absolute_max_probability_difference",
+    "compose_standardized_scores",
     "energy",
     "energy_gap",
     "ensemble_bald",
     "ensemble_predictive_entropy",
+    "fit_score_standardization",
     "logit_l2_distance",
     "max_probability_difference",
     "ood_detection_metrics",
@@ -32,4 +41,5 @@ __all__ = [
     "student_msp",
     "student_teacher_kl_divergence",
     "student_teacher_kl_divergence_from_logits",
+    "standardize_score",
 ]

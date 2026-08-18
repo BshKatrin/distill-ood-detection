@@ -84,6 +84,106 @@ loss = MSE(z_reconstructed, z) over hidden channels only
 Corrections on visible channels are not constrained by the loss and are not
 included in OOD scoring.
 
+### Channel-group-masked residual reconstruction
+
+`channel_group_masked_residual_reconstruction` replaces independent Bernoulli
+channel masking with a flat cut of a precomputed channel hierarchy. The current
+experiments use the signed Pearson-correlation distance
+`1 - Pearson correlation`, average linkage, and a cut distance of `0.5` from
+the complete official ID training split. See
+[Top-activation profile correlation](channel_grouping/top_activation_correlation.md)
+for the grouping definition and artifact provenance.
+
+For every example, one cluster is sampled uniformly from the clusters in the
+selected cut. Every channel in that cluster is zeroed across its complete
+spatial map. Cluster sampling is not weighted by cluster size, and singleton
+clusters remain eligible. `mask_probability` is not used by this method.
+
+The student architecture, residual target, and hidden-only reconstruction loss
+are the same as for channel-masked residual reconstruction:
+
+```text
+group_id ~ Uniform({0, ..., group_count - 1})
+hidden_channels = groups[group_id]
+z_corrupted[hidden_channels, :, :] = 0
+z_reconstructed = z_corrupted + delta_z
+loss = MSE(z_reconstructed, z) over hidden_channels only
+```
+
+Training samples a new group independently for every example each time it is
+seen. Inference performs `evaluation_draws` independent samples for every
+example and averages their reconstruction errors. The current configs use 10
+draws. Score artifacts also save `sampled_channel_group_indices` with shape
+`(sample_count, evaluation_draws)`, making every random draw auditable.
+
+The group artifact loader verifies that the artifact comes from the matching
+complete ID training split and feature layer, matches the configured feature
+shape, contains the requested cut, and partitions every channel exactly once.
+For NMF latent-profile artifacts, which intentionally retain only the hierarchy
+rather than predefined cuts, the loader derives the requested flat cut from the
+saved linkage matrix and performs the same partition checks.
+
+At distance `0.5`, the current ResNet-18 artifacts contain:
+
+| ID dataset | Layer | Clusters | Cluster-size range | Singleton clusters |
+| --- | --- | ---: | ---: | ---: |
+| CIFAR-10 | layer1 | 22 | 1-9 | 11 |
+| CIFAR-10 | layer2 | 91 | 1-4 | 63 |
+| CIFAR-10 | layer3 | 170 | 1-10 | 126 |
+| CIFAR-10 | layer4 | 36 | 4-35 | 0 |
+| CIFAR-100 | layer1 | 17 | 1-16 | 3 |
+| CIFAR-100 | layer2 | 89 | 1-6 | 65 |
+| CIFAR-100 | layer3 | 252 | 1-2 | 248 |
+| CIFAR-100 | layer4 | 401 | 1-3 | 297 |
+
+### Stratified within-group channel masking
+
+`channel_group_stratified_masked_residual_reconstruction` considers every
+hierarchy-cut group with at least `channel_group_min_size` channels. For each
+example and draw, it samples without replacement inside every eligible group
+and hides:
+
+```text
+max(1, round(channel_group_mask_fraction * group_size))
+```
+
+The selected channels from all eligible groups form one combined mask. The
+student and hidden-only residual loss are unchanged from channel-group-masked
+residual reconstruction. The CIFAR-10 ResNet-18 layer4 configuration uses cut
+distance `0.5`, minimum group size `4`, mask fraction `0.25`, and 10 evaluation
+draws. All 36 groups qualify; discrete rounding masks 135 of 512 channels per
+draw.
+
+### Channel-masked k-NN reconstruction
+
+`channel_masked_knn_reconstruction` and
+`channel_group_masked_knn_reconstruction` replace the learned student with
+exact k-NN regression over clean ID training activation maps. Each reference
+and query remains a pre-GAP map with shape `(C, H, W)`. For every independently
+sampled mask, squared L2 distance is calculated only over unmasked channels:
+
+```text
+distance(q, x; m) = sum(m * (q - x)^2)
+```
+
+Search uses batched GPU matrix multiplication and chunks the reference bank;
+it does not use FAISS because each query has a different channel subspace. The
+reference channelwise squared norms are precomputed, and each search keeps only
+the running global top-k candidates. The hidden-channel prediction is the mean
+of the selected neighbors' clean maps. Visible query channels are copied
+unchanged. No student is trained or checkpointed.
+
+The channel-group variant samples one complete hierarchy-cut cluster uniformly
+per example and draw. It uses `channel_group_path` and
+`channel_group_distance_threshold` with the same validation and sampling rules
+as the learned channel-group residual method. It retains the sampled group IDs
+alongside neighbor indices and distances.
+
+The reference artifact must be the complete clean ID training split exported
+by `export-teacher-activations`, with the same feature layer and map shape as
+the query. Score artifacts retain neighbor indices, masked squared distances,
+and visible-channel counts for every evaluation draw.
+
 ### Confusion-channel replacement
 
 `confusion_channel_replacement_reconstruction` and
@@ -254,6 +354,79 @@ strategy:
     method: channel_masked_residual_reconstruction
     mask_probability: 0.2
     evaluation_draws: 10
+```
+
+Channel-group-masked residual example:
+
+```yaml
+student:
+  kind: feature_residual_denoiser
+  feature_layer: layer3
+  input_shape: [256, 8, 8]
+  num_classes: 256
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: channel_group_masked_residual_reconstruction
+    channel_group_path: runs/channel_grouping/top_activation_correlation/cifar_10/resnet18/channel_groups/layer3.pt
+    channel_group_distance_threshold: 0.5
+    evaluation_draws: 10
+```
+
+Stratified within-group residual example:
+
+```yaml
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: channel_group_stratified_masked_residual_reconstruction
+    channel_group_path: runs/channel_grouping/top_activation_correlation/cifar_10/resnet18/channel_groups/layer4.pt
+    channel_group_distance_threshold: 0.5
+    channel_group_min_size: 4
+    channel_group_mask_fraction: 0.25
+    evaluation_draws: 10
+```
+
+Channel-masked k-NN example:
+
+```yaml
+student:
+  kind: knn
+  feature_layer: layer3
+  input_shape: [256, 8, 8]
+  num_classes: 256
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: channel_masked_knn_reconstruction
+    activation_path: runs/teachers/cifar_10/resnet18/teacher_activations/cifar10_train/layer3.pt
+    mask_probability: 0.2
+    evaluation_draws: 10
+    k_neighbors: 10
+    knn_query_batch_size: 128
+    knn_reference_chunk_size: 50000
+```
+
+Run score export directly; the method is inference-only:
+
+```bash
+distill-ood export-feature-denoising-scores --config <config>
+```
+
+Channel-group-masked k-NN changes the method and adds the hierarchy artifact:
+
+```yaml
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: channel_group_masked_knn_reconstruction
+    activation_path: runs/teachers/cifar_10/resnet18/teacher_activations/cifar10_train/layer3.pt
+    channel_group_path: runs/channel_grouping/top_activation_correlation/cifar_10/resnet18/channel_groups/layer3.pt
+    channel_group_distance_threshold: 0.5
+    evaluation_draws: 10
+    k_neighbors: 10
 ```
 
 Confusion-channel replacement residual example:

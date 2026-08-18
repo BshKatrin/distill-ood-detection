@@ -28,6 +28,11 @@ from distill_ood_detection.distillation.perturbation import (
     pca_projector_path,
     save_pca_projector,
 )
+from distill_ood_detection.distillation.nmf import (
+    fit_nmf_concept_projector_from_activations,
+    nmf_concept_projector_path,
+    save_nmf_concept_projector,
+)
 from distill_ood_detection.distillation.subspace_ensemble import (
     fit_subspace_ensemble,
     save_fitted_subspace_ensemble,
@@ -38,6 +43,7 @@ from distill_ood_detection.distillation.feature_denoising import (
     feature_normalizer_path,
     fit_class_channel_corruption_bank,
     fit_feature_normalizer_from_loader,
+    load_channel_groups,
     reconstruction_loss,
     save_class_channel_corruption_bank,
     save_feature_normalizer,
@@ -60,6 +66,15 @@ def run_experiment(
     """Run one or all student distillation methods from an experiment config."""
 
     training_defaults = config.training.defaults
+    if (
+        config.strategy.name == "feature_denoising"
+        and config.strategy.feature_denoising.method
+        == "channel_masked_knn_reconstruction"
+    ):
+        raise ValueError(
+            "channel_masked_knn_reconstruction is inference-only; run "
+            "export-feature-denoising-scores"
+        )
     set_seed(training_defaults.seed)
     device = resolve_device(training_defaults.device)
     methods = (method,) if method else config.training.enabled_methods()
@@ -145,6 +160,43 @@ def run_experiment(
                 "strategy": config.strategy.name,
             },
         )
+    nmf_projector = None
+    if (
+        config.strategy.name == "feature_denoising"
+        and config.strategy.feature_denoising.method
+        == "nmf_concept_masked_residual_reconstruction"
+    ):
+        nmf_config = config.strategy.feature_denoising
+        if nmf_config.nmf_activation_path is None:
+            raise ValueError("nmf_activation_path is required for NMF concept masking")
+        if config.student.feature_layer is None:
+            raise ValueError("student.feature_layer is required for NMF concept masking")
+        nmf_projector = fit_nmf_concept_projector_from_activations(
+            Path(nmf_config.nmf_activation_path),
+            n_components=nmf_config.nmf_components,
+            batch_size=nmf_config.nmf_batch_size,
+            max_iter=nmf_config.nmf_max_iter,
+            encoding_max_iter=nmf_config.nmf_encoding_max_iter,
+            random_state=training_defaults.seed,
+            expected_dataset=f"{config.dataset.name}_train",
+            expected_layer=config.student.feature_layer,
+        ).to(device)
+        save_nmf_concept_projector(
+            nmf_concept_projector_path(experiment_dir),
+            nmf_projector,
+            {
+                "activation_path": nmf_config.nmf_activation_path,
+                "dataset": f"{config.dataset.name}_train",
+                "split": "train",
+                "feature_layer": config.student.feature_layer,
+                "nmf_components": nmf_config.nmf_components,
+                "nmf_batch_size": nmf_config.nmf_batch_size,
+                "nmf_max_iter": nmf_config.nmf_max_iter,
+                "objective": "frobenius_residual",
+                "scope": "global",
+                "strategy": config.strategy.name,
+            },
+        )
     if (
         config.strategy.name == "perturbation"
         and config.strategy.perturbation.method == "clipping"
@@ -200,6 +252,28 @@ def run_experiment(
             },
         )
         set_seed(training_defaults.seed)
+    channel_groups = None
+    if (
+        config.strategy.name == "feature_denoising"
+        and config.strategy.feature_denoising.method
+        in {
+            "channel_group_masked_residual_reconstruction",
+            "channel_group_stratified_masked_residual_reconstruction",
+        }
+    ):
+        group_config = config.strategy.feature_denoising
+        if group_config.channel_group_path is None:
+            raise ValueError("Channel-group masking requires channel_group_path")
+        if config.student.feature_layer is None:
+            raise ValueError("Channel-group masking requires student.feature_layer")
+        channel_groups = load_channel_groups(
+            Path(group_config.channel_group_path),
+            device,
+            distance_threshold=group_config.channel_group_distance_threshold,
+            expected_dataset=f"{config.dataset.name}_train",
+            expected_layer=config.student.feature_layer,
+            expected_feature_shape=config.student.input_shape,
+        )
     class_channel_corruption = None
     if (
         config.strategy.name == "feature_denoising"
@@ -562,6 +636,8 @@ def run_experiment(
                     class_channel_corruption=class_channel_corruption,
                     image_normalization=image_normalization,
                     pixmix_provider=feature_denoising_pixmix_provider,
+                    channel_groups=channel_groups,
+                    nmf_projector=nmf_projector,
                 )
                 if feature_normalizer is not None:
                     summary["feature_normalizer_path"] = str(
@@ -570,6 +646,71 @@ def run_experiment(
                 if class_channel_corruption is not None:
                     summary["class_channel_corruption_path"] = str(
                         class_channel_corruption_path(experiment_dir)
+                    )
+                if channel_groups is not None:
+                    fixed_group_index = (
+                        config.strategy.feature_denoising.channel_group_index
+                    )
+                    fixed_group_size = (
+                        int(channel_groups.group_sizes[fixed_group_index].item())
+                        if fixed_group_index is not None
+                        else None
+                    )
+                    summary.update(
+                        {
+                            "channel_group_path": channel_groups.source_path,
+                            "channel_group_distance_threshold": (
+                                channel_groups.distance_threshold
+                            ),
+                            "channel_group_count": channel_groups.group_count,
+                            "channel_group_sizes": (
+                                channel_groups.group_sizes.cpu().tolist()
+                            ),
+                            "channel_group_index": fixed_group_index,
+                            "channel_group_size": fixed_group_size,
+                        }
+                    )
+                    if (
+                        config.strategy.feature_denoising.method
+                        == "channel_group_stratified_masked_residual_reconstruction"
+                    ):
+                        group_sizes = channel_groups.group_sizes.cpu()
+                        eligible = torch.zeros_like(group_sizes, dtype=torch.bool)
+                        if fixed_group_index is None:
+                            eligible = group_sizes >= (
+                                config.strategy.feature_denoising.channel_group_min_size
+                            )
+                        else:
+                            eligible[fixed_group_index] = True
+                        masked_counts = torch.floor(
+                            group_sizes[eligible].float()
+                            * config.strategy.feature_denoising.channel_group_mask_fraction
+                            + 0.5
+                        ).clamp_min(1)
+                        summary.update(
+                            {
+                                "eligible_channel_group_count": int(eligible.sum()),
+                                "masked_channel_count_per_draw": int(
+                                    masked_counts.sum()
+                                ),
+                                "realized_mask_fraction": (
+                                    float(masked_counts[0] / fixed_group_size)
+                                    if fixed_group_size is not None
+                                    else None
+                                ),
+                            }
+                        )
+                if nmf_projector is not None:
+                    summary.update(
+                        {
+                            "nmf_concept_projector_path": str(
+                                nmf_concept_projector_path(experiment_dir)
+                            ),
+                            "nmf_fit_reconstruction_error": (
+                                nmf_projector.fit_reconstruction_error
+                            ),
+                            "nmf_fit_n_iter": nmf_projector.fit_n_iter,
+                        }
                     )
                 best_checkpoint_path = Path(str(summary["best_checkpoint_path"]))
                 student.load_state_dict(
@@ -590,6 +731,8 @@ def run_experiment(
                     class_channel_corruption=class_channel_corruption,
                     image_normalization=image_normalization,
                     pixmix_provider=feature_denoising_pixmix_provider,
+                    channel_groups=channel_groups,
+                    nmf_projector=nmf_projector,
                 )
                 summary["test_reconstruction_loss"] = test_reconstruction_loss
                 write_json(output_dir / "metrics.json", summary)
@@ -604,6 +747,10 @@ def run_experiment(
                     if class_channel_corruption is not None:
                         mlflow.log_artifact(
                             str(class_channel_corruption_path(experiment_dir))
+                        )
+                    if nmf_projector is not None:
+                        mlflow.log_artifact(
+                            str(nmf_concept_projector_path(experiment_dir))
                         )
                 summaries.append(summary)
             write_json(experiment_dir / "summary.json", {"methods": summaries})

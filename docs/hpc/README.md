@@ -3,6 +3,8 @@
 This directory contains HPC cluster-related documentation.
 
 - [SLURM jobs](slurm-jobs.md): Submit reusable config-driven sbatch jobs.
+- [Panel dashboards](panel-dashboards.md): serve the specialist and global
+  channel-cluster dashboards and connect through login-host tunnels.
 - [Syncing run artifacts](sync-runs.md): Copy selected remote `runs/` folders
   into local `runs/`.
 

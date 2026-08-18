@@ -10,7 +10,6 @@ import yaml
 
 from distill_ood_detection.utils import get_data_dir_override
 
-
 DISTILLATION_METHODS: tuple[str, ...] = (
     "cross_entropy",
     "mse_logits",
@@ -27,6 +26,11 @@ FeatureDenoisingMethod = Literal[
     "spatial_block_residual_reconstruction",
     "channel_masked_reconstruction",
     "channel_masked_residual_reconstruction",
+    "channel_group_masked_residual_reconstruction",
+    "channel_group_stratified_masked_residual_reconstruction",
+    "nmf_concept_masked_residual_reconstruction",
+    "channel_masked_knn_reconstruction",
+    "channel_group_masked_knn_reconstruction",
     "confusion_channel_replacement_reconstruction",
     "confusion_channel_replacement_residual_reconstruction",
     "spatial_token_prediction",
@@ -66,6 +70,11 @@ PerturbationMethod = Literal[
 TeacherTarget = Literal["clean", "perturbed"]
 ClippingMode = Literal["constant", "spatial_dependent", "channel_dependent"]
 DropoutMode = Literal["element", "channel", "spatial"]
+ChannelLinkageMethod = Literal["single", "complete", "average"]
+ChannelGroupingMethod = Literal[
+    "top_activation_correlation",
+    "nmf_latent_cosine",
+]
 LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
     "cross_entropy_softmax": "cross_entropy",
 }
@@ -91,7 +100,9 @@ class DatasetConfig:
     ood_datasets: tuple[OODDatasetConfig, ...] = field(default_factory=tuple)
     pre_size: int | None = None
     image_size: int | None = None
-    normalization: tuple[tuple[float, float, float], tuple[float, float, float]] | None = None
+    normalization: (
+        tuple[tuple[float, float, float], tuple[float, float, float]] | None
+    ) = None
 
 
 @dataclass(frozen=True)
@@ -177,6 +188,11 @@ class FeatureDenoisingConfig:
 
     method: FeatureDenoisingMethod = "pca_masked_reconstruction"
     activation_path: str | None = None
+    channel_group_path: str | None = None
+    channel_group_distance_threshold: float = 0.5
+    channel_group_index: int | None = None
+    channel_group_min_size: int = 1
+    channel_group_mask_fraction: float = 0.25
     mask_probability: float = 0.3
     prototype_count: int = 50
     class_statistics_epsilon: float = 1.0e-6
@@ -205,7 +221,16 @@ class FeatureDenoisingConfig:
     pca_components: int = 128
     pca_mask_probability: float = 0.3
     pca_activation_path: str | None = None
+    nmf_components: int = 32
+    nmf_mask_probability: float = 0.2
+    nmf_activation_path: str | None = None
+    nmf_batch_size: int = 1024
+    nmf_max_iter: int = 200
+    nmf_encoding_max_iter: int = 200
     evaluation_draws: int = 1
+    k_neighbors: int = 10
+    knn_query_batch_size: int = 256
+    knn_reference_chunk_size: int = 50_000
     pixel_augmentation_method: PixelAugmentationMethod = "affine"
     pixmix: PixMixConfig = field(default_factory=PixMixConfig)
 
@@ -243,7 +268,9 @@ class StrategyConfig:
 
     name: StrategyName = "baseline"
     perturbation: PerturbationConfig = field(default_factory=PerturbationConfig)
-    feature_denoising: FeatureDenoisingConfig = field(default_factory=FeatureDenoisingConfig)
+    feature_denoising: FeatureDenoisingConfig = field(
+        default_factory=FeatureDenoisingConfig
+    )
     activation_subspace: ActivationSubspaceConfig = field(
         default_factory=ActivationSubspaceConfig
     )
@@ -269,11 +296,7 @@ class TreeMethodsConfig:
     def enabled_modes(self) -> tuple[TreeDistillationMode, ...]:
         """Return enabled tree distillation modes in a deterministic order."""
 
-        return tuple(
-            mode
-            for mode in ("logits",)
-            if getattr(self, mode) is not None
-        )
+        return tuple(mode for mode in ("logits",) if getattr(self, mode) is not None)
 
 
 @dataclass(frozen=True)
@@ -353,8 +376,12 @@ class MethodTrainingConfig:
 class TrainingByMethodConfig:
     """Enabled distillation methods and their method-specific settings."""
 
-    cross_entropy: MethodTrainingConfig | None = field(default_factory=MethodTrainingConfig)
-    mse_logits: MethodTrainingConfig | None = field(default_factory=MethodTrainingConfig)
+    cross_entropy: MethodTrainingConfig | None = field(
+        default_factory=MethodTrainingConfig
+    )
+    mse_logits: MethodTrainingConfig | None = field(
+        default_factory=MethodTrainingConfig
+    )
     kl_divergence: MethodTrainingConfig | None = None
 
     def enabled_methods(self) -> tuple[DistillationMethod, ...]:
@@ -443,19 +470,39 @@ class TeacherActivationConfig:
 
 
 @dataclass(frozen=True)
-class EmbeddingDistanceConfig:
-    """Configuration for exporting pooled embeddings and ID distances."""
+class ChannelGroupingConfig:
+    """Configuration for grouping teacher channels by activation profiles."""
 
     experiment_name: str
     run_dir: str
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     teacher: TeacherConfig = field(default_factory=TeacherConfig)
+    method: ChannelGroupingMethod = "top_activation_correlation"
     layers: tuple[str, ...] = ("layer1", "layer2", "layer3", "layer4")
+    profile_top_fraction: float = 0.10
+    standardization_epsilon: float = 1.0e-6
+    linkage_method: ChannelLinkageMethod = "average"
+    cut_thresholds: tuple[float, ...] = (0.1, 0.2, 0.3, 0.5)
+    nmf_components: int = 32
+    nmf_batch_size: int = 65_536
+    nmf_epochs: int = 2
+    device: str = "auto"
+    seed: int = 123
+
+
+@dataclass(frozen=True)
+class EmbeddingDistanceConfig:
+    """Configuration for exporting layer4 embeddings and FAISS k-NN scores."""
+
+    experiment_name: str
+    run_dir: str
+    dataset: DatasetConfig = field(default_factory=DatasetConfig)
+    teacher: TeacherConfig = field(default_factory=TeacherConfig)
+    perturbation: PerturbationConfig | None = None
+    query_perturbed: bool = False
     k_neighbors: int = 10
     embedding_shard_size: int = 4096
-    query_block_size: int = 1024
-    reference_block_size: int = 8192
-    standardization_epsilon: float = 1.0e-6
+    search_batch_size: int = 8192
     device: str = "auto"
     seed: int = 123
 
@@ -486,6 +533,14 @@ def load_teacher_activation_config(path: Path) -> TeacherActivationConfig:
     with path.open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle) or {}
     return parse_teacher_activation_config(raw)
+
+
+def load_channel_grouping_config(path: Path) -> ChannelGroupingConfig:
+    """Load a teacher channel-grouping configuration from a YAML file."""
+
+    with path.open("r", encoding="utf-8") as handle:
+        raw = yaml.safe_load(handle) or {}
+    return parse_channel_grouping_config(raw)
 
 
 def load_embedding_distance_config(path: Path) -> EmbeddingDistanceConfig:
@@ -528,46 +583,133 @@ def parse_teacher_activation_config(raw: dict[str, Any]) -> TeacherActivationCon
     return config
 
 
-def parse_embedding_distance_config(raw: dict[str, Any]) -> EmbeddingDistanceConfig:
-    """Parse a pooled-embedding distance configuration."""
+def parse_channel_grouping_config(raw: dict[str, Any]) -> ChannelGroupingConfig:
+    """Parse a channel-grouping configuration."""
 
     dataset = _parse_dataset_config(raw.get("dataset", {}))
     teacher = TeacherConfig(**raw.get("teacher", {}))
-    layers = tuple(raw.get("layers", ("layer1", "layer2", "layer3", "layer4")))
-    config = EmbeddingDistanceConfig(
+    config = ChannelGroupingConfig(
         experiment_name=raw["experiment_name"],
         run_dir=raw["run_dir"],
         dataset=dataset,
         teacher=teacher,
-        layers=layers,
-        k_neighbors=raw.get("k_neighbors", 10),
-        embedding_shard_size=raw.get("embedding_shard_size", 4096),
-        query_block_size=raw.get("query_block_size", 1024),
-        reference_block_size=raw.get("reference_block_size", 8192),
+        method=raw.get("method", "top_activation_correlation"),
+        layers=tuple(raw.get("layers", ("layer1", "layer2", "layer3", "layer4"))),
+        profile_top_fraction=raw.get("profile_top_fraction", 0.10),
         standardization_epsilon=raw.get("standardization_epsilon", 1.0e-6),
+        linkage_method=raw.get("linkage_method", "average"),
+        cut_thresholds=tuple(raw.get("cut_thresholds", (0.1, 0.2, 0.3, 0.5))),
+        nmf_components=raw.get("nmf_components", 32),
+        nmf_batch_size=raw.get("nmf_batch_size", 65_536),
+        nmf_epochs=raw.get("nmf_epochs", 2),
         device=raw.get("device", "auto"),
         seed=raw.get("seed", 123),
     )
     supported_layers = {"layer1", "layer2", "layer3", "layer4"}
     if teacher.num_classes <= 0:
         raise ValueError("teacher.num_classes must be positive")
+    if config.method not in {"top_activation_correlation", "nmf_latent_cosine"}:
+        raise ValueError(
+            "channel-grouping method must be 'top_activation_correlation' or "
+            "'nmf_latent_cosine'"
+        )
     if not config.layers:
         raise ValueError("layers must contain at least one teacher layer")
-    if any(layer not in supported_layers for layer in config.layers):
-        unknown = sorted(set(config.layers) - supported_layers)
-        raise ValueError(f"Unsupported embedding-distance layers: {unknown}")
     if len(set(config.layers)) != len(config.layers):
         raise ValueError("layers must not contain duplicates")
+    if any(layer not in supported_layers for layer in config.layers):
+        unknown = sorted(set(config.layers) - supported_layers)
+        raise ValueError(f"Unsupported channel-grouping layers: {unknown}")
+    if not 0.0 < config.profile_top_fraction <= 1.0:
+        raise ValueError("profile_top_fraction must satisfy 0 < fraction <= 1")
+    if config.standardization_epsilon <= 0.0:
+        raise ValueError("standardization_epsilon must be positive")
+    if config.linkage_method not in {"single", "complete", "average"}:
+        raise ValueError(
+            "linkage_method must be one of 'single', 'complete', or 'average'"
+        )
+    if any(not 0.0 < threshold < 2.0 for threshold in config.cut_thresholds):
+        raise ValueError("cut_thresholds must contain values strictly between 0 and 2")
+    if tuple(sorted(set(config.cut_thresholds))) != config.cut_thresholds:
+        raise ValueError("cut_thresholds must be unique and sorted in ascending order")
+    if config.nmf_components <= 0:
+        raise ValueError("nmf_components must be positive")
+    if config.nmf_batch_size <= 0:
+        raise ValueError("nmf_batch_size must be positive")
+    if config.nmf_epochs <= 0:
+        raise ValueError("nmf_epochs must be positive")
+    if config.method == "nmf_latent_cosine":
+        if config.linkage_method != "average":
+            raise ValueError("NMF latent channel grouping requires average linkage")
+        if config.cut_thresholds:
+            raise ValueError(
+                "NMF latent channel grouping exports no flat cuts; "
+                "cut_thresholds must be empty"
+            )
+    return config
+
+
+def parse_embedding_distance_config(raw: dict[str, Any]) -> EmbeddingDistanceConfig:
+    """Parse a pooled-embedding distance configuration."""
+
+    obsolete_fields = {
+        "layers",
+        "query_block_size",
+        "reference_block_size",
+        "standardization_epsilon",
+    }.intersection(raw)
+    if obsolete_fields:
+        raise ValueError(
+            "Obsolete embedding-distance fields: "
+            f"{sorted(obsolete_fields)}; FAISS k-NN is fixed to layer4 and uses "
+            "search_batch_size"
+        )
+    dataset = _parse_dataset_config(raw.get("dataset", {}))
+    teacher = TeacherConfig(**raw.get("teacher", {}))
+    perturbation_raw = raw.get("perturbation")
+    perturbation = (
+        None
+        if perturbation_raw is None
+        else _parse_strategy_config(
+            {
+                "name": "perturbation",
+                "perturbation": perturbation_raw.copy(),
+            }
+        ).perturbation
+    )
+    if perturbation is not None and perturbation.method not in {
+        "clipping",
+        "pixel_augmentation",
+    }:
+        raise ValueError(
+            "FAISS k-NN perturbation supports only clipping or pixel_augmentation"
+        )
+    if perturbation is not None and perturbation.teacher_target != "clean":
+        raise ValueError("FAISS k-NN perturbation requires teacher_target='clean'")
+    config = EmbeddingDistanceConfig(
+        experiment_name=raw["experiment_name"],
+        run_dir=raw["run_dir"],
+        dataset=dataset,
+        teacher=teacher,
+        perturbation=perturbation,
+        query_perturbed=raw.get("query_perturbed", False),
+        k_neighbors=raw.get("k_neighbors", 10),
+        embedding_shard_size=raw.get("embedding_shard_size", 4096),
+        search_batch_size=raw.get("search_batch_size", 8192),
+        device=raw.get("device", "auto"),
+        seed=raw.get("seed", 123),
+    )
+    if teacher.num_classes <= 0:
+        raise ValueError("teacher.num_classes must be positive")
+    if config.query_perturbed and config.perturbation is None:
+        raise ValueError("query_perturbed requires a perturbation configuration")
     for name in (
         "k_neighbors",
         "embedding_shard_size",
-        "query_block_size",
-        "reference_block_size",
+        "search_batch_size",
     ):
         if getattr(config, name) <= 0:
             raise ValueError(f"{name} must be positive")
-    if config.standardization_epsilon <= 0.0:
-        raise ValueError("standardization_epsilon must be positive")
     return config
 
 
@@ -606,14 +748,16 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     if strategy.name == "feature_denoising" and strategy.feature_denoising.method in {
         "spatial_block_residual_reconstruction",
         "channel_masked_residual_reconstruction",
+        "channel_group_masked_residual_reconstruction",
+        "channel_group_stratified_masked_residual_reconstruction",
+        "nmf_concept_masked_residual_reconstruction",
         "confusion_channel_replacement_reconstruction",
         "confusion_channel_replacement_residual_reconstruction",
     }:
         residual_method = strategy.feature_denoising.method
         if student.kind != "feature_residual_denoiser":
             raise ValueError(
-                f"{residual_method} requires "
-                "student.kind: feature_residual_denoiser"
+                f"{residual_method} requires student.kind: feature_residual_denoiser"
             )
         if len(student.input_shape) != 3:
             raise ValueError(
@@ -647,11 +791,62 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
                 "strategy.feature_denoising.spatial_mask_block_sizes must fit "
                 "student.input_shape"
             )
+        if residual_method == "nmf_concept_masked_residual_reconstruction":
+            if strategy.feature_denoising.nmf_activation_path is None:
+                raise ValueError(
+                    "NMF concept masking requires "
+                    "strategy.feature_denoising.nmf_activation_path"
+                )
+            if strategy.feature_denoising.nmf_components > input_channels:
+                raise ValueError(
+                    "strategy.feature_denoising.nmf_components must not exceed "
+                    "the feature channel count"
+                )
+    if (
+        strategy.name == "feature_denoising"
+        and strategy.feature_denoising.method
+        in {
+            "channel_masked_knn_reconstruction",
+            "channel_group_masked_knn_reconstruction",
+        }
+    ):
+        if student.kind != "knn":
+            raise ValueError(
+                "Channel-masked k-NN reconstruction requires student.kind: knn"
+            )
+        if len(student.input_shape) != 3:
+            raise ValueError(
+                "k-NN Feature Denoising input_shape must contain channels, "
+                "height, and width"
+            )
+        if student.num_classes != student.input_shape[0]:
+            raise ValueError(
+                "k-NN Feature Denoising student.num_classes must equal the "
+                "feature channel count"
+            )
+        if strategy.feature_denoising.activation_path is None:
+            raise ValueError(
+                "Channel-masked k-NN reconstruction requires "
+                "strategy.feature_denoising.activation_path"
+            )
+    if (
+        strategy.name == "feature_denoising"
+        and strategy.feature_denoising.method
+        in {
+            "channel_group_masked_residual_reconstruction",
+            "channel_group_stratified_masked_residual_reconstruction",
+            "channel_group_masked_knn_reconstruction",
+        }
+        and strategy.feature_denoising.channel_group_path is None
+    ):
+        raise ValueError(
+            "Channel-group masking requires "
+            "strategy.feature_denoising.channel_group_path"
+        )
     if strategy.name == "activation_subspace":
         activation_subspace = strategy.activation_subspace
         if activation_subspace.target == "projected_logits" and (
-            activation_subspace.component != "decisive"
-            or student.kind != "linear"
+            activation_subspace.component != "decisive" or student.kind != "linear"
         ):
             raise ValueError(
                 "activation-subspace projected_logits targets require a "
@@ -665,7 +860,9 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
                 "activation-subspace coordinate targets require an autoencoder"
             )
     if strategy.name == "subspace_ensemble" and student.kind != "linear":
-        raise ValueError("subspace-ensemble training currently requires a linear student")
+        raise ValueError(
+            "subspace-ensemble training currently requires a linear student"
+        )
     if strategy.name == "subspace_ensemble":
         ensemble = strategy.subspace_ensemble
         expected_input_dimension = ensemble.subset_size
@@ -700,7 +897,9 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
         and strategy.perturbation.method in {"pixel_augmentation", "pixmix"}
         and student.kind == "random_forest"
     ):
-        raise ValueError("pixel-space perturbations support only linear and MLP students")
+        raise ValueError(
+            "pixel-space perturbations support only linear and MLP students"
+        )
     optimizer = _parse_optimizer_config(raw.get("optimizer", {}))
     training = _parse_training_config(
         raw.get("training", {}),
@@ -724,8 +923,7 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     mlflow = MlflowConfig(**raw.get("mlflow", {}))
     if mlflow.enabled:
         raise ValueError(
-            "MLflow tracking is disabled for this project; "
-            "set mlflow.enabled to false"
+            "MLflow tracking is disabled for this project; set mlflow.enabled to false"
         )
 
     return ExperimentConfig(
@@ -759,7 +957,9 @@ def _parse_dataset_config(raw: dict[str, Any]) -> DatasetConfig:
     return DatasetConfig(**dataset_raw)
 
 
-def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> StudentConfig:
+def _parse_student_config(
+    raw: dict[str, Any], strategy: StrategyConfig
+) -> StudentConfig:
     """Parse neural-network student settings."""
 
     student = StudentConfig(**raw)
@@ -769,6 +969,7 @@ def _parse_student_config(raw: dict[str, Any], strategy: StrategyConfig) -> Stud
         "random_forest",
         "feature_reconstructor",
         "feature_residual_denoiser",
+        "knn",
         "spatial_token_predictor",
         "autoencoder",
     }:
@@ -817,7 +1018,10 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         and "teacher_target" not in perturbation_raw
     ):
         perturbation_raw["teacher_target"] = "perturbed"
-    if perturbation_raw.get("method") == "pixmix" and "teacher_target" not in perturbation_raw:
+    if (
+        perturbation_raw.get("method") == "pixmix"
+        and "teacher_target" not in perturbation_raw
+    ):
         perturbation_raw["teacher_target"] = "perturbed"
     legacy_clipping_fields = {
         field_name
@@ -945,9 +1149,7 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
             "strategy.perturbation.translate_fraction requires 0 <= fraction <= 1"
         )
     if perturbation.scale_min <= 0.0 or perturbation.scale_min > perturbation.scale_max:
-        raise ValueError(
-            "strategy.perturbation requires 0 < scale_min <= scale_max"
-        )
+        raise ValueError("strategy.perturbation requires 0 < scale_min <= scale_max")
     if not 0.0 <= perturbation.brightness_delta <= 1.0:
         raise ValueError(
             "strategy.perturbation.brightness_delta requires 0 <= delta <= 1"
@@ -963,6 +1165,11 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         "spatial_block_residual_reconstruction",
         "channel_masked_reconstruction",
         "channel_masked_residual_reconstruction",
+        "channel_group_masked_residual_reconstruction",
+        "channel_group_stratified_masked_residual_reconstruction",
+        "nmf_concept_masked_residual_reconstruction",
+        "channel_masked_knn_reconstruction",
+        "channel_group_masked_knn_reconstruction",
         "confusion_channel_replacement_reconstruction",
         "confusion_channel_replacement_residual_reconstruction",
         "spatial_token_prediction",
@@ -971,29 +1178,50 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         "pixel_masked_multilayer_prediction",
         "pixel_masked_multilayer_l234_prediction",
     }:
-        raise ValueError(f"Unsupported Feature Denoising method: {feature_denoising.method}")
-    if not 0.0 < feature_denoising.mask_probability < 1.0:
-        raise ValueError("strategy.feature_denoising.mask_probability requires 0 < p < 1")
-    if feature_denoising.prototype_count <= 0:
         raise ValueError(
-            "strategy.feature_denoising.prototype_count must be positive"
+            f"Unsupported Feature Denoising method: {feature_denoising.method}"
         )
+    if not 0.0 < feature_denoising.mask_probability < 1.0:
+        raise ValueError(
+            "strategy.feature_denoising.mask_probability requires 0 < p < 1"
+        )
+    if not 0.0 < feature_denoising.channel_group_distance_threshold < 2.0:
+        raise ValueError(
+            "strategy.feature_denoising.channel_group_distance_threshold "
+            "must be strictly between 0 and 2"
+        )
+    if (
+        feature_denoising.channel_group_index is not None
+        and feature_denoising.channel_group_index < 0
+    ):
+        raise ValueError(
+            "strategy.feature_denoising.channel_group_index must be non-negative"
+        )
+    if feature_denoising.channel_group_min_size <= 0:
+        raise ValueError(
+            "strategy.feature_denoising.channel_group_min_size must be positive"
+        )
+    if not 0.0 < feature_denoising.channel_group_mask_fraction <= 1.0:
+        raise ValueError(
+            "strategy.feature_denoising.channel_group_mask_fraction requires "
+            "0 < fraction <= 1"
+        )
+    if feature_denoising.prototype_count <= 0:
+        raise ValueError("strategy.feature_denoising.prototype_count must be positive")
     if feature_denoising.class_statistics_epsilon <= 0.0:
         raise ValueError(
             "strategy.feature_denoising.class_statistics_epsilon must be positive"
         )
     if feature_denoising.confusion_split not in {"validation", "test"}:
         raise ValueError(
-            "strategy.feature_denoising.confusion_split must be "
-            "'validation' or 'test'"
+            "strategy.feature_denoising.confusion_split must be 'validation' or 'test'"
         )
     if not feature_denoising.spatial_mask_block_sizes:
         raise ValueError(
             "strategy.feature_denoising.spatial_mask_block_sizes must not be empty"
         )
     if any(
-        block_size <= 0
-        for block_size in feature_denoising.spatial_mask_block_sizes
+        block_size <= 0 for block_size in feature_denoising.spatial_mask_block_sizes
     ):
         raise ValueError(
             "strategy.feature_denoising.spatial_mask_block_sizes must be positive"
@@ -1006,57 +1234,119 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
             "contain duplicates"
         )
     if feature_denoising.target_block_count <= 0:
-        raise ValueError("strategy.feature_denoising.target_block_count must be positive")
-    if not 0.0 < feature_denoising.target_block_scale_min <= feature_denoising.target_block_scale_max <= 1.0:
+        raise ValueError(
+            "strategy.feature_denoising.target_block_count must be positive"
+        )
+    if (
+        not 0.0
+        < feature_denoising.target_block_scale_min
+        <= feature_denoising.target_block_scale_max
+        <= 1.0
+    ):
         raise ValueError(
             "strategy.feature_denoising target block scale requires 0 < min <= max <= 1"
         )
     if (
         feature_denoising.target_aspect_ratio_min <= 0.0
-        or feature_denoising.target_aspect_ratio_min > feature_denoising.target_aspect_ratio_max
+        or feature_denoising.target_aspect_ratio_min
+        > feature_denoising.target_aspect_ratio_max
     ):
         raise ValueError(
             "strategy.feature_denoising target aspect ratio requires 0 < min <= max"
         )
-    if not 0.0 < feature_denoising.context_scale_min <= feature_denoising.context_scale_max <= 1.0:
+    if (
+        not 0.0
+        < feature_denoising.context_scale_min
+        <= feature_denoising.context_scale_max
+        <= 1.0
+    ):
         raise ValueError(
             "strategy.feature_denoising context scale requires 0 < min <= max <= 1"
         )
     if feature_denoising.target_token_count < 0:
-        raise ValueError("strategy.feature_denoising.target_token_count must be non-negative")
+        raise ValueError(
+            "strategy.feature_denoising.target_token_count must be non-negative"
+        )
     if feature_denoising.image_mask_block_count <= 0:
-        raise ValueError("strategy.feature_denoising.image_mask_block_count must be positive")
-    if not 0.0 < feature_denoising.image_mask_scale_min <= feature_denoising.image_mask_scale_max <= 1.0:
+        raise ValueError(
+            "strategy.feature_denoising.image_mask_block_count must be positive"
+        )
+    if (
+        not 0.0
+        < feature_denoising.image_mask_scale_min
+        <= feature_denoising.image_mask_scale_max
+        <= 1.0
+    ):
         raise ValueError(
             "strategy.feature_denoising image mask scale requires 0 < min <= max <= 1"
         )
     if (
         feature_denoising.image_mask_aspect_ratio_min <= 0.0
-        or feature_denoising.image_mask_aspect_ratio_min > feature_denoising.image_mask_aspect_ratio_max
+        or feature_denoising.image_mask_aspect_ratio_min
+        > feature_denoising.image_mask_aspect_ratio_max
     ):
         raise ValueError(
             "strategy.feature_denoising image mask aspect ratio requires 0 < min <= max"
         )
     if feature_denoising.embedding_pool not in {"avg", "cls"}:
-        raise ValueError("strategy.feature_denoising.embedding_pool must be 'avg' or 'cls'")
+        raise ValueError(
+            "strategy.feature_denoising.embedding_pool must be 'avg' or 'cls'"
+        )
     if feature_denoising.rotation_degrees < 0.0:
-        raise ValueError("strategy.feature_denoising.rotation_degrees must be non-negative")
+        raise ValueError(
+            "strategy.feature_denoising.rotation_degrees must be non-negative"
+        )
     if not 0.0 <= feature_denoising.translate_fraction <= 1.0:
         raise ValueError(
             "strategy.feature_denoising.translate_fraction requires 0 <= fraction <= 1"
         )
-    if feature_denoising.scale_min <= 0.0 or feature_denoising.scale_min > feature_denoising.scale_max:
-        raise ValueError("strategy.feature_denoising requires 0 < scale_min <= scale_max")
+    if (
+        feature_denoising.scale_min <= 0.0
+        or feature_denoising.scale_min > feature_denoising.scale_max
+    ):
+        raise ValueError(
+            "strategy.feature_denoising requires 0 < scale_min <= scale_max"
+        )
     if not 0.0 <= feature_denoising.brightness_delta <= 1.0:
-        raise ValueError("strategy.feature_denoising.brightness_delta requires 0 <= delta <= 1")
+        raise ValueError(
+            "strategy.feature_denoising.brightness_delta requires 0 <= delta <= 1"
+        )
     if not 0.0 <= feature_denoising.contrast_delta <= 1.0:
-        raise ValueError("strategy.feature_denoising.contrast_delta requires 0 <= delta <= 1")
+        raise ValueError(
+            "strategy.feature_denoising.contrast_delta requires 0 <= delta <= 1"
+        )
     if feature_denoising.pca_components <= 0:
         raise ValueError("strategy.feature_denoising.pca_components must be positive")
     if not 0.0 < feature_denoising.pca_mask_probability < 1.0:
-        raise ValueError("strategy.feature_denoising.pca_mask_probability requires 0 < p < 1")
+        raise ValueError(
+            "strategy.feature_denoising.pca_mask_probability requires 0 < p < 1"
+        )
+    if feature_denoising.nmf_components <= 0:
+        raise ValueError("strategy.feature_denoising.nmf_components must be positive")
+    if not 0.0 < feature_denoising.nmf_mask_probability < 1.0:
+        raise ValueError(
+            "strategy.feature_denoising.nmf_mask_probability requires 0 < p < 1"
+        )
+    if feature_denoising.nmf_batch_size <= 0:
+        raise ValueError("strategy.feature_denoising.nmf_batch_size must be positive")
+    if feature_denoising.nmf_max_iter <= 0:
+        raise ValueError("strategy.feature_denoising.nmf_max_iter must be positive")
+    if feature_denoising.nmf_encoding_max_iter <= 0:
+        raise ValueError(
+            "strategy.feature_denoising.nmf_encoding_max_iter must be positive"
+        )
     if feature_denoising.evaluation_draws <= 0:
         raise ValueError("strategy.feature_denoising.evaluation_draws must be positive")
+    if feature_denoising.k_neighbors <= 0:
+        raise ValueError("strategy.feature_denoising.k_neighbors must be positive")
+    if feature_denoising.knn_query_batch_size <= 0:
+        raise ValueError(
+            "strategy.feature_denoising.knn_query_batch_size must be positive"
+        )
+    if feature_denoising.knn_reference_chunk_size <= 0:
+        raise ValueError(
+            "strategy.feature_denoising.knn_reference_chunk_size must be positive"
+        )
     if feature_denoising.pixel_augmentation_method not in {"affine", "pixmix"}:
         raise ValueError(
             "strategy.feature_denoising.pixel_augmentation_method must be "
@@ -1227,12 +1517,12 @@ def _parse_optimizer_config(raw: dict[str, Any]) -> OptimizerByMethodConfig:
             }
         )
     shared_optimizer = OptimizerConfig(**optimizer_raw)
-    return OptimizerByMethodConfig(
-        **{name: shared_optimizer for name in method_names}
-    )
+    return OptimizerByMethodConfig(**{name: shared_optimizer for name in method_names})
 
 
-def _parse_training_config(raw: dict[str, Any], require_methods: bool = True) -> TrainingConfig:
+def _parse_training_config(
+    raw: dict[str, Any], require_methods: bool = True
+) -> TrainingConfig:
     """Parse shared and method-specific training settings."""
 
     training_raw = raw.copy()
@@ -1255,7 +1545,9 @@ def _parse_training_config(raw: dict[str, Any], require_methods: bool = True) ->
     if defaults.log_every_steps <= 0:
         raise ValueError("training.defaults.log_every_steps must be positive")
     if require_methods and not training.enabled_methods():
-        raise ValueError("training.methods must enable at least one distillation method")
+        raise ValueError(
+            "training.methods must enable at least one distillation method"
+        )
     for method in training.enabled_methods():
         training.for_method(method)
     return training
@@ -1275,17 +1567,18 @@ def _parse_training_methods(
             "mse_logits": {},
         }
     elif isinstance(raw_methods, list):
-        methods_raw = {
-            _normalize_method_name(method): {}
-            for method in raw_methods
-        }
+        methods_raw = {_normalize_method_name(method): {} for method in raw_methods}
     elif isinstance(raw_methods, dict):
         methods_raw = {
-            _normalize_method_name(name) if name in LEGACY_METHOD_ALIASES else name: value
+            _normalize_method_name(name)
+            if name in LEGACY_METHOD_ALIASES
+            else name: value
             for name, value in raw_methods.items()
         }
     else:
-        raise ValueError("training.methods must be a mapping from method name to config")
+        raise ValueError(
+            "training.methods must be a mapping from method name to config"
+        )
 
     if (legacy_temperature is not None or legacy_alpha is not None) and (
         raw_methods is None or "cross_entropy" in methods_raw
@@ -1332,12 +1625,18 @@ def _resolve_method_training_config(
     """Resolve one method's training settings and validate method-specific fields."""
 
     if method == "cross_entropy":
-        temperature = method_config.temperature if method_config.temperature is not None else 1.0
+        temperature = (
+            method_config.temperature if method_config.temperature is not None else 1.0
+        )
         alpha = method_config.alpha if method_config.alpha is not None else 0.5
         if temperature <= 0.0:
-            raise ValueError("training.methods.cross_entropy.temperature must be positive")
+            raise ValueError(
+                "training.methods.cross_entropy.temperature must be positive"
+            )
         if not 0.0 <= alpha <= 1.0:
-            raise ValueError("training.methods.cross_entropy.alpha must be between 0.0 and 1.0")
+            raise ValueError(
+                "training.methods.cross_entropy.alpha must be between 0.0 and 1.0"
+            )
         return ResolvedTrainingMethodConfig(
             epochs=defaults.epochs,
             seed=defaults.seed,
@@ -1350,7 +1649,9 @@ def _resolve_method_training_config(
         if method_config.alpha is not None:
             raise ValueError("training.methods.kl_divergence.alpha is not supported")
         if method_config.temperature is not None:
-            raise ValueError("training.methods.kl_divergence.temperature is not supported")
+            raise ValueError(
+                "training.methods.kl_divergence.temperature is not supported"
+            )
         return ResolvedTrainingMethodConfig(
             epochs=defaults.epochs,
             seed=defaults.seed,

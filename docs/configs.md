@@ -15,9 +15,22 @@ and inference outputs) as the authoritative experiment record.
 
 ```text
 configs/
+  channel_cluster_audit/
+    <grouping_method>/
+      <id_dataset>/
+        <teacher_architecture>.yaml
+  channel_grouping/
+    <grouping_method>/
+      <id_dataset>/
+        <teacher_architecture>.yaml
   embedding_distances/
     <id_dataset>/
       <teacher_architecture>.yaml
+    perturbation/
+      <perturbation_level>/
+        <perturbation_method>/
+          <id_dataset>/
+            <teacher_variant>.yaml
   teachers/
     <id_dataset>/
       <teacher_architecture>.yaml
@@ -49,20 +62,45 @@ configs/
             <student_variant>.yaml
 ```
 
-Embedding-distance configs select any subset of the four post-GAP ResNet stage
-outputs (`layer1` through `layer4`), exact k-NN selection block sizes, and the
-pooled-embedding shard size. Each configured layer selects neighbors
-independently. The selected ID
-neighbors' mean probabilities and logits produce the classifier-based OOD
+Embedding-distance configs use the post-GAP `layer4` ResNet embedding. They
+select the number of neighbors, FAISS query batch size, and pooled-embedding
+shard size. One exact `IndexFlatL2` index is built from raw ID training
+embeddings and reused for every query dataset. The
+selected ID neighbors' mean probabilities and logits produce the classifier-based OOD
 Scores documented under [OOD Scores](ood_scores/README.md#k-nn-output-aggregation).
 They write to
 `runs/embedding_distances/<id_dataset>/<teacher_architecture>/`.
+
+Perturbation-conditioned k-NN configs add a `perturbation` mapping using the
+same clipping or affine settings as student configs. ID reference images are
+corrupted once and their post-GAP `layer4` representations are indexed against
+clean teacher outputs. `query_perturbed: false` searches with one clean query
+representation; `query_perturbed: true` searches every configured evaluation
+draw and aggregates all `draws * k_neighbors` neighbor outputs. The source
+variant's `embedding_pool` remains recorded for traceability, but FAISS pooling
+is always post-GAP.
 
 Current perturbation levels are `embedding` and `pixel`. Embedding
 methods currently include `clipping`, `dropout`, and `pca`.
 Pixel methods include affine `pixel_augmentation` and `pixmix`.
 Current Feature Denoising methods include `pca_masking`, `feature_masking`,
+`channel_group_masking`, `channel_group_stratified_masking`,
+`knn_channel_masking`, `knn_channel_group_masking`,
+`nmf_concept_masking`,
 `spatial_token_prediction`, and `pixel_masked_embedding`.
+Channel-grouping configs are separate from student configs because they build
+teacher-analysis artifacts rather than train a student. The first method is
+`top_activation_correlation`; it writes to
+`runs/channel_grouping/top_activation_correlation/<id_dataset>/<teacher_architecture>/`.
+The `nmf_latent_cosine` method writes fitted NMF `P` matrices and channel
+dendrograms to the corresponding `runs/channel_grouping/nmf_latent_cosine/`
+hierarchy without exporting flat cluster cuts.
+Channel-cluster audit configs are dataset-level task generators rather than
+ordinary student configs. Each layer points to one existing generic specialist
+config as its architecture/data template and specifies the hierarchy-cut
+distance. The generated manifest records every resolved fixed-cluster identity,
+channel list, mask count, inference draw count, and run directory; it avoids 269
+nearly identical YAML files.
 Activation-subspace components are `decisive` and `insignificant`.
 Their explicit targets are `projected_logits` or `coordinates`;
 coordinate-target students use the `autoencoder` kind.
@@ -159,6 +197,15 @@ four-dimensional teacher feature-map shape. They save validation-derived
 class statistics and confusion pairs plus training-subset activation exemplars
 in `<run_dir>/class_channel_corruption.pt`. The first launch configs cover
 CIFAR-10 and CIFAR-100 ID datasets with a ResNet-18 teacher at `layer4`.
+Feature Denoising channel-group masking configs also use an unmodified teacher
+feature-map shape. They reference a channel-grouping artifact, select a
+hierarchy cut with `channel_group_distance_threshold`, and sample one complete
+cluster per example. The current ResNet-18 configs cover layers 1-4 for both ID
+datasets at distance `0.5`, with 10 independent inference draws.
+Feature Denoising NMF concept-masking configs point to a complete ID training
+activation artifact, use the unmodified teacher feature-map shape for the
+residual CNN, and configure the global concept count, Bernoulli concept-mask
+probability, MiniBatchNMF fit parameters, and fixed-basis encoding iterations.
 
 Subspace-ensemble configs describe one 16-member ensemble and may enable both
 `mse_logits` and `kl_divergence`. Both objectives reuse the exact selections

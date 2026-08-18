@@ -11,6 +11,12 @@ packaging, but day-to-day work should use one of the focused environments.
 - `envs/gpu`: minimal runtime for GPU-cluster jobs.
 - `envs/notebooks`: notebook, plotting, and experiment-visualization tools.
 - `envs/tests`: test runner and test dependencies.
+- `envs/dashboard`: locked CPU runtime for Panel, Bokeh, Parquet summaries,
+  lazy PyTorch artifact reads, and dashboard smoke tests.
+
+The GPU environment pins `faiss-gpu-cu12` for exact CUDA k-NN search on the
+cluster. The test environment uses `faiss-cpu` so the same index behavior can
+be validated without a CUDA device.
 
 ## Usage
 
@@ -20,6 +26,7 @@ Sync an environment from the repository root:
 uv sync --project envs/gpu
 uv sync --project envs/notebooks
 uv sync --project envs/tests
+uv sync --project envs/dashboard
 ```
 
 The environment projects set `tool.uv.package = false`. They do not install the

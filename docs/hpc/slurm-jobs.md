@@ -25,6 +25,52 @@ ensemble inference and score exporters after training. Their `train-infer`
 pipeline therefore finishes with predictive-entropy and BALD OOD metrics
 rather than the generic single-student probability export.
 
+Configs below `configs/students/feature_denoising/knn_channel_masking/` are
+inference-only. The runner skips training and directly exports exact masked
+k-NN reconstruction scores.
+The same applies to `knn_channel_group_masking/`, which masks one complete
+hierarchy-cut cluster for each example and evaluation draw.
+
+Configs below `configs/students/feature_denoising/channel_group_masking/` run
+the normal train-then-score Feature Denoising pipeline. They load the matching
+ID training channel hierarchy, sample one complete cluster per training
+example, and independently resample one cluster for each inference draw.
+
+## NMF channel-cluster audit
+
+Use `slurm_scripts/submit_channel_cluster_audit.sh` for the specialist audit.
+It expands the two dataset-level configs into one 269-task manifest, exports
+shared teacher metadata, and submits a restartable one-GPU array with at most
+two simultaneous tasks. Successful completion triggers the CPU Parquet summary
+job and then the CPU-only Panel server job.
+
+Rerunning the submission script uses deep artifact validation and submits only
+missing task indices. To inspect or submit a targeted subset directly:
+
+```bash
+PYTHONPATH="$PWD/src" uv run --project envs/gpu --no-sync \
+  python -m distill_ood_detection.cli channel-cluster-audit-status \
+  --manifest runs/channel_cluster_audit/nmf_latent_cosine/manifest.json \
+  --deep
+```
+
+When channel hierarchies must be fitted first, submit
+`slurm_scripts/launch_channel_cluster_audit_array.sbatch` with an `afterok`
+dependency on the grouping jobs. It builds the manifest after those artifacts
+exist, enforces `MAX_TASKS`, and submits only incomplete training-and-inference
+array elements.
+
+The Panel job defaults to port 5006 and eight hours. It binds to the compute
+node's cluster-facing interfaces and restricts WebSocket origins to
+`localhost:5006`; use the SSH tunnel shown
+in the [audit documentation](../strategies/feature_denoising/channel_grouping/channel_cluster_audit.md#dashboard).
+
+The separate global-student distribution dashboard exports cluster-decomposed
+absolute and relative improvements from the existing NMF students, summarizes
+Tukey boxplots, and serves on port 5007. Complete commands for launching and
+tunneling to both Panel applications are in
+[Panel dashboards on SLURM](panel-dashboards.md).
+
 ## Modes
 
 Set `MODE` to choose the pipeline:
@@ -114,12 +160,13 @@ Teacher logit/probability artifacts are written under:
 <run_dir>/teacher_probabilities/
 ```
 
-## Layerwise embedding distances
+## Layer4 embedding distances
 
 Use `slurm_scripts/export_embedding_distances.sbatch` with one config under
-`configs/embedding_distances/`. The job extracts GAP embeddings from all four
-ResNet stages, selects exact top-k ID training neighbors in bounded blocks, and
-computes classifier-based OOD Scores from their mean probabilities and logits:
+`configs/embedding_distances/`. The job extracts post-GAP `layer4` embeddings,
+builds one exact raw-embedding GPU FAISS index, and computes
+classifier-based OOD Scores from the selected neighbors' mean probabilities
+and logits:
 
 ```bash
 sbatch --exclude=daft \
@@ -129,6 +176,12 @@ sbatch --exclude=daft \
 
 Artifacts are written below
 `runs/embedding_distances/<id_dataset>/<teacher_architecture>/`.
+
+Configs below `configs/embedding_distances/perturbation/` use the same command.
+They preserve post-GAP `layer4` FAISS geometry while applying the configured
+affine or sequential clipping corruption to ID references and, when
+`query_perturbed: true`, to each query draw. Their artifacts mirror the config
+hierarchy below `runs/embedding_distances/perturbation/`.
 
 ## Report tables
 
@@ -201,6 +254,68 @@ sbatch --exclude=daft \
 The job is inference-only. It makes one clean teacher pass over ID training
 data to choose `k`, then writes compact distribution
 artifacts below `<run_dir>/feature_denoising_subspace_errors/`.
+
+## Feature Denoising channel grouping
+
+Build top-10%-activation channel profiles, Pearson correlation matrices, and
+average-linkage hierarchies on the GPU cluster:
+
+```bash
+sbatch --exclude=daft \
+  slurm_scripts/build_channel_groups.sbatch \
+  configs/channel_grouping/top_activation_correlation/cifar_10/resnet18.yaml
+```
+
+Submit the CIFAR-100 config separately to let SLURM schedule the two ID jobs in
+parallel. Each config processes `layer1` through `layer4` in one teacher pass.
+The job never writes raw feature maps or per-sample profiles. It writes compact
+numeric artifacts, JSON group cuts, an overview PNG, and a labeled vector PDF
+below `<run_dir>/channel_groups/`.
+
+The same runner accepts `configs/channel_grouping/nmf_latent_cosine/...`.
+Those jobs stream post-ReLU spatial activations through global MiniBatchNMF
+models and export each layer's `P` matrix plus overview and labeled
+dendrograms. They intentionally omit flat group cuts.
+
+Sync the complete `channel_groups/` directory to the Mac. It is intentionally
+small enough to retain the linkage and correlation data for later recutting,
+while the remote-rendered dendrograms can be inspected immediately.
+
+## Feature Denoising channel-group masking
+
+After building the grouping artifacts, run the distance-`0.5` ResNet-18
+experiments with the ordinary config runner. For example, request two GPUs and
+pass the four configs for one ID dataset; the runner executes two pipelines at
+a time:
+
+```bash
+sbatch --exclude=daft --gres=gpu:2 \
+  --job-name=fd_groups_c10 \
+  slurm_scripts/run_configs.sbatch \
+  configs/students/feature_denoising/channel_group_masking/cifar_10/resnet18/cluster_layer1_d050.yaml \
+  configs/students/feature_denoising/channel_group_masking/cifar_10/resnet18/cluster_layer2_d050.yaml \
+  configs/students/feature_denoising/channel_group_masking/cifar_10/resnet18/cluster_layer3_d050.yaml \
+  configs/students/feature_denoising/channel_group_masking/cifar_10/resnet18/cluster_layer4_d050.yaml
+```
+
+Submit CIFAR-100 as a separate job. Each pipeline trains a residual denoiser
+and then exports best-checkpoint reconstruction scores for ID and configured
+OOD datasets. The configs use 10 independently sampled cluster masks per image
+at inference and retain the sampled group IDs in each score artifact.
+
+## Feature Denoising layer composition
+
+After exporting the strong pixel-augmented MLP scores for layer3 and layer4 on
+both ID datasets, submit the CPU-only composition report:
+
+```bash
+sbatch slurm_scripts/build_feature_denoising_layer_composition_report.sbatch
+```
+
+The job standardizes each layer's absolute-improvement score using the matching
+ID test split, evaluates the configured beta sweep, and writes the JSON summary,
+Markdown experiment report, and ROC-AUC/FPR@95 plots. Do not request a GPU for
+this report job.
 
 ## PixMix mixing set
 
