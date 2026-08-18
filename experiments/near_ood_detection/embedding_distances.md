@@ -1,6 +1,9 @@
 # Layerwise k-NN Neighbor-Output OOD Scores
 
-Status: scoring implementation updated; cluster rerun required.
+Status: raw layer4 FAISS and perturbation-conditioned runs completed on
+2026-08-05. See the
+[complete OOD Score report](knn_faiss_ood_scores.md) for the authoritative
+version 4 results.
 
 ## Question
 
@@ -59,48 +62,33 @@ Student MSP, Student energy, predictive entropy, and BALD. The latter two treat
 the selected neighbor probability distributions as a local ensemble. Save raw
 metrics and sign-adjusted OOD Scores.
 
-Calculate each quantity in two embedding spaces:
+Calculate each quantity from neighbors selected in the raw post-GAP `layer4`
+embedding space. Higher sign-adjusted OOD Scores are always more ID-like.
 
-- `raw`: the unmodified GAP embedding;
-- `id_standardized`: subtract the ID training mean and divide by the ID
-  training standard deviation independently at each layer.
+Perturbation-conditioned follow-ups keep that same post-GAP geometry. They
+index one corrupted representation per ID training example while retaining the
+clean teacher outputs as regression targets. Clean-inference queries are
+unperturbed. For clipped inference, each of the 50 query draws is searched
+independently and all `50 * k` neighbor outputs are aggregated into one local
+prediction and uncertainty ensemble per sample.
 
-Raw and ID-standardized embeddings can select different neighbors. Fit all
-normalization statistics on ID training embeddings only and compute the full
-classifier score set for both selections. Higher sign-adjusted OOD Scores are
-always more ID-like.
+## Exact FAISS Computation
 
-## Exact, Memory-Bounded Computation
+The current implementation replaces the original blockwise PyTorch search with
+one exact FAISS `IndexFlatL2` index over raw post-GAP `layer4` ID training
+embeddings, then reuses it for every ID and OOD query dataset.
 
-Do not construct or save the full distance matrix. For query block `Q` and ID
-reference block `R`, compute squared distances with matrix multiplication:
-
-```text
-D2 = ||Q||^2 + ||R||^2 - 2 Q R^T
-```
-
-Clamp small negative values to zero. Iterate over reference blocks and retain
-only the smallest `k` values for every query. This is exact and bounds peak
-memory by `query_block_size * reference_block_size`, rather than by the total
-number of sample pairs. Perform the matrix multiplication on GPU when
-available and store final per-sample distances as `float32` on CPU.
-
-Start with query blocks of 1,024 and reference blocks of 8,192, then tune from
-measured device memory. The same implementation must run on CPU with smaller
-blocks. `torch.inference_mode()` should cover embedding extraction, and
-distance computation should remain in `float32` for the reproducible baseline.
-
-An exact FAISS flat index may be considered only if profiling shows the
-PyTorch implementation is a bottleneck. It should not be the initial
-dependency because blocked matrix multiplication already performs the same
-exact search and keeps the implementation simple.
+FAISS returns squared L2 distance, while version 3 artifacts stored Euclidean
+distance. Version 4 artifacts preserve that contract by clamping numerical
+negatives to zero and taking the square root before serialization. Query
+batches are controlled by `search_batch_size`; reference blocking is managed
+internally by FAISS.
 
 ## Artifact Plan
 
 Add a dedicated pooled-embedding export instead of extending the existing raw
-teacher-activation export to early layers. Extract all four stages in one pass
-through each dataset, GAP each batch immediately, and write bounded shards so
-all layers do not accumulate in RAM.
+teacher-activation export. Extract `layer4` in one pass through each dataset,
+GAP each batch immediately, and write bounded shards.
 
 ```text
 runs/embedding_distances/<id_dataset>/<teacher>/
@@ -117,7 +105,7 @@ Each embedding shard contains embeddings, teacher logits, teacher
 probabilities, labels, sample offsets, dataset/split, teacher identity and
 revision, layer, pooling method, dtype, and preprocessing metadata. The result
 artifact contains neighbor indices and distances, mean probabilities and
-logits, raw metrics, and sign-adjusted OOD Scores for both embedding spaces.
+logits, raw metrics, and sign-adjusted OOD Scores.
 Manifests record score signs, the seed, and block sizes.
 
 Keeping embeddings separate from distances lets us add another distance or
@@ -153,6 +141,11 @@ overlap with a few ID classes.
 The implementation does not save full pairwise matrices or raw early-layer
 feature maps. The generated results below remain from the superseded
 distance-only run until the updated cluster jobs complete.
+
+The generated results below describe the retired version 3 multi-layer,
+ID-standardized experiment. Regenerate this section after the raw layer4 FAISS
+jobs have completed; do not compare these legacy values with version 4
+artifacts.
 
 <!-- BEGIN GENERATED RESULTS -->
 ## Results
