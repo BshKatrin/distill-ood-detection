@@ -17,6 +17,8 @@ Sections marked "Not implemented" describe planned work. All other sections corr
 - [Feature Denoising NMF concept masking](strategies/feature_denoising/nmf_concept_masking.md):
   global non-negative concept directions, complete-direction masking, and
   residual reconstruction scoring.
+- [ViT patch-token masked reconstruction](strategies/feature_denoising/patch_token_masking.md):
+  layer-12 patch grids, Bernoulli masking, and residual CNN reconstruction.
 - [NMF channel-cluster audit](strategies/feature_denoising/channel_grouping/channel_cluster_audit.md):
   269 fixed-cluster specialists, audit metrics, restartable arrays, and the
   minimal remote Panel score application.
@@ -29,5 +31,9 @@ Sections marked "Not implemented" describe planned work. All other sections corr
 - [Syncing run artifacts from the GPU cluster](hpc/sync-runs.md): Copy selected remote `runs/` folders into local `runs/`.
 - [Objectives](objectives/README.md): Distillation objective functions for deep-learning students.
 - [OOD Scores](ood_scores/README.md): Per-sample scores that quantify whether a sample is more ID-like or OOD-like.
+- [OpenOOD ImageNet](openood_imagenet200.md): fixed ImageNet-200/ImageNet-1K
+  ID/OOD manifests, pretrained ResNets, and pluggable score evaluation.
+- [OpenOOD CIFAR](openood_cifar.md): fixed CIFAR-10/CIFAR-100 manifests,
+  OOD-positive metrics, existing-student evaluation, and restartable SLURM jobs.
 - [Reports](reports/README.md): Export metric reports, render report outputs,
   and generate analysis notebooks.

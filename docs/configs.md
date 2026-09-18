@@ -187,6 +187,9 @@ only the masked PCA projection and reconstructs the clean PCA projection.
 Feature Denoising spatial token prediction configs set `student.input_shape` to the teacher
 feature-map shape. The student receives padded visible tokens plus spatial
 position indices, not a zero-masked dense feature map.
+Feature Denoising ViT patch-token configs set `student.input_shape` to
+`[768, 14, 14]` for 224x224 ViT-B/16 inputs. The CLS token is excluded, and the
+residual CNN receives only the zero-masked patch grid.
 Feature Denoising spatial block residual configs set `student.input_shape` to
 the teacher feature-map shape with one additional mask channel and set
 `student.num_classes` to the teacher channel count. The configured

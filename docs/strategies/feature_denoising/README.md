@@ -23,6 +23,7 @@ Channel groups used by masking strategies are documented separately under
 | [Feature Masked Reconstruction](feature_masking.md) | `channel_group_masked_knn_reconstruction` | Raw feature map with one hierarchy-cut channel group hidden | Mean hidden group channels from exact ID neighbors |
 | [Feature Masked Reconstruction](feature_masking.md) | `confusion_channel_replacement_residual_reconstruction` | Confusing-class channel-replaced raw feature map | Residual correction for the clean raw feature map |
 | [Spatial Token Prediction](spatial_token_prediction.md) | `spatial_token_prediction` | Visible raw feature tokens and target positions | Target raw feature tokens |
+| [ViT Patch-Token Masked Reconstruction](patch_token_masking.md) | `patch_token_masked_residual_reconstruction` | Zero-masked ViT patch-embedding grid | Residual correction for the original patch grid |
 | [Pixel-Masked Embedding Prediction](pixel_masked_embedding.md) | `pixel_masked_embedding_prediction` | Pooled embedding from pixel-masked image | Pooled embedding from clean image |
 | [Pixel-Augmented Embedding Prediction](pixel_augmented_embedding.md) | `pixel_augmented_embedding_prediction` | Pooled embedding from pixel-augmented image | Pooled embedding from clean image |
 | Pixel-Masked Multilayer Prediction | `pixel_masked_multilayer_prediction` | Pooled layer3 + layer4 from pixel-masked image | Clean pooled layer3 + layer4 + logits |

@@ -44,8 +44,9 @@ Open `http://localhost:5006/channel_cluster_audit`.
 
 ## Global-student cluster distributions
 
-This dashboard compares the per-image distribution of absolute or relative
-improvement for the global NMF students. It supports ResNet-18, ResNet-50,
+This dashboard compares per-image raw reconstruction error, absolute
+improvement, or relative improvement for the global NMF students. It supports
+ResNet-18, ResNet-50,
 CIFAR-10 ID, and CIFAR-100 ID. Each value is averaged over ten independent
 masks before its boxplot statistics are computed.
 
@@ -72,9 +73,8 @@ summary_job=$(sbatch --parsable \
 
 panel_job=$(sbatch --parsable \
   --exclude=daft \
-  --dependency="afterok:${summary_job}" \
   --time=1-00:00:00 \
-  --export=ALL,SKIP_UV_SYNC=1,PORT=5007 \
+  --export=ALL,SKIP_UV_SYNC=1,PORT=5007,SUMMARY_DIR=runs/global_channel_cluster_distributions/nmf_latent_cosine/summary_r18_with_reconstruction \
   slurm_scripts/serve_global_channel_cluster_distributions.sbatch)
 
 printf 'export=%s summary=%s panel=%s\n' \

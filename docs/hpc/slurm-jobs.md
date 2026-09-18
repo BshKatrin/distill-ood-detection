@@ -241,6 +241,48 @@ The script maps these environment variables to exporter flags:
 - `OUTPUT_DIR`: `export_test_metrics_table.py --output-dir`.
 - `JSON_OUTPUT`: `export_test_metrics_table.py --json-output`.
 
+## OpenOOD CIFAR evaluation
+
+Use `slurm_scripts/submit_openood_cifar_evaluation.sh` to evaluate the focused
+CIFAR-10/CIFAR-100 variants against the fixed OpenOOD v1.5 manifests. The
+submission script first resolves existing checkpoints into a task manifest,
+submits a CPU data-preparation job, and then submits a dependent one-GPU array
+with at most two simultaneous tasks.
+
+```bash
+slurm_scripts/submit_openood_cifar_evaluation.sh
+```
+
+The jobs reuse the existing GPU environment and project checkpoints. Set
+`SOURCE_DIR` when the evaluation code is staged separately from the project
+checkout, and set `OPENOOD_ROOT`, `MANIFEST`, or `MAX_CONCURRENT` to override
+their documented defaults. Missing checkpoints remain in the manifest's
+`missing` list and are never silently substituted. Protocol details and exact
+sample counts are in [OpenOOD CIFAR](../openood_cifar.md).
+
+When compute nodes have no outbound access to the OpenOOD archive host, run
+`slurm_scripts/launch_openood_cifar_after_transfer.sh` in the background on the
+login node. It performs resumable network transfer only, then submits the
+normal SLURM extraction and GPU jobs automatically. It does not install a
+downloader or perform extraction/model computation on the login node.
+
+## ViT patch-token Feature Denoising
+
+Train the CIFAR-10 and CIFAR-100 `layer12` patch-token residual students in
+parallel, then export their standard ID/OOD reconstruction scores:
+
+```bash
+sbatch --gres=gpu:2 --job-name=fd_vit_patch_l12 \
+  slurm_scripts/run_configs.sbatch \
+  configs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020.yaml \
+  configs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020.yaml
+```
+
+The runner sets Hugging Face offline mode. Both ViT checkpoints must therefore
+already be present in the compute environment's Hugging Face cache, as required
+by the teacher configs. After training, the normal OpenOOD CIFAR submission
+includes both best checkpoints in its selected-variant manifest.
+
 ## Feature Denoising activation subspaces
 
 Submit the exact per-draw classifier-subspace analysis:
