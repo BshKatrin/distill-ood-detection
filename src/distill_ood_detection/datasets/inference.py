@@ -8,10 +8,18 @@ from typing import TypedDict
 
 import torch
 from torch.utils.data import DataLoader, Dataset, Subset, random_split
-from torchvision.datasets import CIFAR10, CIFAR100, ImageNet, MNIST, SVHN
-from torchvision.transforms import CenterCrop, Compose, Lambda, Normalize, Resize, ToTensor
+from torchvision.datasets import CIFAR10, CIFAR100, MNIST, SVHN, ImageNet
+from torchvision.transforms import (
+    CenterCrop,
+    Compose,
+    Lambda,
+    Normalize,
+    Resize,
+    ToTensor,
+)
 
 from distill_ood_detection.config import DatasetConfig, OODDatasetConfig
+from distill_ood_detection.datasets.image_list import ImageListDataset
 
 
 class IDPreprocessingConfig(TypedDict):
@@ -38,6 +46,11 @@ ID_PREPROCESSING: dict[str, IDPreprocessingConfig] = {
         "image_size": 224,
         "normalization": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     },
+    "imagenet200": {
+        "pre_size": 256,
+        "image_size": 224,
+        "normalization": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    },
 }
 
 
@@ -48,6 +61,7 @@ class NamedLoader:
     name: str
     split: str
     loader: DataLoader[tuple[torch.Tensor, int]]
+    group: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,11 +76,7 @@ class DataLoaders:
 def build_id_loaders(config: DatasetConfig, seed: int) -> DataLoaders:
     """Build deterministic in-distribution train/validation/test dataloaders."""
 
-    train_subset, validation_subset = split_train_validation(
-        _id_dataset(config, split="train"),
-        validation_fraction=config.validation_fraction,
-        seed=seed,
-    )
+    train_subset, validation_subset = _id_train_validation_subsets(config, seed)
     return DataLoaders(
         train=_loader(train_subset, config, shuffle=True),
         validation=_loader(validation_subset, config),
@@ -105,7 +115,9 @@ def build_in_distribution_train_loader(config: DatasetConfig, seed: int) -> Name
     )
 
 
-def build_in_distribution_validation_loader(config: DatasetConfig, seed: int) -> NamedLoader:
+def build_in_distribution_validation_loader(
+    config: DatasetConfig, seed: int
+) -> NamedLoader:
     """Build the in-distribution validation split loader."""
 
     _, validation_subset = _id_train_validation_subsets(config, seed)
@@ -124,6 +136,7 @@ def build_ood_loaders(config: DatasetConfig) -> list[NamedLoader]:
             name=f"{ood.name}_{ood.split}",
             split=ood.split,
             loader=_loader(_ood_dataset(config, ood), config),
+            group=ood.group,
         )
         for ood in config.ood_datasets
     ]
@@ -133,6 +146,12 @@ def _ood_dataset(
     dataset_config: DatasetConfig,
     ood_config: OODDatasetConfig,
 ) -> Dataset[tuple[torch.Tensor, int]]:
+    if ood_config.image_list is not None:
+        return ImageListDataset(
+            ood_config.image_list,
+            default_data_dir=Path(dataset_config.data_dir),
+            transform=_dataset_transform(dataset_config),
+        )
     return _torchvision_dataset(
         name=ood_config.name,
         root=Path(dataset_config.data_dir),
@@ -145,6 +164,11 @@ def _id_train_validation_subsets(
     config: DatasetConfig,
     seed: int,
 ) -> tuple[Dataset[tuple[torch.Tensor, int]], Dataset[tuple[torch.Tensor, int]]]:
+    if config.image_lists:
+        return (
+            _id_dataset(config, split="train"),
+            _id_dataset(config, split="validation"),
+        )
     return split_train_validation(
         _id_dataset(config, split="train"),
         validation_fraction=config.validation_fraction,
@@ -174,6 +198,18 @@ def split_train_validation(
 
 def _id_dataset(config: DatasetConfig, split: str) -> Dataset[tuple[torch.Tensor, int]]:
     _id_preprocessing(config.name)
+    if config.image_lists:
+        try:
+            image_list = config.image_lists[split]
+        except KeyError as error:
+            raise ValueError(
+                f"No image-list manifest configured for ID split {split!r}"
+            ) from error
+        return ImageListDataset(
+            image_list,
+            default_data_dir=Path(config.data_dir),
+            transform=_dataset_transform(config),
+        )
     return _torchvision_dataset(
         name=config.name,
         root=Path(config.data_dir),
@@ -189,13 +225,19 @@ def _torchvision_dataset(
     transform: Compose,
 ) -> Dataset[tuple[torch.Tensor, int]]:
     if name == "cifar10":
-        return CIFAR10(root=root, train=split == "train", download=True, transform=transform)
+        return CIFAR10(
+            root=root, train=split == "train", download=True, transform=transform
+        )
     if name == "cifar100":
-        return CIFAR100(root=root, train=split == "train", download=True, transform=transform)
+        return CIFAR100(
+            root=root, train=split == "train", download=True, transform=transform
+        )
     if name == "imagenet":
         return ImageNet(root=root, split=_imagenet_split(split), transform=transform)
     if name == "mnist":
-        return MNIST(root=root, train=split == "train", download=True, transform=transform)
+        return MNIST(
+            root=root, train=split == "train", download=True, transform=transform
+        )
     if name == "svhn":
         return SVHN(root=root, split=split, download=True, transform=transform)
     raise ValueError(f"Unsupported dataset: {name}")

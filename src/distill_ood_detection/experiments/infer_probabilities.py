@@ -57,6 +57,7 @@ def run_probability_inference(
     include_train: bool = False,
     include_validation: bool = False,
     apply_perturbation: bool = False,
+    output_dir: Path | None = None,
 ) -> dict[str, object]:
     """Infer teacher and student logits/probabilities for ID and OOD datasets."""
 
@@ -64,7 +65,10 @@ def run_probability_inference(
     set_seed(training_defaults.seed)
     device = resolve_device(training_defaults.device)
     experiment_dir = Path(config.run_dir)
-    output_dir = _probability_output_dir(experiment_dir, config, apply_perturbation)
+    if output_dir is None:
+        output_dir = _probability_output_dir(
+            experiment_dir, config, apply_perturbation
+        )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     loaders = []

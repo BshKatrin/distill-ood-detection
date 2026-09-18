@@ -88,6 +88,43 @@ def build_parser() -> argparse.ArgumentParser:
             "Defaults to deterministic unperturbed inference."
         ),
     )
+    openood_cifar_parser = subparsers.add_parser(
+        "evaluate-openood-cifar",
+        help="Evaluate one existing CIFAR student on fixed OpenOOD v1.5 manifests.",
+    )
+    openood_cifar_parser.add_argument("--config", type=Path, required=True)
+    openood_cifar_parser.add_argument(
+        "--openood-root",
+        type=Path,
+        default=Path("/home/bogush/openood"),
+    )
+    openood_cifar_parser.add_argument(
+        "--checkpoint", choices=("best", "latest"), default="best"
+    )
+    openood_cifar_parser.add_argument(
+        "--method",
+        choices=("cross_entropy", "mse_logits", "kl_divergence"),
+        default=None,
+    )
+    openood_cifar_parser.add_argument("--apply-perturbation", action="store_true")
+    openood_cifar_parser.add_argument("--force", action="store_true")
+    openood_manifest_parser = subparsers.add_parser(
+        "build-openood-cifar-manifest",
+        help="Resolve selected OpenOOD CIFAR variants against existing checkpoints.",
+    )
+    openood_manifest_parser.add_argument("--selection", type=Path, required=True)
+    openood_manifest_parser.add_argument("--output", type=Path, required=True)
+    openood_manifest_parser.add_argument("--config-root", type=Path, default=None)
+    openood_task_parser = subparsers.add_parser(
+        "run-openood-cifar-task",
+        help="Run one ready task from an OpenOOD CIFAR evaluation manifest.",
+    )
+    openood_task_parser.add_argument("--manifest", type=Path, required=True)
+    openood_task_parser.add_argument("--task-index", type=int, required=True)
+    openood_task_parser.add_argument(
+        "--openood-root", type=Path, default=Path("/home/bogush/openood")
+    )
+    openood_task_parser.add_argument("--force", action="store_true")
     activations_parser = subparsers.add_parser("export-teacher-activations")
     activations_parser.add_argument(
         "--config",
@@ -346,6 +383,42 @@ def main() -> None:
             include_train=args.include_train,
             include_validation=args.include_validation,
             apply_perturbation=args.apply_perturbation,
+        )
+    if args.command == "evaluate-openood-cifar":
+        from distill_ood_detection.experiments.evaluate_openood_cifar import (
+            run_openood_cifar_evaluation,
+        )
+
+        config = load_config(args.config)
+        run_openood_cifar_evaluation(
+            config,
+            source_config_path=args.config,
+            openood_root=args.openood_root,
+            checkpoint=args.checkpoint,
+            method=args.method,
+            apply_perturbation=args.apply_perturbation,
+            force=args.force,
+        )
+    if args.command == "build-openood-cifar-manifest":
+        from distill_ood_detection.experiments.openood_cifar_manifest import (
+            build_openood_cifar_task_manifest,
+        )
+
+        build_openood_cifar_task_manifest(
+            args.selection,
+            args.output,
+            config_root=args.config_root,
+        )
+    if args.command == "run-openood-cifar-task":
+        from distill_ood_detection.experiments.openood_cifar_manifest import (
+            run_openood_cifar_manifest_task,
+        )
+
+        run_openood_cifar_manifest_task(
+            args.manifest,
+            args.task_index,
+            args.openood_root,
+            force=args.force,
         )
     if args.command == "export-teacher-activations":
         from distill_ood_detection.experiments.export_teacher_activations import (

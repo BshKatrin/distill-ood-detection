@@ -20,38 +20,227 @@ from distill_ood_detection.config import (
     parse_config,
 )
 from distill_ood_detection.distillation.feature_denoising import (
+    ChannelGroups,
     ClassChannelCorruptionBank,
     FeatureNormalizer,
+    collect_channel_knn_reconstruction_scores,
     collect_feature_denoising_reconstruction_scores,
     feature_denoising_predictions,
+    feature_denoising_score_name,
     fit_class_channel_corruption_bank,
     fit_feature_normalizer_from_loader,
     hidden_component_mse,
-    feature_denoising_score_name,
+    load_channel_knn_index,
+    load_channel_groups,
     load_class_channel_corruption_bank,
     load_feature_normalizer,
-    sample_confusion_channel_replacement_batch,
-    save_class_channel_corruption_bank,
-    save_feature_normalizer,
-    sample_pixel_block_keep_mask,
-    sample_pixel_augmented_embedding_batch,
-    sample_pixel_masked_embedding_batch,
-    sample_pixel_masked_multilayer_l234_batch,
-    sample_pixel_masked_multilayer_batch,
     sample_channel_keep_mask,
+    sample_channel_group_keep_mask,
+    sample_channel_group_stratified_keep_mask,
+    sample_confusion_channel_replacement_batch,
     sample_feature_denoising_keep_mask,
     sample_feature_denoising_pca_batch,
+    sample_pixel_augmented_embedding_batch,
+    sample_pixel_block_keep_mask,
+    sample_pixel_masked_embedding_batch,
+    sample_pixel_masked_multilayer_batch,
+    sample_pixel_masked_multilayer_l234_batch,
     sample_spatial_block_hidden_mask,
-    sample_spatial_token_indices,
     sample_spatial_keep_mask,
+    sample_spatial_token_indices,
+    save_class_channel_corruption_bank,
+    save_feature_normalizer,
     train_feature_denoising_student,
 )
 from distill_ood_detection.distillation.perturbation import PcaProjector
+from distill_ood_detection.evaluation.channel_grouping import (
+    hierarchical_channel_linkage,
+)
 from distill_ood_detection.models.student import build_student
 
 
 class FeatureDenoisingTests(unittest.TestCase):
     """Validate Feature Denoising PCA masking behavior."""
+
+    def test_knn_channel_masking_configs_match_resnet18_shapes(self) -> None:
+        expected_shapes = {
+            "layer3": (256, 8, 8),
+            "layer4": (512, 4, 4),
+        }
+        for dataset in ("cifar_10", "cifar_100"):
+            for layer, expected_shape in expected_shapes.items():
+                path = Path(
+                    "configs/students/feature_denoising/knn_channel_masking/"
+                    f"{dataset}/resnet18/knn_{layer}_k10_mask_p020.yaml"
+                )
+                with self.subTest(path=str(path)):
+                    config = load_config(path)
+                    denoising = config.strategy.feature_denoising
+                    self.assertEqual(
+                        denoising.method,
+                        "channel_masked_knn_reconstruction",
+                    )
+                    self.assertEqual(config.student.kind, "knn")
+                    self.assertEqual(config.student.input_shape, expected_shape)
+                    self.assertEqual(denoising.k_neighbors, 10)
+                    self.assertEqual(denoising.mask_probability, 0.2)
+
+    def test_knn_channel_group_masking_configs_match_resnet18_shapes(self) -> None:
+        expected_shapes = {
+            "layer3": (256, 8, 8),
+            "layer4": (512, 4, 4),
+        }
+        for dataset in ("cifar_10", "cifar_100"):
+            for layer, expected_shape in expected_shapes.items():
+                path = Path(
+                    "configs/students/feature_denoising/knn_channel_group_masking/"
+                    f"{dataset}/resnet18/knn_{layer}_k10_d050.yaml"
+                )
+                with self.subTest(path=str(path)):
+                    config = load_config(path)
+                    denoising = config.strategy.feature_denoising
+                    self.assertEqual(
+                        denoising.method,
+                        "channel_group_masked_knn_reconstruction",
+                    )
+                    self.assertEqual(config.student.kind, "knn")
+                    self.assertEqual(config.student.input_shape, expected_shape)
+                    self.assertEqual(denoising.k_neighbors, 10)
+                    self.assertEqual(denoising.channel_group_distance_threshold, 0.5)
+                    self.assertEqual(denoising.evaluation_draws, 10)
+
+    def test_load_channel_knn_index_validates_activation_provenance(self) -> None:
+        activations = torch.randn(5, 3, 2, 2)
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "layer3.pt"
+            torch.save(
+                {
+                    "dataset": "toy_train",
+                    "split": "train",
+                    "layer": "layer3",
+                    "activations": activations,
+                },
+                path,
+            )
+            index = load_channel_knn_index(
+                path,
+                torch.device("cpu"),
+                expected_dataset="toy_train",
+                expected_layer="layer3",
+                expected_feature_shape=(3, 2, 2),
+            )
+
+        self.assertEqual(index.reference_count, 5)
+        self.assertEqual(index.feature_shape, (3, 2, 2))
+
+    def test_collect_channel_knn_scores_retains_neighbors_per_draw(self) -> None:
+        references = torch.randn(6, 3, 2, 2)
+        queries = torch.randn(4, 3, 2, 2)
+        labels = torch.tensor([0, 1, 0, 1])
+        index_path: Path
+        with TemporaryDirectory() as directory:
+            index_path = Path(directory) / "layer3.pt"
+            torch.save(
+                {
+                    "dataset": "toy_train",
+                    "split": "train",
+                    "layer": "layer3",
+                    "activations": references,
+                },
+                index_path,
+            )
+            index = load_channel_knn_index(
+                index_path,
+                torch.device("cpu"),
+                expected_dataset="toy_train",
+                expected_layer="layer3",
+                expected_feature_shape=(3, 2, 2),
+            )
+            torch.manual_seed(7)
+            scores = collect_channel_knn_reconstruction_scores(
+                loader=DataLoader(
+                    TensorDataset(queries, labels),
+                    batch_size=2,
+                ),
+                device=torch.device("cpu"),
+                perturbation_forwarder=_IdentityFeatureForwarder(),
+                feature_denoising_config=FeatureDenoisingConfig(
+                    method="channel_masked_knn_reconstruction",
+                    mask_probability=0.2,
+                    evaluation_draws=2,
+                    k_neighbors=2,
+                    knn_query_batch_size=1,
+                    knn_reference_chunk_size=3,
+                ),
+                index=index,
+            )
+
+        torch.testing.assert_close(scores["labels"], labels)
+        self.assertEqual(tuple(scores["neighbor_indices"].shape), (4, 2, 2))
+        self.assertEqual(
+            tuple(scores["neighbor_squared_distances"].shape),
+            (4, 2, 2),
+        )
+        self.assertEqual(tuple(scores["visible_channel_counts"].shape), (4, 2))
+        self.assertTrue(torch.all(torch.isfinite(scores["scores"])))
+
+    def test_collect_channel_group_knn_scores_uses_complete_groups(self) -> None:
+        references = torch.randn(6, 4, 2, 2)
+        queries = torch.randn(3, 4, 2, 2)
+        labels = torch.tensor([0, 1, 0])
+        groups = ChannelGroups(
+            membership=torch.tensor(
+                [
+                    [True, True, False, False],
+                    [False, False, True, False],
+                    [False, False, False, True],
+                ]
+            ),
+            distance_threshold=0.5,
+            source_path="toy.pt",
+        )
+        index_path: Path
+        with TemporaryDirectory() as directory:
+            index_path = Path(directory) / "layer3.pt"
+            torch.save(
+                {
+                    "dataset": "toy_train",
+                    "split": "train",
+                    "layer": "layer3",
+                    "activations": references,
+                },
+                index_path,
+            )
+            index = load_channel_knn_index(
+                index_path,
+                torch.device("cpu"),
+                expected_dataset="toy_train",
+                expected_layer="layer3",
+                expected_feature_shape=(4, 2, 2),
+            )
+            torch.manual_seed(7)
+            scores = collect_channel_knn_reconstruction_scores(
+                loader=DataLoader(TensorDataset(queries, labels), batch_size=3),
+                device=torch.device("cpu"),
+                perturbation_forwarder=_IdentityFeatureForwarder(),
+                feature_denoising_config=FeatureDenoisingConfig(
+                    method="channel_group_masked_knn_reconstruction",
+                    channel_group_path="toy.pt",
+                    channel_group_distance_threshold=0.5,
+                    evaluation_draws=3,
+                    k_neighbors=2,
+                    knn_query_batch_size=2,
+                    knn_reference_chunk_size=3,
+                ),
+                index=index,
+                channel_groups=groups,
+            )
+
+        sampled = scores["sampled_channel_group_indices"]
+        expected_visible = (4 - groups.group_sizes[sampled]).to(dtype=torch.int32)
+        self.assertEqual(tuple(sampled.shape), (3, 3))
+        torch.testing.assert_close(scores["visible_channel_counts"], expected_visible)
+        self.assertTrue(torch.all(torch.isfinite(scores["scores"])))
 
     def test_config_matches_pca_input_and_output_shape(self) -> None:
         config = load_config(
@@ -242,6 +431,186 @@ class FeatureDenoisingTests(unittest.TestCase):
                         )
                         self.assertEqual(denoising.confusion_split, "test")
 
+    def test_channel_group_masking_configs_cover_both_datasets_and_all_layers(
+        self,
+    ) -> None:
+        expected_shapes = {
+            "layer1": (64, 32, 32),
+            "layer2": (128, 16, 16),
+            "layer3": (256, 8, 8),
+            "layer4": (512, 4, 4),
+        }
+        for dataset in ("cifar_10", "cifar_100"):
+            for layer, expected_shape in expected_shapes.items():
+                path = Path(
+                    "configs/students/feature_denoising/channel_group_masking/"
+                    f"{dataset}/resnet18/cluster_{layer}_d050.yaml"
+                )
+                with self.subTest(path=str(path)):
+                    config = load_config(path)
+                    denoising = config.strategy.feature_denoising
+                    self.assertEqual(
+                        denoising.method,
+                        "channel_group_masked_residual_reconstruction",
+                    )
+                    self.assertEqual(config.student.input_shape, expected_shape)
+                    self.assertEqual(denoising.channel_group_distance_threshold, 0.5)
+                    self.assertEqual(denoising.evaluation_draws, 10)
+                    self.assertIn(f"/{layer}.pt", denoising.channel_group_path or "")
+
+    def test_channel_group_stratified_layer4_config(self) -> None:
+        path = Path(
+            "configs/students/feature_denoising/channel_group_stratified_masking/"
+            "cifar_10/resnet18/cluster_layer4_d050_min4_p025.yaml"
+        )
+        config = load_config(path)
+        denoising = config.strategy.feature_denoising
+
+        self.assertEqual(
+            denoising.method,
+            "channel_group_stratified_masked_residual_reconstruction",
+        )
+        self.assertEqual(config.student.feature_layer, "layer4")
+        self.assertEqual(config.student.input_shape, (512, 4, 4))
+        self.assertEqual(denoising.channel_group_distance_threshold, 0.5)
+        self.assertEqual(denoising.channel_group_min_size, 4)
+        self.assertEqual(denoising.channel_group_mask_fraction, 0.25)
+        self.assertEqual(denoising.evaluation_draws, 10)
+
+    def test_nmf_channel_group_masking_configs_cover_requested_grid(self) -> None:
+        layer_settings = {
+            "layer2": ((128, 16, 16), "070", 0.7),
+            "layer3": ((256, 8, 8), "060", 0.6),
+            "layer4": ((512, 4, 4), "060", 0.6),
+        }
+        variants = {
+            "channel_group_masking": (
+                "channel_group_masked_residual_reconstruction",
+                "",
+            ),
+            "channel_group_stratified_masking": (
+                "channel_group_stratified_masked_residual_reconstruction",
+                "_p025",
+            ),
+        }
+        for dataset in ("cifar_10", "cifar_100"):
+            for variant, (method, suffix) in variants.items():
+                for layer, (shape, distance_code, threshold) in layer_settings.items():
+                    path = Path(
+                        f"configs/students/feature_denoising/{variant}/"
+                        f"nmf_latent_cosine/{dataset}/resnet18/"
+                        f"cluster_{layer}_d{distance_code}{suffix}.yaml"
+                    )
+                    with self.subTest(path=str(path)):
+                        config = load_config(path)
+                        denoising = config.strategy.feature_denoising
+                        self.assertEqual(denoising.method, method)
+                        self.assertEqual(config.student.input_shape, shape)
+                        self.assertEqual(
+                            denoising.channel_group_distance_threshold,
+                            threshold,
+                        )
+                        self.assertEqual(denoising.evaluation_draws, 10)
+                        self.assertIn(
+                            f"nmf_latent_cosine/{dataset}/resnet18/"
+                            f"channel_groups/{layer}.pt",
+                            denoising.channel_group_path or "",
+                        )
+                        if variant == "channel_group_stratified_masking":
+                            self.assertEqual(denoising.channel_group_min_size, 1)
+                            self.assertEqual(
+                                denoising.channel_group_mask_fraction,
+                                0.25,
+                            )
+
+    def test_resnet50_nmf_stratified_configs_are_generic_students(self) -> None:
+        layer_settings = {
+            "layer2": ((512, 16, 16), "060", 0.6),
+            "layer3": ((1024, 8, 8), "060", 0.6),
+            "layer4": ((2048, 4, 4), "055", 0.55),
+        }
+        for dataset in ("cifar_10", "cifar_100"):
+            for layer, (shape, distance_code, threshold) in layer_settings.items():
+                path = Path(
+                    "configs/students/feature_denoising/"
+                    "channel_group_stratified_masking/nmf_latent_cosine/"
+                    f"{dataset}/resnet50/"
+                    f"cluster_{layer}_d{distance_code}_p025.yaml"
+                )
+                with self.subTest(path=str(path)):
+                    config = load_config(path)
+                    denoising = config.strategy.feature_denoising
+                    self.assertEqual(config.student.input_shape, shape)
+                    self.assertEqual(config.student.hidden_channels, (64,))
+                    self.assertIsNone(denoising.channel_group_index)
+                    self.assertEqual(denoising.channel_group_min_size, 1)
+                    self.assertEqual(denoising.channel_group_mask_fraction, 0.25)
+                    self.assertEqual(
+                        denoising.channel_group_distance_threshold,
+                        threshold,
+                    )
+                    self.assertEqual(denoising.evaluation_draws, 10)
+
+    def test_load_channel_groups_validates_partition_and_provenance(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "layer3.pt"
+            torch.save(
+                {
+                    "dataset": "toy_train",
+                    "split": "train",
+                    "layer": "layer3",
+                    "feature_shape": (5, 2, 2),
+                    "cut_groups": {"0.5": [[0, 2], [1], [3, 4]]},
+                },
+                path,
+            )
+            groups = load_channel_groups(
+                path,
+                torch.device("cpu"),
+                distance_threshold=0.5,
+                expected_dataset="toy_train",
+                expected_layer="layer3",
+                expected_feature_shape=(5, 2, 2),
+            )
+
+        self.assertEqual(groups.group_count, 3)
+        self.assertEqual(groups.channel_count, 5)
+        self.assertEqual(groups.group_sizes.tolist(), [2, 1, 2])
+
+    def test_load_channel_groups_cuts_nmf_linkage_at_runtime(self) -> None:
+        distances = torch.tensor(
+            [
+                [0.0, 0.1, 0.9],
+                [0.1, 0.0, 0.8],
+                [0.9, 0.8, 0.0],
+            ]
+        )
+        linkage_matrix = hierarchical_channel_linkage(distances, method="average")
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "layer2.pt"
+            torch.save(
+                {
+                    "method": "nmf_latent_cosine",
+                    "dataset": "toy_train",
+                    "split": "train",
+                    "layer": "layer2",
+                    "feature_shape": (3, 2, 2),
+                    "linkage": torch.from_numpy(linkage_matrix),
+                },
+                path,
+            )
+            groups = load_channel_groups(
+                path,
+                torch.device("cpu"),
+                distance_threshold=0.5,
+                expected_dataset="toy_train",
+                expected_layer="layer2",
+                expected_feature_shape=(3, 2, 2),
+            )
+
+        self.assertEqual(groups.group_count, 2)
+        self.assertEqual(groups.group_sizes.tolist(), [2, 1])
+
     def test_spatial_block_residual_config_rejects_shape_mismatches(self) -> None:
         path = Path(
             "configs/students/feature_denoising/feature_masking/cifar_10/"
@@ -268,7 +637,9 @@ class FeatureDenoisingTests(unittest.TestCase):
         )
 
         self.assertEqual(config.strategy.name, "feature_denoising")
-        self.assertEqual(config.strategy.feature_denoising.method, "spatial_token_prediction")
+        self.assertEqual(
+            config.strategy.feature_denoising.method, "spatial_token_prediction"
+        )
         self.assertEqual(config.student.kind, "spatial_token_predictor")
         self.assertEqual(config.student.input_shape, (512, 4, 4))
         self.assertEqual(config.strategy.feature_denoising.target_block_count, 2)
@@ -300,7 +671,9 @@ class FeatureDenoisingTests(unittest.TestCase):
                 self.assertEqual(config.student.feature_layer, layer)
                 self.assertEqual(config.student.input_shape, (channels,))
                 self.assertEqual(config.student.num_classes, channels)
-                self.assertEqual(config.strategy.feature_denoising.image_mask_block_count, 2)
+                self.assertEqual(
+                    config.strategy.feature_denoising.image_mask_block_count, 2
+                )
 
     def test_pixel_augmented_embedding_configs_match_pooled_shapes(self) -> None:
         expected = {
@@ -344,9 +717,14 @@ class FeatureDenoisingTests(unittest.TestCase):
             ),
         }
 
-        for (dataset, architecture), (teacher_classes, layer_dims) in config_cases.items():
+        for (dataset, architecture), (
+            teacher_classes,
+            layer_dims,
+        ) in config_cases.items():
             for layer, channels in layer_dims.items():
-                with self.subTest(dataset=dataset, architecture=architecture, layer=layer):
+                with self.subTest(
+                    dataset=dataset, architecture=architecture, layer=layer
+                ):
                     config = load_config(
                         Path(
                             "configs/students/feature_denoising/pixel_augmented_embedding/"
@@ -364,10 +742,14 @@ class FeatureDenoisingTests(unittest.TestCase):
                     self.assertEqual(config.student.feature_layer, layer)
                     self.assertEqual(config.student.input_shape, (channels,))
                     self.assertEqual(config.student.num_classes, channels)
-                    self.assertEqual(config.strategy.feature_denoising.rotation_degrees, 20.0)
+                    self.assertEqual(
+                        config.strategy.feature_denoising.rotation_degrees, 20.0
+                    )
                     if architecture == "vit_base_patch16_224":
                         self.assertEqual(config.dataset.image_size, 224)
-                        self.assertEqual(config.strategy.feature_denoising.embedding_pool, "cls")
+                        self.assertEqual(
+                            config.strategy.feature_denoising.embedding_pool, "cls"
+                        )
 
     def test_pixel_masked_multilayer_config_matches_concat_shape(self) -> None:
         config = load_config(
@@ -378,7 +760,10 @@ class FeatureDenoisingTests(unittest.TestCase):
         )
 
         self.assertEqual(config.strategy.name, "feature_denoising")
-        self.assertEqual(config.strategy.feature_denoising.method, "pixel_masked_multilayer_prediction")
+        self.assertEqual(
+            config.strategy.feature_denoising.method,
+            "pixel_masked_multilayer_prediction",
+        )
         self.assertEqual(config.student.kind, "mlp")
         self.assertEqual(config.student.input_shape, (768,))
         self.assertEqual(config.student.num_classes, 778)
@@ -447,7 +832,9 @@ class FeatureDenoisingTests(unittest.TestCase):
             ]
         )
         torch.testing.assert_close(batch.targets, expected_targets)
-        torch.testing.assert_close(batch.student_inputs, batch.targets * batch.keep_mask)
+        torch.testing.assert_close(
+            batch.student_inputs, batch.targets * batch.keep_mask
+        )
 
     def test_hidden_component_mse_scores_hidden_coordinates_only(self) -> None:
         predictions = torch.tensor([[100.0, 2.0, 9.0]])
@@ -480,6 +867,131 @@ class FeatureDenoisingTests(unittest.TestCase):
         self.assertAlmostEqual(hidden_fraction, 0.2, delta=0.01)
         self.assertTrue(torch.all(keep_mask.flatten(start_dim=1).sum(dim=1) < 64))
 
+    def test_channel_group_masking_hides_one_complete_group_per_sample(self) -> None:
+        groups = ChannelGroups(
+            membership=torch.tensor(
+                [
+                    [True, False, True, False, False],
+                    [False, True, False, False, False],
+                    [False, False, False, True, True],
+                ]
+            ),
+            distance_threshold=0.5,
+            source_path="toy.pt",
+        )
+        features = torch.ones(128, 5, 2, 2)
+
+        torch.manual_seed(123)
+        keep_mask, sampled_groups = sample_channel_group_keep_mask(features, groups)
+
+        hidden = (1.0 - keep_mask).squeeze(-1).squeeze(-1).bool()
+        torch.testing.assert_close(hidden, groups.membership[sampled_groups])
+        self.assertEqual(tuple(sampled_groups.shape), (128,))
+        self.assertGreater(torch.unique(sampled_groups).numel(), 1)
+
+    def test_channel_group_masking_can_fix_one_complete_group(self) -> None:
+        groups = ChannelGroups(
+            membership=torch.tensor(
+                [
+                    [True, False, True, False, False],
+                    [False, True, False, False, False],
+                    [False, False, False, True, True],
+                ]
+            ),
+            distance_threshold=0.5,
+            source_path="toy.pt",
+        )
+        features = torch.ones(16, 5, 2, 2)
+
+        first, first_indices = sample_channel_group_keep_mask(
+            features, groups, group_index=2
+        )
+        torch.manual_seed(999)
+        second, second_indices = sample_channel_group_keep_mask(
+            features, groups, group_index=2
+        )
+
+        torch.testing.assert_close(first, second)
+        torch.testing.assert_close(first_indices, torch.full((16,), 2))
+        torch.testing.assert_close(second_indices, torch.full((16,), 2))
+        torch.testing.assert_close(
+            (1.0 - first[:, :, 0, 0]).bool(),
+            groups.membership[2].expand(16, -1),
+        )
+
+    def test_channel_group_stratified_masking_samples_within_each_large_group(
+        self,
+    ) -> None:
+        group_sizes = (3, 4, 5, 8)
+        membership = torch.zeros((len(group_sizes), sum(group_sizes)), dtype=torch.bool)
+        start = 0
+        for group_index, group_size in enumerate(group_sizes):
+            membership[group_index, start : start + group_size] = True
+            start += group_size
+        groups = ChannelGroups(
+            membership=membership,
+            distance_threshold=0.5,
+            source_path="toy.pt",
+        )
+        features = torch.ones(64, sum(group_sizes), 2, 2)
+
+        torch.manual_seed(123)
+        keep_mask = sample_channel_group_stratified_keep_mask(
+            features,
+            groups,
+            min_group_size=4,
+            mask_fraction=0.25,
+        )
+
+        hidden = (1.0 - keep_mask[:, :, 0, 0]).bool()
+        expected_counts = (0, 1, 1, 2)
+        for group_index, expected_count in enumerate(expected_counts):
+            counts = hidden[:, membership[group_index]].sum(dim=1)
+            torch.testing.assert_close(
+                counts,
+                torch.full_like(counts, expected_count),
+            )
+
+    def test_channel_group_stratified_masking_can_target_one_group(self) -> None:
+        membership = torch.tensor(
+            [
+                [True, True, True, False, False, False, False],
+                [False, False, False, True, True, True, True],
+            ]
+        )
+        groups = ChannelGroups(membership, 0.5, "toy.pt")
+        features = torch.ones(32, 7, 2, 2)
+
+        keep_mask = sample_channel_group_stratified_keep_mask(
+            features,
+            groups,
+            min_group_size=4,
+            mask_fraction=0.25,
+            group_index=1,
+        )
+
+        hidden = (1.0 - keep_mask[:, :, 0, 0]).bool()
+        torch.testing.assert_close(hidden[:, :3], torch.zeros((32, 3), dtype=torch.bool))
+        torch.testing.assert_close(hidden[:, 3:].sum(dim=1), torch.ones(32, dtype=torch.long))
+
+    def test_channel_group_stratified_rounds_mask_count_to_nearest_integer(self) -> None:
+        membership = torch.ones((1, 6), dtype=torch.bool)
+        groups = ChannelGroups(membership, 0.5, "toy.pt")
+        features = torch.ones(12, 6, 1, 1)
+
+        keep_mask = sample_channel_group_stratified_keep_mask(
+            features,
+            groups,
+            min_group_size=4,
+            mask_fraction=0.25,
+            group_index=0,
+        )
+
+        torch.testing.assert_close(
+            (1.0 - keep_mask[:, :, 0, 0]).sum(dim=1),
+            torch.full((12,), 2.0),
+        )
+
     def test_hidden_component_mse_broadcasts_feature_masks(self) -> None:
         predictions = torch.zeros(1, 2, 2, 2)
         targets = torch.ones(1, 2, 2, 2)
@@ -503,6 +1015,68 @@ class FeatureDenoisingTests(unittest.TestCase):
 
         torch.testing.assert_close(batch.targets, features)
         torch.testing.assert_close(batch.student_inputs, features * batch.keep_mask)
+
+    def test_vit_patch_token_configs_use_layer12_patch_grids(self) -> None:
+        for dataset, teacher_classes in (("cifar_10", 10), ("cifar_100", 100)):
+            path = Path(
+                "configs/students/feature_denoising/patch_token_masking/"
+                f"{dataset}/vit_base_patch16_224/residual_layer12_mask_p020.yaml"
+            )
+            with self.subTest(path=str(path)):
+                config = load_config(path)
+
+                self.assertEqual(config.dataset.pre_size, 224)
+                self.assertEqual(config.dataset.image_size, 224)
+                self.assertEqual(config.dataset.batch_size, 64)
+                self.assertEqual(config.teacher.num_classes, teacher_classes)
+                self.assertEqual(config.student.kind, "feature_residual_denoiser")
+                self.assertEqual(config.student.feature_layer, "layer12")
+                self.assertEqual(config.student.input_shape, (768, 14, 14))
+                self.assertEqual(config.student.hidden_channels, (64,))
+                self.assertEqual(
+                    config.strategy.feature_denoising.method,
+                    "patch_token_masked_residual_reconstruction",
+                )
+                self.assertEqual(
+                    config.strategy.feature_denoising.mask_probability,
+                    0.2,
+                )
+
+    def test_patch_token_masking_is_bernoulli_and_shared_across_channels(self) -> None:
+        config = FeatureDenoisingConfig(
+            method="patch_token_masked_residual_reconstruction",
+            mask_probability=0.2,
+        )
+        features = torch.ones(512, 3, 14, 14)
+
+        torch.manual_seed(123)
+        batch = sample_feature_denoising_pca_batch(features, config)
+
+        self.assertEqual(tuple(batch.keep_mask.shape), (512, 1, 14, 14))
+        torch.testing.assert_close(batch.student_inputs, features * batch.keep_mask)
+        torch.testing.assert_close(batch.corrupted_features, batch.student_inputs)
+        realized_fraction = float((1.0 - batch.keep_mask).mean())
+        self.assertAlmostEqual(realized_fraction, 0.2, delta=0.01)
+        hidden_counts = (1.0 - batch.keep_mask).flatten(start_dim=1).sum(dim=1)
+        self.assertGreater(len(torch.unique(hidden_counts)), 1)
+        self.assertTrue(torch.all(hidden_counts >= 1))
+
+    def test_patch_token_reconstruction_adds_student_residual(self) -> None:
+        config = FeatureDenoisingConfig(
+            method="patch_token_masked_residual_reconstruction",
+            mask_probability=0.2,
+        )
+        features = torch.ones(2, 4, 3, 3)
+        batch = sample_feature_denoising_pca_batch(features, config)
+        student = _SameShapeZeroCorrectionStudent()
+
+        predictions = feature_denoising_predictions(student, batch, config)
+
+        torch.testing.assert_close(predictions, batch.corrupted_features)
+        self.assertAlmostEqual(
+            float(hidden_component_mse(predictions, batch.targets, batch.keep_mask)),
+            1.0,
+        )
 
     def test_spatial_block_mask_is_shared_across_channels(self) -> None:
         features = torch.zeros(512, 7, 8, 8)
@@ -604,10 +1178,9 @@ class FeatureDenoisingTests(unittest.TestCase):
                     1,
                     1,
                 ),
-                (
-                    20.0
-                    + torch.arange(channel_count, dtype=torch.float32)
-                ).reshape(1, channel_count, 1, 1),
+                (20.0 + torch.arange(channel_count, dtype=torch.float32)).reshape(
+                    1, channel_count, 1, 1
+                ),
             )
         )
         bank = _class_corruption_bank(
@@ -667,9 +1240,7 @@ class FeatureDenoisingTests(unittest.TestCase):
             features=torch.ones(3, channel_count, 2, 2),
             class_ids=torch.tensor([0, 1, 0]),
             config=FeatureDenoisingConfig(
-                method=(
-                    "confusion_channel_replacement_residual_reconstruction"
-                ),
+                method=("confusion_channel_replacement_residual_reconstruction"),
                 mask_probability=0.2,
             ),
             bank=bank,
@@ -680,17 +1251,11 @@ class FeatureDenoisingTests(unittest.TestCase):
 
     def test_class_channel_corruption_fit_and_artifact_round_trip(self) -> None:
         validation_features = torch.stack(
-            [
-                torch.full((2, 2, 2), value)
-                for value in (1.0, 1.0, 2.0, 2.0, 2.0, 2.0)
-            ]
+            [torch.full((2, 2, 2), value) for value in (1.0, 1.0, 2.0, 2.0, 2.0, 2.0)]
         )
         validation_labels = torch.tensor([0, 0, 1, 1, 2, 2])
         confusion_features = torch.stack(
-            [
-                torch.full((2, 2, 2), value)
-                for value in (2.0, 2.0, 0.0, 0.0, 2.0, 2.0)
-            ]
+            [torch.full((2, 2, 2), value) for value in (2.0, 2.0, 0.0, 0.0, 2.0, 2.0)]
         )
         confusion_labels = torch.tensor([0, 0, 1, 1, 2, 2])
         prototype_features = torch.stack(
@@ -837,7 +1402,9 @@ class FeatureDenoisingTests(unittest.TestCase):
         self.assertEqual(tuple(batch.targets.shape), (2, 6, 3))
         self.assertEqual(tuple(batch.keep_mask.shape), (2, 6, 3))
         self.assertTrue(torch.all(batch.keep_mask == 0.0))
-        self.assertEqual(tuple(batch.student_inputs["visible_tokens"].shape), (2, 16, 3))
+        self.assertEqual(
+            tuple(batch.student_inputs["visible_tokens"].shape), (2, 16, 3)
+        )
         self.assertEqual(tuple(batch.student_inputs["target_positions"].shape), (2, 6))
 
     def test_pixel_block_mask_zeros_image_regions(self) -> None:
@@ -857,7 +1424,9 @@ class FeatureDenoisingTests(unittest.TestCase):
         self.assertTrue(torch.all(hidden_fraction > 0.0))
         self.assertTrue(torch.all(hidden_fraction < 1.0))
 
-    def test_pixel_masked_embedding_batch_uses_clean_and_masked_embeddings(self) -> None:
+    def test_pixel_masked_embedding_batch_uses_clean_and_masked_embeddings(
+        self,
+    ) -> None:
         config = load_config(
             Path(
                 "configs/students/feature_denoising/pixel_masked_embedding/cifar_10/resnet18/"
@@ -879,7 +1448,9 @@ class FeatureDenoisingTests(unittest.TestCase):
             "feature_denoising_pixel_embedding_prediction_error",
         )
 
-    def test_pixel_augmented_embedding_batch_uses_clean_and_augmented_embeddings(self) -> None:
+    def test_pixel_augmented_embedding_batch_uses_clean_and_augmented_embeddings(
+        self,
+    ) -> None:
         config = load_config(
             Path(
                 "configs/students/feature_denoising/pixel_augmented_embedding/cifar_10/resnet18/"
@@ -906,7 +1477,9 @@ class FeatureDenoisingTests(unittest.TestCase):
             "feature_denoising_pixel_augmented_embedding_prediction_error",
         )
 
-    def test_pixel_masked_multilayer_batch_concatenates_context_and_targets(self) -> None:
+    def test_pixel_masked_multilayer_batch_concatenates_context_and_targets(
+        self,
+    ) -> None:
         config = load_config(
             Path(
                 "configs/students/feature_denoising/pixel_masked_multilayer/cifar_10/resnet18/"
@@ -927,7 +1500,9 @@ class FeatureDenoisingTests(unittest.TestCase):
             "feature_denoising_pixel_multilayer_prediction_error",
         )
 
-    def test_pixel_masked_multilayer_l234_batch_concatenates_context_and_targets(self) -> None:
+    def test_pixel_masked_multilayer_l234_batch_concatenates_context_and_targets(
+        self,
+    ) -> None:
         config = load_config(
             Path(
                 "configs/students/feature_denoising/pixel_masked_multilayer_l234/cifar_10/"
@@ -1105,10 +1680,7 @@ class FeatureDenoisingTests(unittest.TestCase):
             feature_denoising_score_name(
                 "confusion_channel_replacement_reconstruction"
             ),
-            (
-                "feature_denoising_confusion_channel_replacement_"
-                "reconstruction_error"
-            ),
+            ("feature_denoising_confusion_channel_replacement_reconstruction_error"),
         )
 
     def test_residual_score_export_includes_masked_identity_improvement(self) -> None:
@@ -1146,10 +1718,14 @@ class FeatureDenoisingTests(unittest.TestCase):
         self.assertNotIn("cosine_similarity", scores)
         self.assertNotIn("z_pred", scores)
         self.assertEqual(
-            feature_denoising_score_name(
-                "spatial_block_residual_reconstruction"
-            ),
+            feature_denoising_score_name("spatial_block_residual_reconstruction"),
             "feature_denoising_spatial_block_residual_reconstruction_error",
+        )
+        self.assertEqual(
+            feature_denoising_score_name(
+                "patch_token_masked_residual_reconstruction"
+            ),
+            "feature_denoising_patch_token_residual_reconstruction_error",
         )
 
     def test_channel_residual_score_export_includes_identity_improvement(self) -> None:
@@ -1181,10 +1757,52 @@ class FeatureDenoisingTests(unittest.TestCase):
         )
         self.assertNotIn("cosine_similarity", scores)
         self.assertEqual(
-            feature_denoising_score_name(
-                "channel_masked_residual_reconstruction"
-            ),
+            feature_denoising_score_name("channel_masked_residual_reconstruction"),
             "feature_denoising_channel_residual_reconstruction_error",
+        )
+
+    def test_channel_group_score_export_resamples_group_for_ten_draws(self) -> None:
+        config = FeatureDenoisingConfig(
+            method="channel_group_masked_residual_reconstruction",
+            channel_group_path="toy.pt",
+            channel_group_distance_threshold=0.5,
+            evaluation_draws=10,
+        )
+        groups = ChannelGroups(
+            membership=torch.eye(4, dtype=torch.bool),
+            distance_threshold=0.5,
+            source_path="toy.pt",
+        )
+        features = torch.ones(3, 4, 2, 2)
+        labels = torch.tensor([0, 1, 2])
+        loader = DataLoader(TensorDataset(features, labels), batch_size=3)
+
+        torch.manual_seed(123)
+        scores = collect_feature_denoising_reconstruction_scores(
+            student=_SameShapeZeroCorrectionStudent(),
+            loader=loader,
+            device=torch.device("cpu"),
+            perturbation_forwarder=_IdentityFeatureForwarder(),
+            feature_denoising_config=config,
+            channel_groups=groups,
+        )
+
+        self.assertEqual(tuple(scores["sampled_channel_group_indices"].shape), (3, 10))
+        self.assertTrue(
+            torch.all(
+                (scores["sampled_channel_group_indices"] >= 0)
+                & (scores["sampled_channel_group_indices"] < 4)
+            )
+        )
+        torch.testing.assert_close(
+            scores["raw_reconstruction_error"],
+            scores["identity_error"],
+        )
+        self.assertEqual(
+            feature_denoising_score_name(
+                "channel_group_masked_residual_reconstruction"
+            ),
+            "feature_denoising_channel_group_residual_reconstruction_error",
         )
 
     def test_confusion_channel_score_export_uses_teacher_predictions(
@@ -1212,9 +1830,7 @@ class FeatureDenoisingTests(unittest.TestCase):
                 num_classes=2,
             ),
             feature_denoising_config=FeatureDenoisingConfig(
-                method=(
-                    "confusion_channel_replacement_residual_reconstruction"
-                ),
+                method=("confusion_channel_replacement_residual_reconstruction"),
                 mask_probability=0.2,
                 evaluation_draws=1,
             ),
@@ -1306,6 +1922,7 @@ class FeatureDenoisingTests(unittest.TestCase):
         outputs = model(batch.student_inputs)
 
         self.assertEqual(tuple(outputs.shape), (2, 6, 512))
+
 
 class _ToyFeatureForwarder:
     def forward_to_features(self, images: torch.Tensor) -> torch.Tensor:

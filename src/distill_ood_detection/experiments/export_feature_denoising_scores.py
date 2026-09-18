@@ -37,7 +37,11 @@ from distill_ood_detection.distillation.nmf import (
     nmf_concept_projector_path,
 )
 from distill_ood_detection.models.student import build_student
-from distill_ood_detection.models.teacher import build_feature_forwarder, load_teacher
+from distill_ood_detection.models.teacher import (
+    build_feature_forwarder,
+    build_vit_patch_feature_forwarder,
+    load_teacher,
+)
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
 CheckpointSelection = Literal["best", "latest"]
@@ -48,6 +52,7 @@ def run_feature_denoising_score_export(
     checkpoint: CheckpointSelection = "best",
     include_train: bool = False,
     include_validation: bool = False,
+    output_dir: Path | None = None,
 ) -> dict[str, object]:
     """Export reconstruction scores for ID and configured OOD datasets."""
 
@@ -59,7 +64,8 @@ def run_feature_denoising_score_export(
     set_seed(training_defaults.seed)
     device = resolve_device(training_defaults.device)
     experiment_dir = Path(config.run_dir)
-    output_dir = experiment_dir / "feature_denoising_scores"
+    if output_dir is None:
+        output_dir = experiment_dir / "feature_denoising_scores"
     output_dir.mkdir(parents=True, exist_ok=True)
     image_normalization = dataset_normalization(config.dataset)
 
@@ -82,9 +88,19 @@ def run_feature_denoising_score_export(
     )
 
     teacher = load_teacher(config.teacher, device)
-    perturbation_forwarder = build_feature_forwarder(
-        teacher, config.student.feature_layer
-    )
+    if (
+        config.strategy.feature_denoising.method
+        == "patch_token_masked_residual_reconstruction"
+    ):
+        perturbation_forwarder = build_vit_patch_feature_forwarder(
+            teacher,
+            config.student.feature_layer,
+        )
+    else:
+        perturbation_forwarder = build_feature_forwarder(
+            teacher,
+            config.student.feature_layer,
+        )
     perturbation_forwarder.to(device)
     perturbation_forwarder.eval()
     is_knn = config.strategy.feature_denoising.method in {

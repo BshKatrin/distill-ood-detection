@@ -75,6 +75,9 @@ FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RESIDUAL_RECONSTRUCTION_SCORE = 
 FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_SCORE = (
     "feature_denoising_spatial_token_prediction_error"
 )
+FEATURE_DENOISING_PATCH_TOKEN_RESIDUAL_RECONSTRUCTION_SCORE = (
+    "feature_denoising_patch_token_residual_reconstruction_error"
+)
 FEATURE_DENOISING_PIXEL_EMBEDDING_PREDICTION_SCORE = (
     "feature_denoising_pixel_embedding_prediction_error"
 )
@@ -499,6 +502,7 @@ def collect_feature_denoising_reconstruction_scores(
                 draw_errors.append(prediction_error)
                 if feature_denoising_config.method in {
                     "spatial_block_residual_reconstruction",
+                    "patch_token_masked_residual_reconstruction",
                     "channel_masked_residual_reconstruction",
                     "channel_group_masked_residual_reconstruction",
                     "channel_group_stratified_masked_residual_reconstruction",
@@ -994,6 +998,16 @@ def sample_feature_denoising_pca_batch(
     elif config.method == "spatial_masked_reconstruction":
         targets = features
         keep_mask = sample_spatial_keep_mask(targets, config.mask_probability)
+    elif config.method == "patch_token_masked_residual_reconstruction":
+        targets = features
+        keep_mask = sample_spatial_keep_mask(targets, config.mask_probability)
+        corrupted_features = targets * keep_mask
+        return FeatureDenoisingPcaBatch(
+            student_inputs=corrupted_features,
+            targets=targets,
+            keep_mask=keep_mask,
+            corrupted_features=corrupted_features,
+        )
     elif config.method == "spatial_block_residual_reconstruction":
         if feature_normalizer is None:
             raise ValueError(
@@ -1922,10 +1936,12 @@ def collect_channel_group_cluster_improvements(
     student.eval()
     perturbation_forwarder.eval()
     labels: list[torch.Tensor] = []
+    raw_reconstruction_errors: list[torch.Tensor] = []
     absolute_improvements: list[torch.Tensor] = []
     relative_improvements: list[torch.Tensor] = []
     for images, batch_labels in loader:
         features = _teacher_features(perturbation_forwarder, images.to(device))
+        draw_raw: list[torch.Tensor] = []
         draw_absolute: list[torch.Tensor] = []
         draw_relative: list[torch.Tensor] = []
         for _ in range(feature_denoising_config.evaluation_draws):
@@ -1954,9 +1970,13 @@ def collect_channel_group_cluster_improvements(
                 channel_groups,
             )
             improvement = identity_error - raw_error
+            draw_raw.append(raw_error)
             draw_absolute.append(improvement)
             draw_relative.append(improvement / identity_error.clamp_min(1.0e-12))
         labels.append(batch_labels.cpu())
+        raw_reconstruction_errors.append(
+            torch.stack(draw_raw, dim=1).mean(dim=1).cpu()
+        )
         absolute_improvements.append(
             torch.stack(draw_absolute, dim=1).mean(dim=1).cpu()
         )
@@ -1965,6 +1985,7 @@ def collect_channel_group_cluster_improvements(
         )
     return {
         "labels": torch.cat(labels, dim=0),
+        "raw_reconstruction_error": torch.cat(raw_reconstruction_errors, dim=0),
         "absolute_improvement": torch.cat(absolute_improvements, dim=0),
         "relative_improvement": torch.cat(relative_improvements, dim=0),
     }
@@ -2172,6 +2193,7 @@ def feature_denoising_predictions(
     outputs = student(batch.student_inputs)
     if config.method not in {
         "spatial_block_residual_reconstruction",
+        "patch_token_masked_residual_reconstruction",
         "channel_masked_residual_reconstruction",
         "channel_group_masked_residual_reconstruction",
         "channel_group_stratified_masked_residual_reconstruction",
@@ -2234,6 +2256,8 @@ def feature_denoising_score_name(method: str) -> str:
         return FEATURE_DENOISING_CONFUSION_CHANNEL_REPLACEMENT_RESIDUAL_RECONSTRUCTION_SCORE
     if method == "spatial_token_prediction":
         return FEATURE_DENOISING_SPATIAL_TOKEN_PREDICTION_SCORE
+    if method == "patch_token_masked_residual_reconstruction":
+        return FEATURE_DENOISING_PATCH_TOKEN_RESIDUAL_RECONSTRUCTION_SCORE
     if method == "pixel_masked_embedding_prediction":
         return FEATURE_DENOISING_PIXEL_EMBEDDING_PREDICTION_SCORE
     if method == "pixel_augmented_embedding_prediction":

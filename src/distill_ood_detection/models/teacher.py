@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-import torch
-from torch import nn
-from torchvision.models.resnet import BasicBlock, Bottleneck, ResNet
+import math
+from pathlib import Path
 
+import torch
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
 from safetensors.torch import load_file
+from torch import nn
+from torchvision.models.resnet import BasicBlock, Bottleneck, ResNet
 
 from distill_ood_detection.config import TeacherConfig
 from distill_ood_detection.utils import get_hf_token
@@ -46,6 +48,20 @@ class CifarResNet50(ResNet):
         self.maxpool = nn.Identity()
 
 
+class ImageNetResNet18(ResNet):
+    """Standard torchvision ResNet-18 used by the OpenOOD ImageNet-200 model."""
+
+    def __init__(self, num_classes: int = 200) -> None:
+        super().__init__(block=BasicBlock, layers=[2, 2, 2, 2], num_classes=num_classes)
+
+
+class ImageNetResNet50(ResNet):
+    """Standard torchvision ResNet-50 used by the ImageNet-1K benchmark."""
+
+    def __init__(self, num_classes: int = 1000) -> None:
+        super().__init__(block=Bottleneck, layers=[3, 4, 6, 3], num_classes=num_classes)
+
+
 class TeacherFeatureExtractor(nn.Module):
     """Return teacher logits and intermediate features from one forward pass."""
 
@@ -67,7 +83,9 @@ class TeacherFeatureExtractor(nn.Module):
         self._features = None
         logits = self.teacher(images)
         if self._features is None:
-            raise RuntimeError(f"Feature hook did not run for layer: {self.feature_layer}")
+            raise RuntimeError(
+                f"Feature hook did not run for layer: {self.feature_layer}"
+            )
         return logits, self._features
 
     def close(self) -> None:
@@ -199,6 +217,56 @@ class VitClsFeatureForwarder(nn.Module):
         return hidden_states[self.layer_index][:, 0, :]
 
 
+class VitPatchFeatureForwarder(nn.Module):
+    """Return a 2D grid containing only ViT patch-token activations."""
+
+    def __init__(self, teacher: HuggingFaceImageClassifier, feature_layer: str) -> None:
+        super().__init__()
+        layer_index = _vit_layer_index(feature_layer)
+        if layer_index < 1:
+            raise ValueError("ViT feature_layer must refer to encoder layer 1 or later")
+        self.teacher = teacher
+        self.feature_layer = feature_layer
+        self.layer_index = layer_index
+
+    def forward(self, images: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Return ``(teacher_logits, patch_grid)`` for the configured layer."""
+
+        outputs = self.teacher.forward_with_hidden_states(images)
+        return outputs.logits, self._patch_grid_from_outputs(outputs)
+
+    def forward_to_features(self, images: torch.Tensor) -> torch.Tensor:
+        """Return patch tokens as a ``(B, D, H_p, W_p)`` spatial grid."""
+
+        outputs = self.teacher.forward_with_hidden_states(images)
+        return self._patch_grid_from_outputs(outputs)
+
+    def _patch_grid_from_outputs(self, outputs: object) -> torch.Tensor:
+        hidden_states = getattr(outputs, "hidden_states", None)
+        if hidden_states is None:
+            raise RuntimeError("ViT teacher did not return hidden states")
+        if self.layer_index >= len(hidden_states):
+            max_layer = len(hidden_states) - 1
+            raise ValueError(
+                f"ViT feature_layer {self.feature_layer!r} is out of range; "
+                f"maximum encoder layer is layer{max_layer}"
+            )
+        patch_tokens = hidden_states[self.layer_index][:, 1:, :]
+        patch_count = patch_tokens.shape[1]
+        grid_size = math.isqrt(patch_count)
+        if grid_size * grid_size != patch_count:
+            raise ValueError(
+                "ViT patch-token count must form a square spatial grid; "
+                f"got {patch_count} tokens"
+            )
+        return patch_tokens.transpose(1, 2).reshape(
+            patch_tokens.shape[0],
+            patch_tokens.shape[2],
+            grid_size,
+            grid_size,
+        )
+
+
 def build_feature_forwarder(teacher: nn.Module, feature_layer: str) -> nn.Module:
     """Create a feature forwarder matching the teacher architecture."""
 
@@ -207,13 +275,28 @@ def build_feature_forwarder(teacher: nn.Module, feature_layer: str) -> nn.Module
     return ResNetFeatureForwarder(teacher, feature_layer)
 
 
+def build_vit_patch_feature_forwarder(
+    teacher: nn.Module,
+    feature_layer: str,
+) -> VitPatchFeatureForwarder:
+    """Create a ViT forwarder that excludes CLS and returns a patch grid."""
+
+    if not isinstance(teacher, HuggingFaceImageClassifier):
+        raise ValueError("ViT patch-token reconstruction requires a ViT teacher")
+    return VitPatchFeatureForwarder(teacher, feature_layer)
+
+
 def load_teacher(config: TeacherConfig, device: torch.device) -> nn.Module:
-    """Load a pretrained CIFAR teacher from Hugging Face."""
+    """Load a pretrained teacher from a local checkpoint or Hugging Face."""
 
     model = build_teacher_model(config)
-    architecture = _infer_architecture_from_hf_model_id(config.hf_model_id)
-    if architecture in {"resnet18", "resnet50"}:
-        state_dict = _download_state_dict(config)
+    architecture = _resolve_teacher_architecture(config)
+    if architecture != "vit":
+        state_dict = (
+            _load_local_state_dict(config.checkpoint_path)
+            if config.checkpoint_path is not None
+            else _download_state_dict(config)
+        )
         model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -223,13 +306,17 @@ def load_teacher(config: TeacherConfig, device: torch.device) -> nn.Module:
 
 
 def build_teacher_model(config: TeacherConfig) -> nn.Module:
-    """Build one teacher model inferred from the Hugging Face model id."""
+    """Build the configured teacher architecture without loading its weights."""
 
-    architecture = _infer_architecture_from_hf_model_id(config.hf_model_id)
-    if architecture == "resnet18":
+    architecture = _resolve_teacher_architecture(config)
+    if architecture == "resnet18_cifar":
         return CifarResNet18(num_classes=config.num_classes)
-    if architecture == "resnet50":
+    if architecture == "resnet50_cifar":
         return CifarResNet50(num_classes=config.num_classes)
+    if architecture == "resnet18_imagenet":
+        return ImageNetResNet18(num_classes=config.num_classes)
+    if architecture == "resnet50_imagenet":
+        return ImageNetResNet50(num_classes=config.num_classes)
     if architecture == "vit":
         try:
             from transformers import AutoModelForImageClassification
@@ -265,6 +352,37 @@ def _download_state_dict(config: TeacherConfig) -> dict[str, torch.Tensor]:
             token=token,
         )
         return torch.load(path, map_location="cpu", weights_only=True)
+
+
+def _load_local_state_dict(checkpoint_path: str) -> dict[str, torch.Tensor]:
+    path = Path(checkpoint_path).expanduser()
+    if not path.is_file():
+        raise FileNotFoundError(f"Teacher checkpoint not found: {path}")
+    payload = torch.load(path, map_location="cpu", weights_only=True)
+    if isinstance(payload, dict) and "state_dict" in payload:
+        payload = payload["state_dict"]
+    if not isinstance(payload, dict) or not all(
+        isinstance(key, str) and isinstance(value, torch.Tensor)
+        for key, value in payload.items()
+    ):
+        raise ValueError(f"Unsupported teacher checkpoint format: {path}")
+    state_dict = dict(payload)
+    if state_dict and all(key.startswith("module.") for key in state_dict):
+        state_dict = {
+            key.removeprefix("module."): value for key, value in state_dict.items()
+        }
+    return state_dict
+
+
+def _resolve_teacher_architecture(config: TeacherConfig) -> str:
+    if config.architecture != "auto":
+        return config.architecture
+    inferred = _infer_architecture_from_hf_model_id(config.hf_model_id)
+    return {
+        "resnet18": "resnet18_cifar",
+        "resnet50": "resnet50_cifar",
+        "vit": "vit",
+    }[inferred]
 
 
 def _infer_architecture_from_hf_model_id(hf_model_id: str) -> str:

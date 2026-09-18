@@ -55,9 +55,21 @@ class PerturbationTests(unittest.TestCase):
             with self.subTest(path=str(path)):
                 config = load_config(path)
                 architecture = "resnet50" if "resnet50" in path.parts else "resnet18"
+                config_feature_shapes = feature_shapes
+                if {"image_net_1k", "image_net_200"}.intersection(path.parts):
+                    config_feature_shapes = {
+                        ("resnet18", "layer1"): (64, 56, 56),
+                        ("resnet18", "layer2"): (128, 28, 28),
+                        ("resnet18", "layer3"): (256, 14, 14),
+                        ("resnet18", "layer4"): (512, 7, 7),
+                        ("resnet50", "layer1"): (256, 56, 56),
+                        ("resnet50", "layer2"): (512, 28, 28),
+                        ("resnet50", "layer3"): (1024, 14, 14),
+                        ("resnet50", "layer4"): (2048, 7, 7),
+                    }
                 perturbation = config.strategy.perturbation
                 if perturbation.method == "clipping":
-                    final_channels, final_height, final_width = feature_shapes[
+                    final_channels, final_height, final_width = config_feature_shapes[
                         (architecture, "layer4")
                     ]
                     embedding_dim = (
@@ -67,7 +79,7 @@ class PerturbationTests(unittest.TestCase):
                     )
                     perturbation_dim = 0
                     for layer_name, layer_config in perturbation.clipping_layers.items():
-                        channels, height, width = feature_shapes[
+                        channels, height, width = config_feature_shapes[
                             (architecture, layer_name)
                         ]
                         if layer_config.clipping_mode == "constant":
@@ -88,7 +100,7 @@ class PerturbationTests(unittest.TestCase):
                     continue
 
                 feature_layer = config.student.feature_layer
-                feature_shape = feature_shapes.get((architecture, feature_layer))
+                feature_shape = config_feature_shapes.get((architecture, feature_layer))
                 if feature_shape is None:
                     self.fail(f"Unexpected perturbation feature layer in {path}: {feature_layer}")
                 channels, height, width = feature_shape

@@ -3,18 +3,26 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import torch
 from torch import nn
 
+from distill_ood_detection.config import TeacherConfig
 from distill_ood_detection.models.teacher import (
     CifarResNet18,
     CifarResNet50,
     HuggingFaceImageClassifier,
+    ImageNetResNet18,
+    ImageNetResNet50,
     ResNetFeatureForwarder,
     TeacherFeatureExtractor,
     VitClsFeatureForwarder,
+    VitPatchFeatureForwarder,
     _infer_architecture_from_hf_model_id,
+    build_teacher_model,
+    load_teacher,
 )
 
 
@@ -130,6 +138,17 @@ class TeacherFeatureExtractorTests(unittest.TestCase):
         self.assertEqual(tuple(features.shape), (2, 7))
         torch.testing.assert_close(features, torch.full((2, 7), 6.0))
 
+    def test_vit_patch_forwarder_excludes_cls_and_builds_spatial_grid(self) -> None:
+        teacher = HuggingFaceImageClassifier(ToyVitTeacher())
+        forwarder = VitPatchFeatureForwarder(teacher, "layer12")
+        images = torch.randn(2, 3, 224, 224)
+
+        logits, features = forwarder(images)
+
+        self.assertEqual(tuple(logits.shape), (2, 3))
+        self.assertEqual(tuple(features.shape), (2, 7, 2, 2))
+        torch.testing.assert_close(features, torch.full((2, 7, 2, 2), 12.0))
+
     def test_infers_architecture_from_hf_model_id(self) -> None:
         self.assertEqual(
             _infer_architecture_from_hf_model_id("edadaltocg/resnet18_cifar10"),
@@ -140,9 +159,53 @@ class TeacherFeatureExtractorTests(unittest.TestCase):
             "resnet50",
         )
         self.assertEqual(
-            _infer_architecture_from_hf_model_id("nateraw/vit-base-patch16-224-cifar10"),
+            _infer_architecture_from_hf_model_id(
+                "nateraw/vit-base-patch16-224-cifar10"
+            ),
             "vit",
         )
+
+    def test_builds_standard_imagenet_resnet18_stem(self) -> None:
+        model = build_teacher_model(
+            TeacherConfig(architecture="resnet18_imagenet", num_classes=200)
+        )
+
+        self.assertIsInstance(model, ImageNetResNet18)
+        self.assertEqual(model.conv1.kernel_size, (7, 7))
+        self.assertEqual(model.conv1.stride, (2, 2))
+        self.assertEqual(model.fc.out_features, 200)
+
+    def test_loads_local_imagenet_resnet18_checkpoint(self) -> None:
+        source = ImageNetResNet18(num_classes=3)
+        with TemporaryDirectory() as directory:
+            checkpoint_path = Path(directory) / "best.ckpt"
+            torch.save(source.state_dict(), checkpoint_path)
+            loaded = load_teacher(
+                TeacherConfig(
+                    architecture="resnet18_imagenet",
+                    checkpoint_path=str(checkpoint_path),
+                    num_classes=3,
+                ),
+                torch.device("cpu"),
+            )
+
+        torch.testing.assert_close(loaded.conv1.weight, source.conv1.weight)
+        self.assertFalse(loaded.training)
+        self.assertTrue(
+            all(not parameter.requires_grad for parameter in loaded.parameters())
+        )
+
+    def test_builds_standard_imagenet_resnet50(self) -> None:
+        model = build_teacher_model(
+            TeacherConfig(architecture="resnet50_imagenet", num_classes=1000)
+        )
+
+        self.assertIsInstance(model, ImageNetResNet50)
+        self.assertEqual(model.conv1.kernel_size, (7, 7))
+        self.assertEqual(model.conv1.stride, (2, 2))
+        self.assertEqual(len(model.layer3), 6)
+        self.assertEqual(model.fc.in_features, 2048)
+        self.assertEqual(model.fc.out_features, 1000)
 
     def test_rejects_unknown_teacher_architecture(self) -> None:
         with self.assertRaises(ValueError):

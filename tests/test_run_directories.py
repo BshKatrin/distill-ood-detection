@@ -16,7 +16,14 @@ class RunDirectoryConfigTests(unittest.TestCase):
         for config_path in sorted(Path("configs").rglob("*.yaml")):
             with config_path.open() as file:
                 config = yaml.safe_load(file)
-            expected = Path("runs") / config_path.relative_to("configs").with_suffix("")
+            if "run_dir" not in config:
+                continue
+            config_identity = config_path.relative_to("configs").with_suffix("")
+            if config.get("strategy", {}).get("name") == "subspace_ensemble":
+                config_identity = config_identity.with_name(
+                    config_identity.name.removesuffix("_partitioned")
+                ) / config["strategy"]["subspace_ensemble"]["assignment"]
+            expected = Path("runs") / config_identity
             self.assertEqual(Path(config["run_dir"]), expected, config_path)
             self.assertNotIn(config["run_dir"], run_dirs, config_path)
             run_dirs.add(config["run_dir"])

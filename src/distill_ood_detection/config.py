@@ -34,6 +34,7 @@ FeatureDenoisingMethod = Literal[
     "confusion_channel_replacement_reconstruction",
     "confusion_channel_replacement_residual_reconstruction",
     "spatial_token_prediction",
+    "patch_token_masked_residual_reconstruction",
     "pixel_masked_embedding_prediction",
     "pixel_augmented_embedding_prediction",
     "pixel_masked_multilayer_prediction",
@@ -49,7 +50,29 @@ SubspaceEnsembleMethod = Literal[
 SubspaceAssignment = Literal["ordered", "partitioned"]
 PixelAugmentationMethod = Literal["affine", "pixmix"]
 TreeDistillationMode = Literal["logits"]
-OODDatasetName = Literal["cifar10", "cifar100", "mnist", "svhn"]
+OODDatasetName = Literal[
+    "cifar10",
+    "cifar100",
+    "mnist",
+    "svhn",
+    "tin",
+    "texture",
+    "places365",
+    "ssb_hard",
+    "ninco",
+    "inaturalist",
+    "textures",
+    "openimage_o",
+]
+OODDatasetGroup = Literal["validation", "near", "far"]
+TeacherArchitecture = Literal[
+    "auto",
+    "resnet18_cifar",
+    "resnet50_cifar",
+    "resnet18_imagenet",
+    "resnet50_imagenet",
+    "vit",
+]
 StrategyName = Literal[
     "baseline",
     "perturbation",
@@ -81,11 +104,23 @@ LEGACY_METHOD_ALIASES: dict[str, DistillationMethod] = {
 
 
 @dataclass(frozen=True)
+class ImageListConfig:
+    """One image-list split and the directory containing its images."""
+
+    imglist_path: str
+    data_dir: str | None = None
+    strip_prefix: str | None = None
+    basename_search_dir: str | None = None
+
+
+@dataclass(frozen=True)
 class OODDatasetConfig:
     """Out-of-distribution dataset associated with the ID dataset."""
 
     name: OODDatasetName
     split: str = "test"
+    group: OODDatasetGroup | None = None
+    image_list: ImageListConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -98,6 +133,7 @@ class DatasetConfig:
     num_workers: int = 2
     validation_fraction: float = 0.1
     ood_datasets: tuple[OODDatasetConfig, ...] = field(default_factory=tuple)
+    image_lists: dict[str, ImageListConfig] = field(default_factory=dict)
     pre_size: int | None = None
     image_size: int | None = None
     normalization: (
@@ -112,6 +148,8 @@ class TeacherConfig:
     hf_model_id: str = "edadaltocg/resnet18_cifar10"
     revision: str = "main"
     num_classes: int = 10
+    architecture: TeacherArchitecture = "auto"
+    checkpoint_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -747,6 +785,7 @@ def parse_config(raw: dict[str, Any]) -> ExperimentConfig:
     student = _parse_student_config(student_raw, strategy=strategy)
     if strategy.name == "feature_denoising" and strategy.feature_denoising.method in {
         "spatial_block_residual_reconstruction",
+        "patch_token_masked_residual_reconstruction",
         "channel_masked_residual_reconstruction",
         "channel_group_masked_residual_reconstruction",
         "channel_group_stratified_masked_residual_reconstruction",
@@ -945,9 +984,19 @@ def _parse_dataset_config(raw: dict[str, Any]) -> DatasetConfig:
 
     dataset_raw = raw.copy()
     if "ood_datasets" in dataset_raw:
-        dataset_raw["ood_datasets"] = tuple(
-            OODDatasetConfig(**item) for item in dataset_raw["ood_datasets"]
-        )
+        ood_datasets = []
+        for item in dataset_raw["ood_datasets"]:
+            item_raw = item.copy()
+            image_list_raw = item_raw.get("image_list")
+            if image_list_raw is not None:
+                item_raw["image_list"] = ImageListConfig(**image_list_raw)
+            ood_datasets.append(OODDatasetConfig(**item_raw))
+        dataset_raw["ood_datasets"] = tuple(ood_datasets)
+    if "image_lists" in dataset_raw:
+        dataset_raw["image_lists"] = {
+            split: ImageListConfig(**image_list)
+            for split, image_list in dataset_raw["image_lists"].items()
+        }
     if "normalization" in dataset_raw and dataset_raw["normalization"] is not None:
         mean, std = dataset_raw["normalization"]
         dataset_raw["normalization"] = (tuple(mean), tuple(std))
@@ -1173,6 +1222,7 @@ def _parse_strategy_config(raw: dict[str, Any]) -> StrategyConfig:
         "confusion_channel_replacement_reconstruction",
         "confusion_channel_replacement_residual_reconstruction",
         "spatial_token_prediction",
+        "patch_token_masked_residual_reconstruction",
         "pixel_masked_embedding_prediction",
         "pixel_augmented_embedding_prediction",
         "pixel_masked_multilayer_prediction",

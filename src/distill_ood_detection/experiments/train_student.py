@@ -54,6 +54,7 @@ from distill_ood_detection.models.student import build_student
 from distill_ood_detection.models.teacher import (
     TeacherFeatureExtractor,
     build_feature_forwarder,
+    build_vit_patch_feature_forwarder,
     load_teacher,
 )
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
@@ -202,6 +203,17 @@ def run_experiment(
         and config.strategy.perturbation.method == "clipping"
     ):
         perturbation_forwarder = build_feature_forwarder(teacher, "layer4")
+    elif (
+        config.strategy.name == "feature_denoising"
+        and config.strategy.feature_denoising.method
+        == "patch_token_masked_residual_reconstruction"
+    ):
+        if config.student.feature_layer is None:
+            raise ValueError("student.feature_layer is required for this strategy")
+        perturbation_forwarder = build_vit_patch_feature_forwarder(
+            teacher,
+            config.student.feature_layer,
+        )
     elif config.strategy.name in {
         "perturbation",
         "feature_denoising",

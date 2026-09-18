@@ -46,6 +46,7 @@ def run_teacher_probability_export(
                 "model": "teacher",
                 "dataset": named_loader.name,
                 "split": named_loader.split,
+                "group": named_loader.group,
                 "teacher": asdict(config.teacher),
             },
         )
@@ -86,5 +87,6 @@ def export_loader_probabilities(
     return {
         "dataset": named_loader.name,
         "split": named_loader.split,
+        "group": named_loader.group,
         "path": str(path),
     }
