@@ -1,0 +1,4605 @@
+{
+  "completed": [
+    {
+      "metrics_path": "runs/students/perturbation/pixel/augmentation/cifar_10/resnet50/linear_layer4_pixel_augmentation_clean_target/evaluations/openood_v1_5/metrics/mse_logits_unperturbed_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/perturbation/pixel/augmentation/cifar_10/resnet50/linear_layer4_pixel_augmentation_clean_target/evaluations/openood_v1_5/compact_ood_scores/unperturbed/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": "mse_logits",
+        "experiment_name": "linear_layer4_pixel_augmentation_clean_target_student_resnet50_cifar10",
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "unperturbed",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 9000,
+          "mnist_test": 70000,
+          "places365_test": 35195,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 7793
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/perturbation/pixel/augmentation/cifar_10/resnet50/linear_layer4_pixel_augmentation_clean_target",
+        "scores": {
+          "absolute_energy_gap": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.4106752511735666,
+                "aupr_out": 0.43914608367690433,
+                "auroc": 0.3770333950617284,
+                "fpr95": 0.9816666666666667
+              },
+              "mnist_test": {
+                "aupr_in": 0.07361463226791536,
+                "aupr_out": 0.8073491742919626,
+                "auroc": 0.2820588158730159,
+                "fpr95": 0.9873333333333333
+              },
+              "places365_test": {
+                "aupr_in": 0.13877157107757493,
+                "aupr_out": 0.700912856807965,
+                "auroc": 0.29947810768575084,
+                "fpr95": 0.9854444444444445
+              },
+              "svhn_test": {
+                "aupr_in": 0.3046358499113759,
+                "aupr_out": 0.8445195843872249,
+                "auroc": 0.6319652180222632,
+                "fpr95": 0.9624444444444444
+              },
+              "texture_test": {
+                "aupr_in": 0.6045976915166352,
+                "aupr_out": 0.4919050148318397,
+                "auroc": 0.5369664992119779,
+                "fpr95": 0.9735555555555555
+              },
+              "tin_test": {
+                "aupr_in": 0.445967497401568,
+                "aupr_out": 0.4032222515505027,
+                "auroc": 0.37763821520737983,
+                "fpr95": 0.981
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.28040493619337536,
+                "aupr_out": 0.711171657579748,
+                "auroc": 0.437617160198252,
+                "fpr95": 0.9771944444444445
+              },
+              "near": {
+                "aupr_in": 0.42832137428756734,
+                "aupr_out": 0.4211841676137035,
+                "auroc": 0.3773358051345541,
+                "fpr95": 0.9813333333333334
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "absolute_max_probability_difference": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8686337324847822,
+                "aupr_out": 0.8321510160546448,
+                "auroc": 0.8686509197530865,
+                "fpr95": 0.4678888888888889
+              },
+              "mnist_test": {
+                "aupr_in": 0.790627059351056,
+                "aupr_out": 0.9737521544680202,
+                "auroc": 0.9029105261904762,
+                "fpr95": 0.24433333333333335
+              },
+              "places365_test": {
+                "aupr_in": 0.724202607742778,
+                "aupr_out": 0.9504446835501639,
+                "auroc": 0.8800917002099414,
+                "fpr95": 0.3831111111111111
+              },
+              "svhn_test": {
+                "aupr_in": 0.868312596736563,
+                "aupr_out": 0.960011918286153,
+                "auroc": 0.9234806776275353,
+                "fpr95": 0.22566666666666665
+              },
+              "texture_test": {
+                "aupr_in": 0.9264701342913376,
+                "aupr_out": 0.7979336986287345,
+                "auroc": 0.8894730102442868,
+                "fpr95": 0.36477777777777776
+              },
+              "tin_test": {
+                "aupr_in": 0.902491715137396,
+                "aupr_out": 0.8268210834098524,
+                "auroc": 0.8838657484637209,
+                "fpr95": 0.38422222222222224
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8274030995304337,
+                "aupr_out": 0.9205356137332679,
+                "auroc": 0.8989889785680599,
+                "fpr95": 0.3044722222222222
+              },
+              "near": {
+                "aupr_in": 0.885562723811089,
+                "aupr_out": 0.8294860497322486,
+                "auroc": 0.8762583341084037,
+                "fpr95": 0.4260555555555556
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "energy_gap": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.3865729553208423,
+                "aupr_out": 0.3938155747835169,
+                "auroc": 0.3097963209876543,
+                "fpr95": 0.9802222222222222
+              },
+              "mnist_test": {
+                "aupr_in": 0.14040925961133888,
+                "aupr_out": 0.8219220718487048,
+                "auroc": 0.346622903968254,
+                "fpr95": 0.8992222222222223
+              },
+              "places365_test": {
+                "aupr_in": 0.15040386024373464,
+                "aupr_out": 0.6928626388203853,
+                "auroc": 0.30465395968493003,
+                "fpr95": 0.956
+              },
+              "svhn_test": {
+                "aupr_in": 0.14491792574275356,
+                "aupr_out": 0.5441601152951286,
+                "auroc": 0.07651637727924607,
+                "fpr95": 0.9985555555555555
+              },
+              "texture_test": {
+                "aupr_in": 0.5286987887049746,
+                "aupr_out": 0.41334770692029066,
+                "auroc": 0.4172426516942474,
+                "fpr95": 0.9916666666666667
+              },
+              "tin_test": {
+                "aupr_in": 0.4257422034476078,
+                "aupr_out": 0.3657884878101061,
+                "auroc": 0.3193522249312061,
+                "fpr95": 0.9785555555555555
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.2411074585757004,
+                "aupr_out": 0.6180731332211273,
+                "auroc": 0.28625897315666937,
+                "fpr95": 0.9613611111111111
+              },
+              "near": {
+                "aupr_in": 0.40615757938422503,
+                "aupr_out": 0.3798020312968115,
+                "auroc": 0.3145742729594302,
+                "fpr95": 0.9793888888888889
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "logit_l2_distance": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.6113937843616182,
+                "aupr_out": 0.6379586801984942,
+                "auroc": 0.6465707160493827,
+                "fpr95": 0.902
+              },
+              "mnist_test": {
+                "aupr_in": 0.07299405011550689,
+                "aupr_out": 0.7939800375823419,
+                "auroc": 0.27269705,
+                "fpr95": 0.9894444444444445
+              },
+              "places365_test": {
+                "aupr_in": 0.2340599516721929,
+                "aupr_out": 0.815734059443999,
+                "auroc": 0.5534274549730864,
+                "fpr95": 0.929
+              },
+              "svhn_test": {
+                "aupr_in": 0.7107870032119157,
+                "aupr_out": 0.9209945765610997,
+                "auroc": 0.847199557809192,
+                "fpr95": 0.5087777777777778
+              },
+              "texture_test": {
+                "aupr_in": 0.8748677824758903,
+                "aupr_out": 0.7632707016565698,
+                "auroc": 0.8322405141843972,
+                "fpr95": 0.6508888888888889
+              },
+              "tin_test": {
+                "aupr_in": 0.6524341865628847,
+                "aupr_out": 0.602166402226805,
+                "auroc": 0.6490326860287723,
+                "fpr95": 0.8948888888888888
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.4731771968688764,
+                "aupr_out": 0.8234948438110026,
+                "auroc": 0.626391144241669,
+                "fpr95": 0.7695277777777778
+              },
+              "near": {
+                "aupr_in": 0.6319139854622514,
+                "aupr_out": 0.6200625412126496,
+                "auroc": 0.6478017010390775,
+                "fpr95": 0.8984444444444444
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "max_probability_difference": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.5027102562773588,
+                "aupr_out": 0.6966741197966385,
+                "auroc": 0.6013057407407407,
+                "fpr95": 0.9913333333333333
+              },
+              "mnist_test": {
+                "aupr_in": 0.19034766585812582,
+                "aupr_out": 0.956677337964063,
+                "auroc": 0.7368137309523809,
+                "fpr95": 0.9851111111111112
+              },
+              "places365_test": {
+                "aupr_in": 0.24658251939280454,
+                "aupr_out": 0.8984953445769914,
+                "auroc": 0.6513375179555178,
+                "fpr95": 0.9897777777777778
+              },
+              "svhn_test": {
+                "aupr_in": 0.18289521492560754,
+                "aupr_out": 0.7236822252086089,
+                "auroc": 0.3001273560745749,
+                "fpr95": 0.9975555555555555
+              },
+              "texture_test": {
+                "aupr_in": 0.585796772558757,
+                "aupr_out": 0.6041683697356537,
+                "auroc": 0.5690861111111111,
+                "fpr95": 0.9955555555555555
+              },
+              "tin_test": {
+                "aupr_in": 0.5418585760206908,
+                "aupr_out": 0.6846127671279112,
+                "auroc": 0.6137517145016183,
+                "fpr95": 0.9932222222222222
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.30140554318382373,
+                "aupr_out": 0.7957558193713292,
+                "auroc": 0.5643411790233962,
+                "fpr95": 0.9920000000000001
+              },
+              "near": {
+                "aupr_in": 0.5222844161490248,
+                "aupr_out": 0.6906434434622748,
+                "auroc": 0.6075287276211795,
+                "fpr95": 0.9922777777777778
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "student_energy": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8563064494857477,
+                "aupr_out": 0.8616870350823553,
+                "auroc": 0.8706545925925926,
+                "fpr95": 0.5654444444444444
+              },
+              "mnist_test": {
+                "aupr_in": 0.7596124824196862,
+                "aupr_out": 0.9878619027558386,
+                "auroc": 0.9307223261904762,
+                "fpr95": 0.25522222222222224
+              },
+              "places365_test": {
+                "aupr_in": 0.7450360628475786,
+                "aupr_out": 0.9686413286019878,
+                "auroc": 0.9045572792852519,
+                "fpr95": 0.4003333333333333
+              },
+              "svhn_test": {
+                "aupr_in": 0.9229264583757177,
+                "aupr_out": 0.9827133138895516,
+                "auroc": 0.9612130753602403,
+                "fpr95": 0.14555555555555555
+              },
+              "texture_test": {
+                "aupr_in": 0.8759680340606459,
+                "aupr_out": 0.7687578726825799,
+                "auroc": 0.8467132584712374,
+                "fpr95": 0.6191111111111111
+              },
+              "tin_test": {
+                "aupr_in": 0.8952698138782245,
+                "aupr_out": 0.8669791496153513,
+                "auroc": 0.8906334887434593,
+                "fpr95": 0.468
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.825885759425907,
+                "aupr_out": 0.9269936044824895,
+                "auroc": 0.9108014848268015,
+                "fpr95": 0.35505555555555557
+              },
+              "near": {
+                "aupr_in": 0.8757881316819861,
+                "aupr_out": 0.8643330923488532,
+                "auroc": 0.8806440406680259,
+                "fpr95": 0.5167222222222222
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "student_msp": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8735257558385191,
+                "aupr_out": 0.8415232521011033,
+                "auroc": 0.8698265432098765,
+                "fpr95": 0.47333333333333333
+              },
+              "mnist_test": {
+                "aupr_in": 0.7077660569576292,
+                "aupr_out": 0.9802225695967058,
+                "auroc": 0.9017609650793652,
+                "fpr95": 0.3011111111111111
+              },
+              "places365_test": {
+                "aupr_in": 0.7501024782062398,
+                "aupr_out": 0.9584429484138518,
+                "auroc": 0.8887992502091522,
+                "fpr95": 0.37733333333333335
+              },
+              "svhn_test": {
+                "aupr_in": 0.8905483874338456,
+                "aupr_out": 0.9629179911340233,
+                "auroc": 0.9301556823226115,
+                "fpr95": 0.1958888888888889
+              },
+              "texture_test": {
+                "aupr_in": 0.9178500007678316,
+                "aupr_out": 0.7829943691535582,
+                "auroc": 0.8765976063829787,
+                "fpr95": 0.44233333333333336
+              },
+              "tin_test": {
+                "aupr_in": 0.9024095968529193,
+                "aupr_out": 0.8382642358994425,
+                "auroc": 0.8844974906254901,
+                "fpr95": 0.4013333333333333
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8165667308413866,
+                "aupr_out": 0.9211444695745348,
+                "auroc": 0.8993283759985269,
+                "fpr95": 0.32916666666666666
+              },
+              "near": {
+                "aupr_in": 0.8879676763457192,
+                "aupr_out": 0.839893744000273,
+                "auroc": 0.8771620169176833,
+                "fpr95": 0.43733333333333335
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "student_teacher_kl_divergence": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8645525106319245,
+                "aupr_out": 0.8351260528690746,
+                "auroc": 0.8669022530864199,
+                "fpr95": 0.48977777777777776
+              },
+              "mnist_test": {
+                "aupr_in": 0.8004800604417984,
+                "aupr_out": 0.9683341191118994,
+                "auroc": 0.897301796031746,
+                "fpr95": 0.24566666666666667
+              },
+              "places365_test": {
+                "aupr_in": 0.7149435898753067,
+                "aupr_out": 0.9477314227864749,
+                "auroc": 0.8762841738883365,
+                "fpr95": 0.4031111111111111
+              },
+              "svhn_test": {
+                "aupr_in": 0.8687197945483907,
+                "aupr_out": 0.9573516784979961,
+                "auroc": 0.9226156141159598,
+                "fpr95": 0.23622222222222222
+              },
+              "texture_test": {
+                "aupr_in": 0.9309295908311404,
+                "aupr_out": 0.8250685755954278,
+                "auroc": 0.8972886721828212,
+                "fpr95": 0.35733333333333334
+              },
+              "tin_test": {
+                "aupr_in": 0.9012902278911099,
+                "aupr_out": 0.8298991482467009,
+                "auroc": 0.8835980580863168,
+                "fpr95": 0.4022222222222222
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8287682589241591,
+                "aupr_out": 0.9246214489979495,
+                "auroc": 0.8983725640547158,
+                "fpr95": 0.3105833333333333
+              },
+              "near": {
+                "aupr_in": 0.8829213692615172,
+                "aupr_out": 0.8325126005578878,
+                "auroc": 0.8752501555863683,
+                "fpr95": 0.44599999999999995
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "teacher_energy": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8498508936621377,
+                "aupr_out": 0.8650464923215994,
+                "auroc": 0.8678787098765431,
+                "fpr95": 0.598
+              },
+              "mnist_test": {
+                "aupr_in": 0.8557471503277884,
+                "aupr_out": 0.9922971637646616,
+                "auroc": 0.9551982730158731,
+                "fpr95": 0.17633333333333334
+              },
+              "places365_test": {
+                "aupr_in": 0.7508942072863393,
+                "aupr_out": 0.9728610412253953,
+                "auroc": 0.9134584063392843,
+                "fpr95": 0.3918888888888889
+              },
+              "svhn_test": {
+                "aupr_in": 0.8291853738315756,
+                "aupr_out": 0.9560131309452344,
+                "auroc": 0.90842415958137,
+                "fpr95": 0.3247777777777778
+              },
+              "texture_test": {
+                "aupr_in": 0.8963258475626696,
+                "aupr_out": 0.7975772899433422,
+                "auroc": 0.8682426615445232,
+                "fpr95": 0.5387777777777778
+              },
+              "tin_test": {
+                "aupr_in": 0.8967263947243678,
+                "aupr_out": 0.8781211249125928,
+                "auroc": 0.8957527410639177,
+                "fpr95": 0.4747777777777778
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8330381447520933,
+                "aupr_out": 0.9296871564696585,
+                "auroc": 0.9113308751202627,
+                "fpr95": 0.35794444444444445
+              },
+              "near": {
+                "aupr_in": 0.8732886441932528,
+                "aupr_out": 0.8715838086170961,
+                "auroc": 0.8818157254702303,
+                "fpr95": 0.5363888888888889
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "teacher_msp": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8758788221163066,
+                "aupr_out": 0.8455674196305693,
+                "auroc": 0.8726038209876543,
+                "fpr95": 0.47155555555555556
+              },
+              "mnist_test": {
+                "aupr_in": 0.7994090961967341,
+                "aupr_out": 0.9837648514331181,
+                "auroc": 0.9203288666666667,
+                "fpr95": 0.237
+              },
+              "places365_test": {
+                "aupr_in": 0.7591875629158406,
+                "aupr_out": 0.9612465293475589,
+                "auroc": 0.8949913213682499,
+                "fpr95": 0.35244444444444445
+              },
+              "svhn_test": {
+                "aupr_in": 0.8303238866463729,
+                "aupr_out": 0.9381957699691617,
+                "auroc": 0.8891035285631361,
+                "fpr95": 0.3041111111111111
+              },
+              "texture_test": {
+                "aupr_in": 0.9154602113939385,
+                "aupr_out": 0.7808973632416184,
+                "auroc": 0.876412342395587,
+                "fpr95": 0.41733333333333333
+              },
+              "tin_test": {
+                "aupr_in": 0.9060105953813434,
+                "aupr_out": 0.8434751043121322,
+                "auroc": 0.8886482028030853,
+                "fpr95": 0.3818888888888889
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8260951892882215,
+                "aupr_out": 0.9160261284978644,
+                "auroc": 0.8952090147484099,
+                "fpr95": 0.32772222222222225
+              },
+              "near": {
+                "aupr_in": 0.890944708748825,
+                "aupr_out": 0.8445212619713507,
+                "auroc": 0.8806260118953698,
+                "fpr95": 0.4267222222222222
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/perturbation/pixel/augmentation/cifar_10/resnet50/linear_layer4_pixel_augmentation_clean_target.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/perturbation/pixel/augmentation/cifar_10/resnet50/linear_layer4_pixel_augmentation_clean_target/mse_logits/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/perturbation/pixel/augmentation/cifar_10/resnet50/linear_layer4_pixel_augmentation_clean_target.yaml",
+        "method": "mse_logits",
+        "name": "cifar10_affine_resnet50_linear_clean_target_mse_logits_clean_inference",
+        "run_dir": "runs/students/perturbation/pixel/augmentation/cifar_10/resnet50/linear_layer4_pixel_augmentation_clean_target",
+        "task_index": 0
+      }
+    },
+    {
+      "metrics_path": "runs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_clean_target/evaluations/openood_v1_5/metrics/mse_logits_unperturbed_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_clean_target/evaluations/openood_v1_5/compact_ood_scores/unperturbed/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": "mse_logits",
+        "experiment_name": "linear_layer4_pixel_augmentation_clean_target_student_resnet50_cifar100",
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "unperturbed",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 10000,
+          "mnist_test": 70000,
+          "places365_test": 33773,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 6526
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_clean_target",
+        "scores": {
+          "absolute_energy_gap": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.43098895820767197,
+                "aupr_out": 0.4566408058289539,
+                "auroc": 0.42502302222222227,
+                "fpr95": 0.9655555555555555
+              },
+              "mnist_test": {
+                "aupr_in": 0.07006149255858271,
+                "aupr_out": 0.7727453922941777,
+                "auroc": 0.22373488492063495,
+                "fpr95": 0.9823333333333333
+              },
+              "places365_test": {
+                "aupr_in": 0.17786750043350275,
+                "aupr_out": 0.7248600394116783,
+                "auroc": 0.40548640597189733,
+                "fpr95": 0.9643333333333334
+              },
+              "svhn_test": {
+                "aupr_in": 0.407155574942029,
+                "aupr_out": 0.8895409449004571,
+                "auroc": 0.7051090858259919,
+                "fpr95": 0.8594444444444445
+              },
+              "texture_test": {
+                "aupr_in": 0.562145820946996,
+                "aupr_out": 0.343713786668968,
+                "auroc": 0.4066792356185973,
+                "fpr95": 0.9631111111111111
+              },
+              "tin_test": {
+                "aupr_in": 0.5099054097573195,
+                "aupr_out": 0.3392624300735423,
+                "auroc": 0.3831620185922975,
+                "fpr95": 0.9711111111111111
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.30430759722027756,
+                "aupr_out": 0.6827150408188203,
+                "auroc": 0.43525240308428037,
+                "fpr95": 0.9423055555555555
+              },
+              "near": {
+                "aupr_in": 0.47044718398249574,
+                "aupr_out": 0.3979516179512481,
+                "auroc": 0.40409252040725985,
+                "fpr95": 0.9683333333333333
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "absolute_max_probability_difference": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7697731757383937,
+                "aupr_out": 0.7106456774742292,
+                "auroc": 0.7570843055555555,
+                "fpr95": 0.6187777777777778
+              },
+              "mnist_test": {
+                "aupr_in": 0.39400092661898206,
+                "aupr_out": 0.9283307898388911,
+                "auroc": 0.7439130595238094,
+                "fpr95": 0.6138888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.49233066411172166,
+                "aupr_out": 0.8963345388468602,
+                "auroc": 0.7564062811516102,
+                "fpr95": 0.6891111111111111
+              },
+              "svhn_test": {
+                "aupr_in": 0.7937974704528272,
+                "aupr_out": 0.9451718358728767,
+                "auroc": 0.8752354815440826,
+                "fpr95": 0.35733333333333334
+              },
+              "texture_test": {
+                "aupr_in": 0.8189549425406372,
+                "aupr_out": 0.6157613489448712,
+                "auroc": 0.7523433510638298,
+                "fpr95": 0.7274444444444444
+              },
+              "tin_test": {
+                "aupr_in": 0.8426041908242266,
+                "aupr_out": 0.6517775181285383,
+                "auroc": 0.7816105152041407,
+                "fpr95": 0.585
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.624771000931042,
+                "aupr_out": 0.8463996283758748,
+                "auroc": 0.7819745433208329,
+                "fpr95": 0.5969444444444444
+              },
+              "near": {
+                "aupr_in": 0.8061886832813101,
+                "aupr_out": 0.6812115978013837,
+                "auroc": 0.7693474103798481,
+                "fpr95": 0.6018888888888889
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "energy_gap": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.4777250992574903,
+                "aupr_out": 0.47138701509080166,
+                "auroc": 0.4569619,
+                "fpr95": 0.9208888888888889
+              },
+              "mnist_test": {
+                "aupr_in": 0.14029753528099453,
+                "aupr_out": 0.7801012931674554,
+                "auroc": 0.26252779047619046,
+                "fpr95": 0.9024444444444445
+              },
+              "places365_test": {
+                "aupr_in": 0.20316706856903766,
+                "aupr_out": 0.7322204916181463,
+                "auroc": 0.4326737071362068,
+                "fpr95": 0.9356666666666666
+              },
+              "svhn_test": {
+                "aupr_in": 0.14565075707529615,
+                "aupr_out": 0.5459431743901968,
+                "auroc": 0.08330936710373557,
+                "fpr95": 0.9997777777777778
+              },
+              "texture_test": {
+                "aupr_in": 0.5157367233515342,
+                "aupr_out": 0.28877978467687165,
+                "auroc": 0.3364056245074862,
+                "fpr95": 0.9886666666666667
+              },
+              "tin_test": {
+                "aupr_in": 0.5485285045722307,
+                "aupr_out": 0.34730240359435816,
+                "auroc": 0.4062714696768482,
+                "fpr95": 0.9388888888888889
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.2512130210692156,
+                "aupr_out": 0.5867611859631675,
+                "auroc": 0.27872912230590474,
+                "fpr95": 0.9566388888888889
+              },
+              "near": {
+                "aupr_in": 0.5131268019148605,
+                "aupr_out": 0.40934470934257994,
+                "auroc": 0.4316166848384241,
+                "fpr95": 0.9298888888888889
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "logit_l2_distance": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.6670980863753584,
+                "aupr_out": 0.6163688472366575,
+                "auroc": 0.6476206166666667,
+                "fpr95": 0.7723333333333333
+              },
+              "mnist_test": {
+                "aupr_in": 0.07745034798807832,
+                "aupr_out": 0.7623431301732987,
+                "auroc": 0.1934912253968254,
+                "fpr95": 0.9586666666666667
+              },
+              "places365_test": {
+                "aupr_in": 0.4504131453856274,
+                "aupr_out": 0.8517404336853118,
+                "auroc": 0.6793540286948483,
+                "fpr95": 0.7443333333333333
+              },
+              "svhn_test": {
+                "aupr_in": 0.9104142224916788,
+                "aupr_out": 0.9857132889201354,
+                "auroc": 0.9621249722563681,
+                "fpr95": 0.20833333333333334
+              },
+              "texture_test": {
+                "aupr_in": 0.7674660569587844,
+                "aupr_out": 0.58833141757088,
+                "auroc": 0.6998180555555555,
+                "fpr95": 0.8494444444444444
+              },
+              "tin_test": {
+                "aupr_in": 0.7815706507437811,
+                "aupr_out": 0.5645633424802212,
+                "auroc": 0.7039235962134368,
+                "fpr95": 0.733
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.5514359432060422,
+                "aupr_out": 0.7970320675874065,
+                "auroc": 0.6336970704758993,
+                "fpr95": 0.6901944444444446
+              },
+              "near": {
+                "aupr_in": 0.7243343685595698,
+                "aupr_out": 0.5904660948584394,
+                "auroc": 0.6757721064400517,
+                "fpr95": 0.7526666666666666
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "max_probability_difference": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.49672707469272326,
+                "aupr_out": 0.6572771279264351,
+                "auroc": 0.6028939444444444,
+                "fpr95": 0.9741111111111111
+              },
+              "mnist_test": {
+                "aupr_in": 0.10266204477220521,
+                "aupr_out": 0.8781341983572618,
+                "auroc": 0.4175054198412698,
+                "fpr95": 0.9654444444444444
+              },
+              "places365_test": {
+                "aupr_in": 0.2186027729708697,
+                "aupr_out": 0.8541070009680374,
+                "auroc": 0.5747434933230687,
+                "fpr95": 0.9794444444444445
+              },
+              "svhn_test": {
+                "aupr_in": 0.1672351543874939,
+                "aupr_out": 0.6601155278092498,
+                "auroc": 0.22694828587038174,
+                "fpr95": 0.9998888888888889
+              },
+              "texture_test": {
+                "aupr_in": 0.5612545414495955,
+                "aupr_out": 0.4636802172848082,
+                "auroc": 0.4975571808510638,
+                "fpr95": 0.9928888888888889
+              },
+              "tin_test": {
+                "aupr_in": 0.5707958023190216,
+                "aupr_out": 0.5609947138329172,
+                "auroc": 0.5715955068614431,
+                "fpr95": 0.9807777777777777
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.26243862839504106,
+                "aupr_out": 0.7140092361048394,
+                "auroc": 0.429188594971446,
+                "fpr95": 0.9844166666666666
+              },
+              "near": {
+                "aupr_in": 0.5337614385058724,
+                "aupr_out": 0.6091359208796762,
+                "auroc": 0.5872447256529438,
+                "fpr95": 0.9774444444444444
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "student_energy": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7560243550207203,
+                "aupr_out": 0.7617389278427015,
+                "auroc": 0.7770510777777777,
+                "fpr95": 0.7154444444444444
+              },
+              "mnist_test": {
+                "aupr_in": 0.7298973717320174,
+                "aupr_out": 0.9771360996552694,
+                "auroc": 0.8864777087301587,
+                "fpr95": 0.3342222222222222
+              },
+              "places365_test": {
+                "aupr_in": 0.4889641440507556,
+                "aupr_out": 0.9060374934495475,
+                "auroc": 0.7698964458788579,
+                "fpr95": 0.7157777777777777
+              },
+              "svhn_test": {
+                "aupr_in": 0.8719494284913809,
+                "aupr_out": 0.9695666180516789,
+                "auroc": 0.9290520257119443,
+                "fpr95": 0.24833333333333332
+              },
+              "texture_test": {
+                "aupr_in": 0.8612564346473179,
+                "aupr_out": 0.6675530463165527,
+                "auroc": 0.7972661446020489,
+                "fpr95": 0.6226666666666667
+              },
+              "tin_test": {
+                "aupr_in": 0.855245447880312,
+                "aupr_out": 0.7241366160764338,
+                "auroc": 0.8166257363707563,
+                "fpr95": 0.5957777777777777
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.7380168447303679,
+                "aupr_out": 0.8800733143682621,
+                "auroc": 0.8456730812307525,
+                "fpr95": 0.48024999999999995
+              },
+              "near": {
+                "aupr_in": 0.8056349014505162,
+                "aupr_out": 0.7429377719595676,
+                "auroc": 0.796838407074267,
+                "fpr95": 0.6556111111111111
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "student_msp": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7676961785586469,
+                "aupr_out": 0.7560323177776302,
+                "auroc": 0.776609538888889,
+                "fpr95": 0.6728888888888889
+              },
+              "mnist_test": {
+                "aupr_in": 0.6560384373025162,
+                "aupr_out": 0.9632319220968254,
+                "auroc": 0.8303903817460317,
+                "fpr95": 0.41588888888888886
+              },
+              "places365_test": {
+                "aupr_in": 0.5317609523427864,
+                "aupr_out": 0.9108429588647846,
+                "auroc": 0.7805158229618006,
+                "fpr95": 0.6447777777777778
+              },
+              "svhn_test": {
+                "aupr_in": 0.8070189204394141,
+                "aupr_out": 0.9397773046500824,
+                "auroc": 0.8725219622857339,
+                "fpr95": 0.3372222222222222
+              },
+              "texture_test": {
+                "aupr_in": 0.8574488497222075,
+                "aupr_out": 0.64105444163617,
+                "auroc": 0.7823855988967692,
+                "fpr95": 0.6124444444444445
+              },
+              "tin_test": {
+                "aupr_in": 0.8587422531234423,
+                "aupr_out": 0.7131328880655866,
+                "auroc": 0.8120490516566214,
+                "fpr95": 0.5603333333333333
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.7130667899517311,
+                "aupr_out": 0.8637266568119656,
+                "auroc": 0.8164534414725839,
+                "fpr95": 0.5025833333333333
+              },
+              "near": {
+                "aupr_in": 0.8132192158410446,
+                "aupr_out": 0.7345826029216085,
+                "auroc": 0.7943292952727552,
+                "fpr95": 0.6166111111111111
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "student_teacher_kl_divergence": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7849847915253212,
+                "aupr_out": 0.7157280892389011,
+                "auroc": 0.7676897166666667,
+                "fpr95": 0.6017777777777777
+              },
+              "mnist_test": {
+                "aupr_in": 0.4156148797560109,
+                "aupr_out": 0.9122638577214275,
+                "auroc": 0.7163531341269841,
+                "fpr95": 0.6416666666666667
+              },
+              "places365_test": {
+                "aupr_in": 0.527741077725292,
+                "aupr_out": 0.9007865350813633,
+                "auroc": 0.7705492355826646,
+                "fpr95": 0.6654444444444444
+              },
+              "svhn_test": {
+                "aupr_in": 0.8477598953698763,
+                "aupr_out": 0.9624602307868605,
+                "auroc": 0.9131953855937991,
+                "fpr95": 0.29655555555555557
+              },
+              "texture_test": {
+                "aupr_in": 0.8213876137713674,
+                "aupr_out": 0.6346430423573226,
+                "auroc": 0.7631733845547676,
+                "fpr95": 0.7485555555555555
+              },
+              "tin_test": {
+                "aupr_in": 0.8559869961787727,
+                "aupr_out": 0.6651593511377814,
+                "auroc": 0.7988748084584737,
+                "fpr95": 0.5765555555555556
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6531258666556365,
+                "aupr_out": 0.8525384164867434,
+                "auroc": 0.7908177849645539,
+                "fpr95": 0.5880555555555556
+              },
+              "near": {
+                "aupr_in": 0.820485893852047,
+                "aupr_out": 0.6904437201883412,
+                "auroc": 0.7832822625625702,
+                "fpr95": 0.5891666666666666
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "teacher_energy": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.78608389225709,
+                "aupr_out": 0.7789456054998682,
+                "auroc": 0.7988074333333334,
+                "fpr95": 0.6447777777777778
+              },
+              "mnist_test": {
+                "aupr_in": 0.7077938573708108,
+                "aupr_out": 0.9760626047729871,
+                "auroc": 0.8778689984126983,
+                "fpr95": 0.3661111111111111
+              },
+              "places365_test": {
+                "aupr_in": 0.4972378051150205,
+                "aupr_out": 0.9128882303666574,
+                "auroc": 0.7810912826485326,
+                "fpr95": 0.7046666666666667
+              },
+              "svhn_test": {
+                "aupr_in": 0.5776133821327267,
+                "aupr_out": 0.8921677629406266,
+                "auroc": 0.7730205964454004,
+                "fpr95": 0.7115555555555556
+              },
+              "texture_test": {
+                "aupr_in": 0.842662608562035,
+                "aupr_out": 0.6431355110538052,
+                "auroc": 0.7787203900709219,
+                "fpr95": 0.6862222222222222
+              },
+              "tin_test": {
+                "aupr_in": 0.8643571129521582,
+                "aupr_out": 0.7405901256860394,
+                "auroc": 0.8278745530697722,
+                "fpr95": 0.5802222222222222
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6563269132951483,
+                "aupr_out": 0.8560635272835191,
+                "auroc": 0.8026753168943882,
+                "fpr95": 0.6171388888888889
+              },
+              "near": {
+                "aupr_in": 0.8252205026046241,
+                "aupr_out": 0.7597678655929538,
+                "auroc": 0.8133409932015527,
+                "fpr95": 0.6125
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "teacher_msp": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.788998464352814,
+                "aupr_out": 0.7656851447830725,
+                "auroc": 0.7895225,
+                "fpr95": 0.6182222222222222
+              },
+              "mnist_test": {
+                "aupr_in": 0.6361428682040351,
+                "aupr_out": 0.9606200199907081,
+                "auroc": 0.8196483365079366,
+                "fpr95": 0.43666666666666665
+              },
+              "places365_test": {
+                "aupr_in": 0.5385690299729786,
+                "aupr_out": 0.9135938244802901,
+                "auroc": 0.7862569393039147,
+                "fpr95": 0.6323333333333333
+              },
+              "svhn_test": {
+                "aupr_in": 0.5476044605802823,
+                "aupr_out": 0.8747808802688583,
+                "auroc": 0.7405328463258896,
+                "fpr95": 0.7288888888888889
+              },
+              "texture_test": {
+                "aupr_in": 0.840067146468046,
+                "aupr_out": 0.6193244509727553,
+                "auroc": 0.765904974389283,
+                "fpr95": 0.6745555555555556
+              },
+              "tin_test": {
+                "aupr_in": 0.8657489406342338,
+                "aupr_out": 0.7212568302829327,
+                "auroc": 0.8188116082677835,
+                "fpr95": 0.5412222222222223
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6405958763063355,
+                "aupr_out": 0.842079793928153,
+                "auroc": 0.778085774131756,
+                "fpr95": 0.6181111111111112
+              },
+              "near": {
+                "aupr_in": 0.8273737024935239,
+                "aupr_out": 0.7434709875330026,
+                "auroc": 0.8041670541338918,
+                "fpr95": 0.5797222222222222
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_clean_target.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_clean_target/mse_logits/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_clean_target.yaml",
+        "method": "mse_logits",
+        "name": "cifar100_affine_resnet50_linear_clean_target_mse_logits_clean_inference",
+        "run_dir": "runs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_clean_target",
+        "task_index": 1
+      }
+    },
+    {
+      "metrics_path": "runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_layer4_clip_channel_flatten/evaluations/openood_v1_5/metrics/kl_divergence_unperturbed_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_layer4_clip_channel_flatten/evaluations/openood_v1_5/compact_ood_scores/unperturbed/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": "kl_divergence",
+        "experiment_name": "perturbation_linear_layer3_layer4_student_resnet18_cifar10_clip_channel_flatten",
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "unperturbed",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 9000,
+          "mnist_test": 70000,
+          "places365_test": 35195,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 7793
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_layer4_clip_channel_flatten",
+        "scores": {
+          "absolute_energy_gap": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.3945469965095616,
+                "aupr_out": 0.3831311771872308,
+                "auroc": 0.32390053703703703,
+                "fpr95": 0.9811111111111112
+              },
+              "mnist_test": {
+                "aupr_in": 0.0696744728942432,
+                "aupr_out": 0.7842663204368309,
+                "auroc": 0.23820607222222223,
+                "fpr95": 0.9895555555555555
+              },
+              "places365_test": {
+                "aupr_in": 0.13778681859776998,
+                "aupr_out": 0.6757836355979067,
+                "auroc": 0.28786354437972567,
+                "fpr95": 0.9844444444444445
+              },
+              "svhn_test": {
+                "aupr_in": 0.16976975030141456,
+                "aupr_out": 0.5985238799729848,
+                "auroc": 0.2525014042545926,
+                "fpr95": 0.9852222222222222
+              },
+              "texture_test": {
+                "aupr_in": 0.47070340297365404,
+                "aupr_out": 0.26103613119060176,
+                "auroc": 0.2445414893617021,
+                "fpr95": 0.9856666666666667
+              },
+              "tin_test": {
+                "aupr_in": 0.4137563163553215,
+                "aupr_out": 0.33849040669288805,
+                "auroc": 0.2895725437358313,
+                "fpr95": 0.9842222222222222
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.21198361119177045,
+                "aupr_out": 0.5799024917995811,
+                "auroc": 0.25577812755456064,
+                "fpr95": 0.9862222222222223
+              },
+              "near": {
+                "aupr_in": 0.40415165643244155,
+                "aupr_out": 0.3608107919400594,
+                "auroc": 0.30673654038643416,
+                "fpr95": 0.9826666666666667
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "absolute_max_probability_difference": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8774775565194316,
+                "aupr_out": 0.8327625259775309,
+                "auroc": 0.8705862839506173,
+                "fpr95": 0.43722222222222223
+              },
+              "mnist_test": {
+                "aupr_in": 0.7284832174639543,
+                "aupr_out": 0.9807255950418293,
+                "auroc": 0.9063709071428572,
+                "fpr95": 0.2738888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.7162066755108798,
+                "aupr_out": 0.9500188606592356,
+                "auroc": 0.8745099351233603,
+                "fpr95": 0.4086666666666667
+              },
+              "svhn_test": {
+                "aupr_in": 0.8376471716162983,
+                "aupr_out": 0.9402047192217642,
+                "auroc": 0.8965315807894556,
+                "fpr95": 0.291
+              },
+              "texture_test": {
+                "aupr_in": 0.9326616922235023,
+                "aupr_out": 0.7814651901231175,
+                "auroc": 0.8885843676122931,
+                "fpr95": 0.35533333333333333
+              },
+              "tin_test": {
+                "aupr_in": 0.9016824558822725,
+                "aupr_out": 0.8200273765053485,
+                "auroc": 0.8790750887548654,
+                "fpr95": 0.3917777777777778
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8037496892036586,
+                "aupr_out": 0.9131035912614867,
+                "auroc": 0.8914991976669916,
+                "fpr95": 0.33222222222222225
+              },
+              "near": {
+                "aupr_in": 0.8895800062008521,
+                "aupr_out": 0.8263949512414397,
+                "auroc": 0.8748306863527413,
+                "fpr95": 0.4145
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "energy_gap": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.3889679406275608,
+                "aupr_out": 0.38186742640118493,
+                "auroc": 0.319323512345679,
+                "fpr95": 0.9887777777777778
+              },
+              "mnist_test": {
+                "aupr_in": 0.07964542851737903,
+                "aupr_out": 0.7850203809946075,
+                "auroc": 0.24396866825396826,
+                "fpr95": 0.9771111111111112
+              },
+              "places365_test": {
+                "aupr_in": 0.13717593009286955,
+                "aupr_out": 0.6753636211031593,
+                "auroc": 0.28585152720556894,
+                "fpr95": 0.9858888888888889
+              },
+              "svhn_test": {
+                "aupr_in": 0.17414682863999287,
+                "aupr_out": 0.5990376512716054,
+                "auroc": 0.2546958849791709,
+                "fpr95": 0.98
+              },
+              "texture_test": {
+                "aupr_in": 0.4576079328018627,
+                "aupr_out": 0.25710207500690535,
+                "auroc": 0.2279006402679275,
+                "fpr95": 0.9946666666666667
+              },
+              "tin_test": {
+                "aupr_in": 0.40654928978885296,
+                "aupr_out": 0.33660764251503583,
+                "auroc": 0.28264166559733095,
+                "fpr95": 0.9907777777777778
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.21214403001302604,
+                "aupr_out": 0.5791309320940694,
+                "auroc": 0.2531041801766589,
+                "fpr95": 0.9844166666666667
+              },
+              "near": {
+                "aupr_in": 0.3977586152082069,
+                "aupr_out": 0.35923753445811035,
+                "auroc": 0.300982588971505,
+                "fpr95": 0.9897777777777778
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "logit_l2_distance": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.4412752119974945,
+                "aupr_out": 0.41755102369391306,
+                "auroc": 0.4078761172839506,
+                "fpr95": 0.9807777777777777
+              },
+              "mnist_test": {
+                "aupr_in": 0.08460880440359951,
+                "aupr_out": 0.8152664153595384,
+                "auroc": 0.35955456825396825,
+                "fpr95": 0.9855555555555555
+              },
+              "places365_test": {
+                "aupr_in": 0.14869519852250096,
+                "aupr_out": 0.6954862745469901,
+                "auroc": 0.339866546700131,
+                "fpr95": 0.9884444444444445
+              },
+              "svhn_test": {
+                "aupr_in": 0.16388750949496597,
+                "aupr_out": 0.5964269665971935,
+                "auroc": 0.23433377723144164,
+                "fpr95": 0.9957777777777778
+              },
+              "texture_test": {
+                "aupr_in": 0.4943960484238606,
+                "aupr_out": 0.2755403033127644,
+                "auroc": 0.2985565504334121,
+                "fpr95": 0.993
+              },
+              "tin_test": {
+                "aupr_in": 0.44936433462279707,
+                "aupr_out": 0.36540937087241776,
+                "auroc": 0.36361194519297946,
+                "fpr95": 0.9875555555555555
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.22289689021123177,
+                "aupr_out": 0.5956799899541216,
+                "auroc": 0.30807786065473824,
+                "fpr95": 0.9906944444444443
+              },
+              "near": {
+                "aupr_in": 0.4453197733101458,
+                "aupr_out": 0.3914801972831654,
+                "auroc": 0.385744031238465,
+                "fpr95": 0.9841666666666666
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "max_probability_difference": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.514399681682742,
+                "aupr_out": 0.7126743378310801,
+                "auroc": 0.6208399506172839,
+                "fpr95": 0.9905555555555555
+              },
+              "mnist_test": {
+                "aupr_in": 0.11554466344953646,
+                "aupr_out": 0.928599419369198,
+                "auroc": 0.5479614777777777,
+                "fpr95": 0.9916666666666667
+              },
+              "places365_test": {
+                "aupr_in": 0.2358036516597516,
+                "aupr_out": 0.8940639644577398,
+                "auroc": 0.6317932155767076,
+                "fpr95": 0.9891111111111112
+              },
+              "svhn_test": {
+                "aupr_in": 0.3226312439167397,
+                "aupr_out": 0.8827920513623208,
+                "auroc": 0.6805996380523116,
+                "fpr95": 0.9892222222222222
+              },
+              "texture_test": {
+                "aupr_in": 0.5813258399040694,
+                "aupr_out": 0.5896163391913984,
+                "auroc": 0.5598110323089047,
+                "fpr95": 0.9934444444444445
+              },
+              "tin_test": {
+                "aupr_in": 0.5509678836571467,
+                "aupr_out": 0.6967880618811617,
+                "auroc": 0.628408607439725,
+                "fpr95": 0.9905555555555555
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.3138263497325243,
+                "aupr_out": 0.8237679435951643,
+                "auroc": 0.6050413409289255,
+                "fpr95": 0.9908611111111112
+              },
+              "near": {
+                "aupr_in": 0.5326837826699443,
+                "aupr_out": 0.704731199856121,
+                "auroc": 0.6246242790285045,
+                "fpr95": 0.9905555555555555
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "student_energy": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8327481252110859,
+                "aupr_out": 0.8439304486685308,
+                "auroc": 0.8439160370370371,
+                "fpr95": 0.639
+              },
+              "mnist_test": {
+                "aupr_in": 0.7519438562008002,
+                "aupr_out": 0.9900864722230751,
+                "auroc": 0.9370048047619048,
+                "fpr95": 0.30177777777777776
+              },
+              "places365_test": {
+                "aupr_in": 0.6875123241256059,
+                "aupr_out": 0.963425383132175,
+                "auroc": 0.8798395621221449,
+                "fpr95": 0.5474444444444444
+              },
+              "svhn_test": {
+                "aupr_in": 0.7783447612967125,
+                "aupr_out": 0.9638614166637645,
+                "auroc": 0.9072592279587517,
+                "fpr95": 0.47955555555555557
+              },
+              "texture_test": {
+                "aupr_in": 0.9261149320533022,
+                "aupr_out": 0.8466892948526037,
+                "auroc": 0.8932869680851063,
+                "fpr95": 0.5082222222222222
+              },
+              "tin_test": {
+                "aupr_in": 0.8895504715631147,
+                "aupr_out": 0.8607850855710715,
+                "auroc": 0.8777801944765244,
+                "fpr95": 0.5444444444444444
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.7859789684191052,
+                "aupr_out": 0.9410156417179045,
+                "auroc": 0.9043476407319769,
+                "fpr95": 0.45925
+              },
+              "near": {
+                "aupr_in": 0.8611492983871003,
+                "aupr_out": 0.8523577671198012,
+                "auroc": 0.8608481157567808,
+                "fpr95": 0.5917222222222223
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "student_msp": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8449955030934964,
+                "aupr_out": 0.8218604000621864,
+                "auroc": 0.8442492469135804,
+                "fpr95": 0.5894444444444444
+              },
+              "mnist_test": {
+                "aupr_in": 0.7267140487713811,
+                "aupr_out": 0.9821347513392826,
+                "auroc": 0.9058952349206348,
+                "fpr95": 0.319
+              },
+              "places365_test": {
+                "aupr_in": 0.7023647033986218,
+                "aupr_out": 0.9521075578079135,
+                "auroc": 0.8656476645988226,
+                "fpr95": 0.5018888888888889
+              },
+              "svhn_test": {
+                "aupr_in": 0.7371099783598116,
+                "aupr_out": 0.9432499212072482,
+                "auroc": 0.8738164267909581,
+                "fpr95": 0.508
+              },
+              "texture_test": {
+                "aupr_in": 0.9164064362683917,
+                "aupr_out": 0.7948106070030285,
+                "auroc": 0.8742006304176517,
+                "fpr95": 0.5167777777777778
+              },
+              "tin_test": {
+                "aupr_in": 0.8857408228750336,
+                "aupr_out": 0.8184892432307925,
+                "auroc": 0.8637831814876598,
+                "fpr95": 0.5092222222222222
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.7706487916995516,
+                "aupr_out": 0.9180757093393681,
+                "auroc": 0.8798899891820168,
+                "fpr95": 0.4614166666666667
+              },
+              "near": {
+                "aupr_in": 0.865368162984265,
+                "aupr_out": 0.8201748216464895,
+                "auroc": 0.85401621420062,
+                "fpr95": 0.5493333333333333
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "student_teacher_kl_divergence": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.875980696357137,
+                "aupr_out": 0.82257751330939,
+                "auroc": 0.8673946975308642,
+                "fpr95": 0.4736666666666667
+              },
+              "mnist_test": {
+                "aupr_in": 0.7479316894789133,
+                "aupr_out": 0.9775922974431114,
+                "auroc": 0.9067445444444444,
+                "fpr95": 0.29433333333333334
+              },
+              "places365_test": {
+                "aupr_in": 0.7105477800894219,
+                "aupr_out": 0.9424111721327828,
+                "auroc": 0.8697098451484586,
+                "fpr95": 0.4484444444444444
+              },
+              "svhn_test": {
+                "aupr_in": 0.8357936981994399,
+                "aupr_out": 0.9282870553864074,
+                "auroc": 0.8909080170559311,
+                "fpr95": 0.31366666666666665
+              },
+              "texture_test": {
+                "aupr_in": 0.9271328333340475,
+                "aupr_out": 0.7571125878460216,
+                "auroc": 0.8818325453112688,
+                "fpr95": 0.39511111111111114
+              },
+              "tin_test": {
+                "aupr_in": 0.8963221945833757,
+                "aupr_out": 0.8069089455609643,
+                "auroc": 0.8742386472190142,
+                "fpr95": 0.44133333333333336
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8053515002754557,
+                "aupr_out": 0.9013507782020809,
+                "auroc": 0.8872987379900258,
+                "fpr95": 0.36288888888888887
+              },
+              "near": {
+                "aupr_in": 0.8861514454702564,
+                "aupr_out": 0.8147432294351771,
+                "auroc": 0.8708166723749392,
+                "fpr95": 0.4575
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "teacher_energy": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8675312514187487,
+                "aupr_out": 0.8734123128440483,
+                "auroc": 0.879011962962963,
+                "fpr95": 0.5414444444444444
+              },
+              "mnist_test": {
+                "aupr_in": 0.8795196792394857,
+                "aupr_out": 0.9938854492394517,
+                "auroc": 0.9629815492063493,
+                "fpr95": 0.15888888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.7437047810536169,
+                "aupr_out": 0.9716089542582278,
+                "auroc": 0.9091047355211441,
+                "fpr95": 0.41755555555555557
+              },
+              "svhn_test": {
+                "aupr_in": 0.8482580992583582,
+                "aupr_out": 0.972574936098936,
+                "auroc": 0.9345951606569691,
+                "fpr95": 0.29788888888888887
+              },
+              "texture_test": {
+                "aupr_in": 0.904120616986976,
+                "aupr_out": 0.8251936916669608,
+                "auroc": 0.8790071907013396,
+                "fpr95": 0.5494444444444444
+              },
+              "tin_test": {
+                "aupr_in": 0.9021086163532649,
+                "aupr_out": 0.8780674379934985,
+                "auroc": 0.8971177552504384,
+                "fpr95": 0.46111111111111114
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8439007941346092,
+                "aupr_out": 0.940815757815894,
+                "auroc": 0.9214221590214505,
+                "fpr95": 0.3559444444444444
+              },
+              "near": {
+                "aupr_in": 0.8848199338860068,
+                "aupr_out": 0.8757398754187734,
+                "auroc": 0.8880648591067006,
+                "fpr95": 0.5012777777777777
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "teacher_msp": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8855480598485946,
+                "aupr_out": 0.8536060620636305,
+                "auroc": 0.879568413580247,
+                "fpr95": 0.43744444444444447
+              },
+              "mnist_test": {
+                "aupr_in": 0.8197845188692937,
+                "aupr_out": 0.9853651843300232,
+                "auroc": 0.9253220150793651,
+                "fpr95": 0.23033333333333333
+              },
+              "places365_test": {
+                "aupr_in": 0.7554753587532627,
+                "aupr_out": 0.9615938216065998,
+                "auroc": 0.8937769869457467,
+                "fpr95": 0.37344444444444447
+              },
+              "svhn_test": {
+                "aupr_in": 0.8564529034301027,
+                "aupr_out": 0.9595940223992278,
+                "auroc": 0.9183778618623233,
+                "fpr95": 0.26611111111111113
+              },
+              "texture_test": {
+                "aupr_in": 0.9208493188295002,
+                "aupr_out": 0.8005200532523489,
+                "auroc": 0.8851832545311269,
+                "fpr95": 0.4122222222222222
+              },
+              "tin_test": {
+                "aupr_in": 0.9088635581401243,
+                "aupr_out": 0.8492983548513455,
+                "auroc": 0.8912420762222506,
+                "fpr95": 0.3781111111111111
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8381405249705398,
+                "aupr_out": 0.9267682703970499,
+                "auroc": 0.9056650296046406,
+                "fpr95": 0.3205277777777778
+              },
+              "near": {
+                "aupr_in": 0.8972058089943595,
+                "aupr_out": 0.851452208457488,
+                "auroc": 0.8854052449012488,
+                "fpr95": 0.4077777777777778
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_layer4_clip_channel_flatten.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_layer4_clip_channel_flatten/kl_divergence/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_layer4_clip_channel_flatten.yaml",
+        "method": "kl_divergence",
+        "name": "cifar10_channel_clip_resnet18_layers34_flatten_kl_clean_inference",
+        "run_dir": "runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_layer4_clip_channel_flatten",
+        "task_index": 2
+      }
+    },
+    {
+      "metrics_path": "runs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer3_layer4_clip_channel_flatten/evaluations/openood_v1_5/metrics/kl_divergence_unperturbed_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer3_layer4_clip_channel_flatten/evaluations/openood_v1_5/compact_ood_scores/unperturbed/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": "kl_divergence",
+        "experiment_name": "perturbation_linear_layer3_layer4_student_resnet18_cifar100_clip_channel_flatten",
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "unperturbed",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 10000,
+          "mnist_test": 70000,
+          "places365_test": 33773,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 6526
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer3_layer4_clip_channel_flatten",
+        "scores": {
+          "absolute_energy_gap": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.40201163090396735,
+                "aupr_out": 0.42501217844014516,
+                "auroc": 0.3599573722222222,
+                "fpr95": 0.9554444444444444
+              },
+              "mnist_test": {
+                "aupr_in": 0.06085814597480819,
+                "aupr_out": 0.7368247374476362,
+                "auroc": 0.0791568746031746,
+                "fpr95": 0.9908888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.13777113134775265,
+                "aupr_out": 0.660988883804788,
+                "auroc": 0.2580594837427662,
+                "fpr95": 0.9812222222222222
+              },
+              "svhn_test": {
+                "aupr_in": 0.14442646626920713,
+                "aupr_out": 0.5457108003426941,
+                "auroc": 0.07948013982790411,
+                "fpr95": 0.9966666666666667
+              },
+              "texture_test": {
+                "aupr_in": 0.43387109630542003,
+                "aupr_out": 0.24155931681064155,
+                "auroc": 0.15593775610717098,
+                "fpr95": 0.9942222222222222
+              },
+              "tin_test": {
+                "aupr_in": 0.4410322238880201,
+                "aupr_out": 0.28620396752912075,
+                "auroc": 0.2363839513739912,
+                "fpr95": 0.9725555555555555
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.194231709974297,
+                "aupr_out": 0.5462709346014399,
+                "auroc": 0.14315856357025397,
+                "fpr95": 0.99075
+              },
+              "near": {
+                "aupr_in": 0.4215219273959937,
+                "aupr_out": 0.35560807298463293,
+                "auroc": 0.2981706617981067,
+                "fpr95": 0.964
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "absolute_max_probability_difference": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7542880774037027,
+                "aupr_out": 0.6871002135076753,
+                "auroc": 0.7307998055555556,
+                "fpr95": 0.6338888888888888
+              },
+              "mnist_test": {
+                "aupr_in": 0.4161946587036889,
+                "aupr_out": 0.9343759174848312,
+                "auroc": 0.7353512738095238,
+                "fpr95": 0.6347777777777778
+              },
+              "places365_test": {
+                "aupr_in": 0.5739399219003406,
+                "aupr_out": 0.9003812783862865,
+                "auroc": 0.7554486358267782,
+                "fpr95": 0.5911111111111111
+              },
+              "svhn_test": {
+                "aupr_in": 0.6630911359104339,
+                "aupr_out": 0.8981298858754465,
+                "auroc": 0.7821606847128321,
+                "fpr95": 0.5506666666666666
+              },
+              "texture_test": {
+                "aupr_in": 0.8286675631650265,
+                "aupr_out": 0.5863363073673471,
+                "auroc": 0.7266476063829788,
+                "fpr95": 0.6442222222222223
+              },
+              "tin_test": {
+                "aupr_in": 0.8260826527973832,
+                "aupr_out": 0.596610354313985,
+                "auroc": 0.7378540964347737,
+                "fpr95": 0.5917777777777777
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6204733199198725,
+                "aupr_out": 0.8298058472784778,
+                "auroc": 0.7499020501830282,
+                "fpr95": 0.6051944444444444
+              },
+              "near": {
+                "aupr_in": 0.790185365100543,
+                "aupr_out": 0.6418552839108301,
+                "auroc": 0.7343269509951647,
+                "fpr95": 0.6128333333333333
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "energy_gap": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.4341732601283004,
+                "aupr_out": 0.4277101578106651,
+                "auroc": 0.3693330388888889,
+                "fpr95": 0.9273333333333333
+              },
+              "mnist_test": {
+                "aupr_in": 0.10159020642766736,
+                "aupr_out": 0.741449870584794,
+                "auroc": 0.10667287539682539,
+                "fpr95": 0.9538888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.14534197546352626,
+                "aupr_out": 0.6628261530921704,
+                "auroc": 0.2668692430179269,
+                "fpr95": 0.9642222222222222
+              },
+              "svhn_test": {
+                "aupr_in": 0.15301888534867766,
+                "aupr_out": 0.5455098120204839,
+                "auroc": 0.07988257614559859,
+                "fpr95": 0.9804444444444445
+              },
+              "texture_test": {
+                "aupr_in": 0.4495509241881429,
+                "aupr_out": 0.24356217428379642,
+                "auroc": 0.1647146670606777,
+                "fpr95": 0.9756666666666667
+              },
+              "tin_test": {
+                "aupr_in": 0.47083075830636545,
+                "aupr_out": 0.2896978066420678,
+                "auroc": 0.24994046038069942,
+                "fpr95": 0.9457777777777778
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.21237549785700355,
+                "aupr_out": 0.5483370024953111,
+                "auroc": 0.15453484040525714,
+                "fpr95": 0.9685555555555556
+              },
+              "near": {
+                "aupr_in": 0.4525020092173329,
+                "aupr_out": 0.35870398222636646,
+                "auroc": 0.30963674963479415,
+                "fpr95": 0.9365555555555556
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "logit_l2_distance": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.42243151334636597,
+                "aupr_out": 0.4434520584695727,
+                "auroc": 0.39863031666666665,
+                "fpr95": 0.9551111111111111
+              },
+              "mnist_test": {
+                "aupr_in": 0.1898551477260936,
+                "aupr_out": 0.8376528406709665,
+                "auroc": 0.4474781476190476,
+                "fpr95": 0.8482222222222222
+              },
+              "places365_test": {
+                "aupr_in": 0.1431070732854836,
+                "aupr_out": 0.667619340118565,
+                "auroc": 0.2824384189210974,
+                "fpr95": 0.9782222222222222
+              },
+              "svhn_test": {
+                "aupr_in": 0.15583709419033567,
+                "aupr_out": 0.5796965217528283,
+                "auroc": 0.17950215973502698,
+                "fpr95": 0.999
+              },
+              "texture_test": {
+                "aupr_in": 0.4589962955905036,
+                "aupr_out": 0.26082845218068434,
+                "auroc": 0.23870632387706853,
+                "fpr95": 0.9981111111111111
+              },
+              "tin_test": {
+                "aupr_in": 0.4978216645701547,
+                "aupr_out": 0.3313489650806432,
+                "auroc": 0.3662493870671162,
+                "fpr95": 0.97
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.2369489026981041,
+                "aupr_out": 0.5864492886807611,
+                "auroc": 0.2870312625380601,
+                "fpr95": 0.9558888888888889
+              },
+              "near": {
+                "aupr_in": 0.4601265889582603,
+                "aupr_out": 0.3874005117751079,
+                "auroc": 0.38243985186689144,
+                "fpr95": 0.9625555555555556
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "max_probability_difference": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.6201994370036754,
+                "aupr_out": 0.6999262825286358,
+                "auroc": 0.7059569722222222,
+                "fpr95": 0.938
+              },
+              "mnist_test": {
+                "aupr_in": 0.09133093196393932,
+                "aupr_out": 0.8732212461240271,
+                "auroc": 0.3866610222222222,
+                "fpr95": 0.9845555555555555
+              },
+              "places365_test": {
+                "aupr_in": 0.26253562548621423,
+                "aupr_out": 0.8740408792870823,
+                "auroc": 0.6469974930664535,
+                "fpr95": 0.9863333333333333
+              },
+              "svhn_test": {
+                "aupr_in": 0.18675536745647214,
+                "aupr_out": 0.7004623757198492,
+                "auroc": 0.3371045358703818,
+                "fpr95": 0.998
+              },
+              "texture_test": {
+                "aupr_in": 0.5666250271874194,
+                "aupr_out": 0.43480453553119064,
+                "auroc": 0.5026379334121356,
+                "fpr95": 0.9948888888888889
+              },
+              "tin_test": {
+                "aupr_in": 0.6588339072349056,
+                "aupr_out": 0.5829359954343638,
+                "auroc": 0.6651013978274936,
+                "fpr95": 0.9583333333333334
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.2768117380235112,
+                "aupr_out": 0.7206322591655373,
+                "auroc": 0.46835024614279824,
+                "fpr95": 0.9909444444444444
+              },
+              "near": {
+                "aupr_in": 0.6395166721192905,
+                "aupr_out": 0.6414311389814997,
+                "auroc": 0.6855291850248579,
+                "fpr95": 0.9481666666666666
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "student_energy": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.745010033517632,
+                "aupr_out": 0.7230493096825829,
+                "auroc": 0.7486952611111112,
+                "fpr95": 0.6992222222222222
+              },
+              "mnist_test": {
+                "aupr_in": 0.6850631384152013,
+                "aupr_out": 0.9714205263981639,
+                "auroc": 0.8652570841269841,
+                "fpr95": 0.3917777777777778
+              },
+              "places365_test": {
+                "aupr_in": 0.6122782823182521,
+                "aupr_out": 0.9240890010913816,
+                "auroc": 0.8069544113147584,
+                "fpr95": 0.5745555555555556
+              },
+              "svhn_test": {
+                "aupr_in": 0.8854681422945738,
+                "aupr_out": 0.9727123588464288,
+                "auroc": 0.9370334289421566,
+                "fpr95": 0.25566666666666665
+              },
+              "texture_test": {
+                "aupr_in": 0.9012411951312465,
+                "aupr_out": 0.79536811663044,
+                "auroc": 0.8575901891252955,
+                "fpr95": 0.5474444444444444
+              },
+              "tin_test": {
+                "aupr_in": 0.8812964859015525,
+                "aupr_out": 0.7344655328392238,
+                "auroc": 0.8287209112268874,
+                "fpr95": 0.5078888888888888
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.7710126895398184,
+                "aupr_out": 0.9158975007416036,
+                "auroc": 0.8667087783772986,
+                "fpr95": 0.4423611111111111
+              },
+              "near": {
+                "aupr_in": 0.8131532597095923,
+                "aupr_out": 0.7287574212609034,
+                "auroc": 0.7887080861689992,
+                "fpr95": 0.6035555555555555
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "student_msp": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7623940230449666,
+                "aupr_out": 0.733171369708199,
+                "auroc": 0.7569309833333333,
+                "fpr95": 0.6602222222222223
+              },
+              "mnist_test": {
+                "aupr_in": 0.6253413063638976,
+                "aupr_out": 0.9665816146247248,
+                "auroc": 0.834065603968254,
+                "fpr95": 0.4582222222222222
+              },
+              "places365_test": {
+                "aupr_in": 0.6034446009791015,
+                "aupr_out": 0.9164924827049071,
+                "auroc": 0.7920380349852116,
+                "fpr95": 0.5711111111111111
+              },
+              "svhn_test": {
+                "aupr_in": 0.8238494537257981,
+                "aupr_out": 0.9507434653011665,
+                "auroc": 0.894292716656423,
+                "fpr95": 0.35988888888888887
+              },
+              "texture_test": {
+                "aupr_in": 0.8758694523653663,
+                "aupr_out": 0.723277702324647,
+                "auroc": 0.8142839144996059,
+                "fpr95": 0.5924444444444444
+              },
+              "tin_test": {
+                "aupr_in": 0.8766347139926223,
+                "aupr_out": 0.722826575735939,
+                "auroc": 0.8188516191643682,
+                "fpr95": 0.5077777777777778
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.732126203358541,
+                "aupr_out": 0.8892738162388614,
+                "auroc": 0.8336700675273736,
+                "fpr95": 0.4954166666666666
+              },
+              "near": {
+                "aupr_in": 0.8195143685187944,
+                "aupr_out": 0.727998972722069,
+                "auroc": 0.7878913012488508,
+                "fpr95": 0.5840000000000001
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "student_teacher_kl_divergence": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7887814595686564,
+                "aupr_out": 0.7154846495522185,
+                "auroc": 0.7701588222222222,
+                "fpr95": 0.5911111111111111
+              },
+              "mnist_test": {
+                "aupr_in": 0.474133663377426,
+                "aupr_out": 0.9258452581565999,
+                "auroc": 0.7425661452380952,
+                "fpr95": 0.6037777777777777
+              },
+              "places365_test": {
+                "aupr_in": 0.6508266047399713,
+                "aupr_out": 0.9258893116356925,
+                "auroc": 0.8141424494254121,
+                "fpr95": 0.5182222222222223
+              },
+              "svhn_test": {
+                "aupr_in": 0.7811992970887705,
+                "aupr_out": 0.9433444961346494,
+                "auroc": 0.8823170072730999,
+                "fpr95": 0.4282222222222222
+              },
+              "texture_test": {
+                "aupr_in": 0.8702412866140837,
+                "aupr_out": 0.6798310963579802,
+                "auroc": 0.8016057033096926,
+                "fpr95": 0.5964444444444444
+              },
+              "tin_test": {
+                "aupr_in": 0.8725297882122043,
+                "aupr_out": 0.666838252528404,
+                "auroc": 0.8039668164947049,
+                "fpr95": 0.49144444444444446
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6941002129550629,
+                "aupr_out": 0.8687275405712306,
+                "auroc": 0.810157826311575,
+                "fpr95": 0.5366666666666666
+              },
+              "near": {
+                "aupr_in": 0.8306556238904304,
+                "aupr_out": 0.6911614510403112,
+                "auroc": 0.7870628193584636,
+                "fpr95": 0.5412777777777777
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "teacher_energy": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7970917114625613,
+                "aupr_out": 0.7665738307137355,
+                "auroc": 0.7931625944444445,
+                "fpr95": 0.5966666666666667
+              },
+              "mnist_test": {
+                "aupr_in": 0.5277896706236226,
+                "aupr_out": 0.9468674847790767,
+                "auroc": 0.7799757507936509,
+                "fpr95": 0.5534444444444444
+              },
+              "places365_test": {
+                "aupr_in": 0.6223736322358042,
+                "aupr_out": 0.9168466612535286,
+                "auroc": 0.8014922077793898,
+                "fpr95": 0.5537777777777778
+              },
+              "svhn_test": {
+                "aupr_in": 0.7011001302568062,
+                "aupr_out": 0.9028781586751534,
+                "auroc": 0.8155102587413781,
+                "fpr95": 0.5211111111111111
+              },
+              "texture_test": {
+                "aupr_in": 0.8637243699701012,
+                "aupr_out": 0.6573437800520808,
+                "auroc": 0.7889993006304177,
+                "fpr95": 0.6048888888888889
+              },
+              "tin_test": {
+                "aupr_in": 0.8863095922452136,
+                "aupr_out": 0.7351167465952153,
+                "auroc": 0.8349673272721082,
+                "fpr95": 0.48344444444444445
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6787469507715835,
+                "aupr_out": 0.8559840211899599,
+                "auroc": 0.7964943794862092,
+                "fpr95": 0.5583055555555556
+              },
+              "near": {
+                "aupr_in": 0.8417006518538874,
+                "aupr_out": 0.7508452886544754,
+                "auroc": 0.8140649608582764,
+                "fpr95": 0.5400555555555555
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "teacher_msp": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7962445300525713,
+                "aupr_out": 0.7646410207738178,
+                "auroc": 0.7901176166666667,
+                "fpr95": 0.5933333333333334
+              },
+              "mnist_test": {
+                "aupr_in": 0.5212669871815063,
+                "aupr_out": 0.9481518669527172,
+                "auroc": 0.7763398198412699,
+                "fpr95": 0.5558888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.6261107622451823,
+                "aupr_out": 0.9181199258717376,
+                "auroc": 0.8018304826011573,
+                "fpr95": 0.5445555555555556
+              },
+              "svhn_test": {
+                "aupr_in": 0.6757897378564552,
+                "aupr_out": 0.8902083261373946,
+                "auroc": 0.7947783390527898,
+                "fpr95": 0.5445555555555556
+              },
+              "texture_test": {
+                "aupr_in": 0.8598115191169713,
+                "aupr_out": 0.6410462914225123,
+                "auroc": 0.7808193459416863,
+                "fpr95": 0.6031111111111112
+              },
+              "tin_test": {
+                "aupr_in": 0.8851960219715614,
+                "aupr_out": 0.7350555681040799,
+                "auroc": 0.8325463360234278,
+                "fpr95": 0.4836666666666667
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6707447516000288,
+                "aupr_out": 0.8493816025960905,
+                "auroc": 0.7884419968592258,
+                "fpr95": 0.5620277777777778
+              },
+              "near": {
+                "aupr_in": 0.8407202760120664,
+                "aupr_out": 0.7498482944389488,
+                "auroc": 0.8113319763450473,
+                "fpr95": 0.5385
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer3_layer4_clip_channel_flatten.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer3_layer4_clip_channel_flatten/kl_divergence/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer3_layer4_clip_channel_flatten.yaml",
+        "method": "kl_divergence",
+        "name": "cifar100_channel_clip_resnet18_layers34_flatten_kl_clean_inference",
+        "run_dir": "runs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer3_layer4_clip_channel_flatten",
+        "task_index": 3
+      }
+    },
+    {
+      "metrics_path": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer2_mask_p020/evaluations/openood_v1_5/metrics/feature_denoising_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer2_mask_p020/evaluations/openood_v1_5/feature_denoising_scores/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": null,
+        "experiment_name": "feature_denoising_channel_residual_layer2_resnet18_cifar10_mask_p020",
+        "feature_denoising_score_recovery": {
+          "inference_rerun": false,
+          "recovered_scores": [
+            "feature_denoising_absolute_improvement",
+            "feature_denoising_relative_improvement"
+          ],
+          "source": "saved_per_sample_artifacts"
+        },
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "10_draw_reconstruction",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 9000,
+          "mnist_test": 70000,
+          "places365_test": 35195,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 7793
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer2_mask_p020",
+        "scores": {
+          "feature_denoising_absolute_improvement": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.5184517471042516,
+                "aupr_out": 0.551176691838749,
+                "auroc": 0.5406181604938272,
+                "fpr95": 0.9528888888888889
+              },
+              "mnist_test": {
+                "aupr_in": 0.42736052755047854,
+                "aupr_out": 0.9509855832963895,
+                "auroc": 0.7529666928571429,
+                "fpr95": 0.6518888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.26491371687594334,
+                "aupr_out": 0.8430586348836174,
+                "auroc": 0.5898985777651498,
+                "fpr95": 0.9008888888888889
+              },
+              "svhn_test": {
+                "aupr_in": 0.8967444775043429,
+                "aupr_out": 0.983653964827771,
+                "auroc": 0.957613881206037,
+                "fpr95": 0.21122222222222223
+              },
+              "texture_test": {
+                "aupr_in": 0.6609320979120124,
+                "aupr_out": 0.6168735528950428,
+                "auroc": 0.6465309889676911,
+                "fpr95": 0.993
+              },
+              "tin_test": {
+                "aupr_in": 0.6222206733230333,
+                "aupr_out": 0.5526725364140699,
+                "auroc": 0.59862468454596,
+                "fpr95": 0.8956666666666667
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.5624877049606942,
+                "aupr_out": 0.8486429339757051,
+                "auroc": 0.7367525351990052,
+                "fpr95": 0.6892499999999999
+              },
+              "near": {
+                "aupr_in": 0.5703362102136424,
+                "aupr_out": 0.5519246141264094,
+                "auroc": 0.5696214225198936,
+                "fpr95": 0.9242777777777778
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "feature_denoising_channel_residual_reconstruction_error": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.49381672130241405,
+                "aupr_out": 0.5359195653868449,
+                "auroc": 0.5099690925925926,
+                "fpr95": 0.9596666666666667
+              },
+              "mnist_test": {
+                "aupr_in": 0.19638243301043484,
+                "aupr_out": 0.8466863261523198,
+                "auroc": 0.4842260579365079,
+                "fpr95": 0.852
+              },
+              "places365_test": {
+                "aupr_in": 0.21518754839754262,
+                "aupr_out": 0.8292843385169304,
+                "auroc": 0.5452812157661283,
+                "fpr95": 0.9578888888888889
+              },
+              "svhn_test": {
+                "aupr_in": 0.14579551660312592,
+                "aupr_out": 0.5467936152013578,
+                "auroc": 0.08697320605408727,
+                "fpr95": 0.9993333333333333
+              },
+              "texture_test": {
+                "aupr_in": 0.5361100683342878,
+                "aupr_out": 0.47108579789249544,
+                "auroc": 0.4430476753349094,
+                "fpr95": 0.9971111111111111
+              },
+              "tin_test": {
+                "aupr_in": 0.5184396072479085,
+                "aupr_out": 0.4573214438185196,
+                "auroc": 0.4799503400487617,
+                "fpr95": 0.9591111111111111
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.2733688915863478,
+                "aupr_out": 0.673462519440776,
+                "auroc": 0.3898820387729083,
+                "fpr95": 0.9515833333333332
+              },
+              "near": {
+                "aupr_in": 0.5061281642751613,
+                "aupr_out": 0.49662050460268226,
+                "auroc": 0.49495971632067715,
+                "fpr95": 0.9593888888888888
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "feature_denoising_relative_improvement": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.5298336736263456,
+                "aupr_out": 0.5861932920098126,
+                "auroc": 0.5594156851851853,
+                "fpr95": 0.9492222222222222
+              },
+              "mnist_test": {
+                "aupr_in": 0.6243163619677835,
+                "aupr_out": 0.9489670791216763,
+                "auroc": 0.809754573809524,
+                "fpr95": 0.4491111111111111
+              },
+              "places365_test": {
+                "aupr_in": 0.2800339027453679,
+                "aupr_out": 0.8886236477992544,
+                "auroc": 0.6627886189641836,
+                "fpr95": 0.9312222222222222
+              },
+              "svhn_test": {
+                "aupr_in": 0.1773484688155691,
+                "aupr_out": 0.6590967487408927,
+                "auroc": 0.3060669603223384,
+                "fpr95": 0.9978888888888889
+              },
+              "texture_test": {
+                "aupr_in": 0.6089163374695756,
+                "aupr_out": 0.5992293765368021,
+                "auroc": 0.5815678092986604,
+                "fpr95": 0.994
+              },
+              "tin_test": {
+                "aupr_in": 0.5845219265983221,
+                "aupr_out": 0.5608394166431202,
+                "auroc": 0.5798492521778804,
+                "fpr95": 0.9382222222222222
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.422653767749574,
+                "aupr_out": 0.7739792130496563,
+                "auroc": 0.5900444905986766,
+                "fpr95": 0.8430555555555554
+              },
+              "near": {
+                "aupr_in": 0.5571778001123339,
+                "aupr_out": 0.5735163543264664,
+                "auroc": 0.5696324686815328,
+                "fpr95": 0.9437222222222221
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer2_mask_p020.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer2_mask_p020/channel_masked_residual_reconstruction/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer2_mask_p020.yaml",
+        "method": null,
+        "name": "cifar10_feature_denoising_resnet18_layer2_mask_p020_10_draw",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer2_mask_p020",
+        "task_index": 4
+      }
+    },
+    {
+      "metrics_path": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer3_mask_p020/evaluations/openood_v1_5/metrics/feature_denoising_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer3_mask_p020/evaluations/openood_v1_5/feature_denoising_scores/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": null,
+        "experiment_name": "feature_denoising_channel_residual_layer3_resnet18_cifar10_mask_p020",
+        "feature_denoising_score_recovery": {
+          "inference_rerun": false,
+          "recovered_scores": [
+            "feature_denoising_absolute_improvement",
+            "feature_denoising_relative_improvement"
+          ],
+          "source": "saved_per_sample_artifacts"
+        },
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "10_draw_reconstruction",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 9000,
+          "mnist_test": 70000,
+          "places365_test": 35195,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 7793
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer3_mask_p020",
+        "scores": {
+          "feature_denoising_absolute_improvement": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8496561494012526,
+                "aupr_out": 0.8210492054182683,
+                "auroc": 0.8400831728395062,
+                "fpr95": 0.5476666666666666
+              },
+              "mnist_test": {
+                "aupr_in": 0.753113108749335,
+                "aupr_out": 0.9727891952740709,
+                "auroc": 0.8803540222222223,
+                "fpr95": 0.30922222222222223
+              },
+              "places365_test": {
+                "aupr_in": 0.8044570188816742,
+                "aupr_out": 0.9667038794022705,
+                "auroc": 0.9049585120992565,
+                "fpr95": 0.3297777777777778
+              },
+              "svhn_test": {
+                "aupr_in": 0.945148035043481,
+                "aupr_out": 0.9900344024292078,
+                "auroc": 0.9745100880113367,
+                "fpr95": 0.1228888888888889
+              },
+              "texture_test": {
+                "aupr_in": 0.9485576027485885,
+                "aupr_out": 0.9030634069724497,
+                "auroc": 0.9297950847123718,
+                "fpr95": 0.3461111111111111
+              },
+              "tin_test": {
+                "aupr_in": 0.9175361999708218,
+                "aupr_out": 0.8612255799976485,
+                "auroc": 0.8954465902448066,
+                "fpr95": 0.37366666666666665
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.8628189413557696,
+                "aupr_out": 0.9581477210194997,
+                "auroc": 0.9224044267612967,
+                "fpr95": 0.277
+              },
+              "near": {
+                "aupr_in": 0.8835961746860372,
+                "aupr_out": 0.8411373927079584,
+                "auroc": 0.8677648815421564,
+                "fpr95": 0.46066666666666667
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "feature_denoising_channel_residual_reconstruction_error": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.3958802806615267,
+                "aupr_out": 0.3986822786524437,
+                "auroc": 0.3383007777777778,
+                "fpr95": 0.9898888888888889
+              },
+              "mnist_test": {
+                "aupr_in": 0.08922957847835178,
+                "aupr_out": 0.8094955773364582,
+                "auroc": 0.32051350238095233,
+                "fpr95": 0.9588888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.1309676764252335,
+                "aupr_out": 0.6641452239800885,
+                "auroc": 0.25180094868273584,
+                "fpr95": 0.9918888888888889
+              },
+              "svhn_test": {
+                "aupr_in": 0.1426819605309107,
+                "aupr_out": 0.5357562886710638,
+                "auroc": 0.03928683500648774,
+                "fpr95": 1.0
+              },
+              "texture_test": {
+                "aupr_in": 0.4531581847499949,
+                "aupr_out": 0.30595084144814255,
+                "auroc": 0.22940273837667455,
+                "fpr95": 1.0
+              },
+              "tin_test": {
+                "aupr_in": 0.4022438923639987,
+                "aupr_out": 0.33243169202199624,
+                "auroc": 0.2692762593210431,
+                "fpr95": 0.9911111111111112
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.20400935004612272,
+                "aupr_out": 0.5788369828589381,
+                "auroc": 0.21025100611171263,
+                "fpr95": 0.9876944444444444
+              },
+              "near": {
+                "aupr_in": 0.3990620865127627,
+                "aupr_out": 0.36555698533722,
+                "auroc": 0.30378851854941047,
+                "fpr95": 0.9905
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "feature_denoising_relative_improvement": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8277499659927952,
+                "aupr_out": 0.7865966876113296,
+                "auroc": 0.8162280370370372,
+                "fpr95": 0.5705555555555556
+              },
+              "mnist_test": {
+                "aupr_in": 0.7150987059654543,
+                "aupr_out": 0.9731234958128142,
+                "auroc": 0.8751761873015874,
+                "fpr95": 0.3562222222222222
+              },
+              "places365_test": {
+                "aupr_in": 0.6784879476365231,
+                "aupr_out": 0.9444136850677498,
+                "auroc": 0.8482921563984782,
+                "fpr95": 0.49266666666666664
+              },
+              "svhn_test": {
+                "aupr_in": 0.46881606665556913,
+                "aupr_out": 0.8298435851206849,
+                "auroc": 0.672568787133784,
+                "fpr95": 0.778
+              },
+              "texture_test": {
+                "aupr_in": 0.8689659886041914,
+                "aupr_out": 0.768088934045058,
+                "auroc": 0.8230949468085106,
+                "fpr95": 0.6271111111111111
+              },
+              "tin_test": {
+                "aupr_in": 0.8782728847106777,
+                "aupr_out": 0.7940745157937752,
+                "auroc": 0.846626488158889,
+                "fpr95": 0.49322222222222223
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6828421772154345,
+                "aupr_out": 0.8788674250115767,
+                "auroc": 0.80478301941059,
+                "fpr95": 0.5635
+              },
+              "near": {
+                "aupr_in": 0.8530114253517365,
+                "aupr_out": 0.7903356017025525,
+                "auroc": 0.8314272625979631,
+                "fpr95": 0.5318888888888889
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer3_mask_p020.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer3_mask_p020/channel_masked_residual_reconstruction/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer3_mask_p020.yaml",
+        "method": null,
+        "name": "cifar10_feature_denoising_resnet18_layer3_mask_p020_10_draw",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer3_mask_p020",
+        "task_index": 5
+      }
+    },
+    {
+      "metrics_path": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer4_mask_p020/evaluations/openood_v1_5/metrics/feature_denoising_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer4_mask_p020/evaluations/openood_v1_5/feature_denoising_scores/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": null,
+        "experiment_name": "feature_denoising_channel_residual_layer4_resnet18_cifar10_mask_p020",
+        "feature_denoising_score_recovery": {
+          "inference_rerun": false,
+          "recovered_scores": [
+            "feature_denoising_absolute_improvement",
+            "feature_denoising_relative_improvement"
+          ],
+          "source": "saved_per_sample_artifacts"
+        },
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "10_draw_reconstruction",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 9000,
+          "mnist_test": 70000,
+          "places365_test": 35195,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 7793
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer4_mask_p020",
+        "scores": {
+          "feature_denoising_absolute_improvement": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.7683583776534886,
+                "aupr_out": 0.7637186397957574,
+                "auroc": 0.7724047839506174,
+                "fpr95": 0.721
+              },
+              "mnist_test": {
+                "aupr_in": 0.9152129740287934,
+                "aupr_out": 0.996989123325629,
+                "auroc": 0.9796700611111112,
+                "fpr95": 0.10033333333333333
+              },
+              "places365_test": {
+                "aupr_in": 0.5657711431170803,
+                "aupr_out": 0.9331856082705148,
+                "auroc": 0.8033085365661157,
+                "fpr95": 0.6475555555555556
+              },
+              "svhn_test": {
+                "aupr_in": 0.8031617211410631,
+                "aupr_out": 0.965960108705884,
+                "auroc": 0.9120789989244007,
+                "fpr95": 0.4127777777777778
+              },
+              "texture_test": {
+                "aupr_in": 0.8024156403999908,
+                "aupr_out": 0.679408845821726,
+                "auroc": 0.7512837667454688,
+                "fpr95": 0.7933333333333333
+              },
+              "tin_test": {
+                "aupr_in": 0.8003902011783254,
+                "aupr_out": 0.7382941907785958,
+                "auroc": 0.7780098949199423,
+                "fpr95": 0.7041111111111111
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.7716403696717319,
+                "aupr_out": 0.8938859215309385,
+                "auroc": 0.8615853408367741,
+                "fpr95": 0.48850000000000005
+              },
+              "near": {
+                "aupr_in": 0.7843742894159069,
+                "aupr_out": 0.7510064152871766,
+                "auroc": 0.7752073394352799,
+                "fpr95": 0.7125555555555556
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "feature_denoising_channel_residual_reconstruction_error": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.7646847498942095,
+                "aupr_out": 0.698132971842821,
+                "auroc": 0.745929061728395,
+                "fpr95": 0.6856666666666666
+              },
+              "mnist_test": {
+                "aupr_in": 0.25166161344041615,
+                "aupr_out": 0.8836868121532895,
+                "auroc": 0.5756028000000001,
+                "fpr95": 0.7833333333333333
+              },
+              "places365_test": {
+                "aupr_in": 0.47931361782467885,
+                "aupr_out": 0.8884416990212151,
+                "auroc": 0.7309202838155673,
+                "fpr95": 0.6977777777777778
+              },
+              "svhn_test": {
+                "aupr_in": 0.387687757191457,
+                "aupr_out": 0.7568875429314414,
+                "auroc": 0.5705207394318104,
+                "fpr95": 0.8276666666666667
+              },
+              "texture_test": {
+                "aupr_in": 0.8321301096035282,
+                "aupr_out": 0.6535630345424019,
+                "auroc": 0.7585584712371946,
+                "fpr95": 0.692
+              },
+              "tin_test": {
+                "aupr_in": 0.7978942973048273,
+                "aupr_out": 0.6734257198556631,
+                "auroc": 0.7569258593894805,
+                "fpr95": 0.6624444444444444
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.48769827451502,
+                "aupr_out": 0.795644772162087,
+                "auroc": 0.6589005736211431,
+                "fpr95": 0.7501944444444444
+              },
+              "near": {
+                "aupr_in": 0.7812895235995184,
+                "aupr_out": 0.685779345849242,
+                "auroc": 0.7514274605589377,
+                "fpr95": 0.6740555555555555
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "feature_denoising_relative_improvement": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8578422079087648,
+                "aupr_out": 0.8307100500096678,
+                "auroc": 0.8542589691358025,
+                "fpr95": 0.5211111111111111
+              },
+              "mnist_test": {
+                "aupr_in": 0.7946380518189485,
+                "aupr_out": 0.9887936330571087,
+                "auroc": 0.9372594134920634,
+                "fpr95": 0.2528888888888889
+              },
+              "places365_test": {
+                "aupr_in": 0.6787782030813568,
+                "aupr_out": 0.9489027258672099,
+                "auroc": 0.8639028318416442,
+                "fpr95": 0.4748888888888889
+              },
+              "svhn_test": {
+                "aupr_in": 0.7618194604974526,
+                "aupr_out": 0.9351328201595468,
+                "auroc": 0.8705058539063033,
+                "fpr95": 0.441
+              },
+              "texture_test": {
+                "aupr_in": 0.9120133313867642,
+                "aupr_out": 0.796141034363366,
+                "auroc": 0.872167937352246,
+                "fpr95": 0.4811111111111111
+              },
+              "tin_test": {
+                "aupr_in": 0.8814847039246256,
+                "aupr_out": 0.8135414915721041,
+                "auroc": 0.862431990247658,
+                "fpr95": 0.4918888888888889
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.7868122616961306,
+                "aupr_out": 0.9172425533618078,
+                "auroc": 0.8859590091480642,
+                "fpr95": 0.41247222222222224
+              },
+              "near": {
+                "aupr_in": 0.8696634559166951,
+                "aupr_out": 0.822125770790886,
+                "auroc": 0.8583454796917303,
+                "fpr95": 0.5065
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer4_mask_p020.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer4_mask_p020/channel_masked_residual_reconstruction/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer4_mask_p020.yaml",
+        "method": null,
+        "name": "cifar10_feature_denoising_resnet18_layer4_mask_p020_10_draw",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer4_mask_p020",
+        "task_index": 6
+      }
+    },
+    {
+      "metrics_path": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer2_mask_p020/evaluations/openood_v1_5/metrics/feature_denoising_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer2_mask_p020/evaluations/openood_v1_5/feature_denoising_scores/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": null,
+        "experiment_name": "feature_denoising_channel_residual_layer2_resnet18_cifar100_mask_p020",
+        "feature_denoising_score_recovery": {
+          "inference_rerun": false,
+          "recovered_scores": [
+            "feature_denoising_absolute_improvement",
+            "feature_denoising_relative_improvement"
+          ],
+          "source": "saved_per_sample_artifacts"
+        },
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "10_draw_reconstruction",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 10000,
+          "mnist_test": 70000,
+          "places365_test": 33773,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 6526
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer2_mask_p020",
+        "scores": {
+          "feature_denoising_absolute_improvement": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.5438135685989479,
+                "aupr_out": 0.5553013632478719,
+                "auroc": 0.5531257833333333,
+                "fpr95": 0.8941111111111111
+              },
+              "mnist_test": {
+                "aupr_in": 0.7337107902416051,
+                "aupr_out": 0.9857045399600841,
+                "auroc": 0.9162536801587302,
+                "fpr95": 0.3224444444444444
+              },
+              "places365_test": {
+                "aupr_in": 0.28423259447718496,
+                "aupr_out": 0.8156817020512264,
+                "auroc": 0.5708635366186664,
+                "fpr95": 0.8792222222222222
+              },
+              "svhn_test": {
+                "aupr_in": 0.8098044405019967,
+                "aupr_out": 0.9637150364712666,
+                "auroc": 0.9136113415966673,
+                "fpr95": 0.372
+              },
+              "texture_test": {
+                "aupr_in": 0.5261973267865934,
+                "aupr_out": 0.3701091150544397,
+                "auroc": 0.4083622635933807,
+                "fpr95": 0.9985555555555555
+              },
+              "tin_test": {
+                "aupr_in": 0.6324659269384989,
+                "aupr_out": 0.43511329267916543,
+                "auroc": 0.5360369887969489,
+                "fpr95": 0.8978888888888888
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.5884862880018451,
+                "aupr_out": 0.7838025983842541,
+                "auroc": 0.7022727054918612,
+                "fpr95": 0.6430555555555555
+              },
+              "near": {
+                "aupr_in": 0.5881397477687234,
+                "aupr_out": 0.4952073279635187,
+                "auroc": 0.5445813860651412,
+                "fpr95": 0.8959999999999999
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "feature_denoising_channel_residual_reconstruction_error": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.46296885238491464,
+                "aupr_out": 0.4844917174593495,
+                "auroc": 0.46696692222222225,
+                "fpr95": 0.9473333333333334
+              },
+              "mnist_test": {
+                "aupr_in": 0.1713733575065323,
+                "aupr_out": 0.8411419763534028,
+                "auroc": 0.4735572341269841,
+                "fpr95": 0.88
+              },
+              "places365_test": {
+                "aupr_in": 0.23522886514242072,
+                "aupr_out": 0.7941267950328599,
+                "auroc": 0.5358283951348382,
+                "fpr95": 0.937
+              },
+              "svhn_test": {
+                "aupr_in": 0.1463995225370791,
+                "aupr_out": 0.5491333160041078,
+                "auroc": 0.0958539745953698,
+                "fpr95": 0.9984444444444445
+              },
+              "texture_test": {
+                "aupr_in": 0.5608664411218667,
+                "aupr_out": 0.48814764115222153,
+                "auroc": 0.4885753250591017,
+                "fpr95": 0.9955555555555555
+              },
+              "tin_test": {
+                "aupr_in": 0.5706978059204213,
+                "aupr_out": 0.382920471225555,
+                "auroc": 0.4689065107092995,
+                "fpr95": 0.9462222222222222
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.2784670465769747,
+                "aupr_out": 0.668137432135648,
+                "auroc": 0.3984537322290734,
+                "fpr95": 0.95275
+              },
+              "near": {
+                "aupr_in": 0.516833329152668,
+                "aupr_out": 0.4337060943424522,
+                "auroc": 0.46793671646576085,
+                "fpr95": 0.9467777777777777
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "feature_denoising_relative_improvement": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.48123538313611997,
+                "aupr_out": 0.5019324158115702,
+                "auroc": 0.4895253,
+                "fpr95": 0.9392222222222222
+              },
+              "mnist_test": {
+                "aupr_in": 0.7479761155505706,
+                "aupr_out": 0.9772812525170512,
+                "auroc": 0.900454915079365,
+                "fpr95": 0.30522222222222223
+              },
+              "places365_test": {
+                "aupr_in": 0.27013639938234135,
+                "aupr_out": 0.8391974994111504,
+                "auroc": 0.6028877456350734,
+                "fpr95": 0.9176666666666666
+              },
+              "svhn_test": {
+                "aupr_in": 0.15673814960666457,
+                "aupr_out": 0.5795745006909407,
+                "auroc": 0.18844244050058048,
+                "fpr95": 0.9963333333333333
+              },
+              "texture_test": {
+                "aupr_in": 0.5356130091875181,
+                "aupr_out": 0.47362368197451454,
+                "auroc": 0.44806981875492513,
+                "fpr95": 0.9992222222222222
+              },
+              "tin_test": {
+                "aupr_in": 0.5693971954065163,
+                "aupr_out": 0.4054695044353578,
+                "auroc": 0.4866359519188205,
+                "fpr95": 0.9545555555555556
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.4276159184317737,
+                "aupr_out": 0.7174192336484142,
+                "auroc": 0.534963729992486,
+                "fpr95": 0.8046111111111112
+              },
+              "near": {
+                "aupr_in": 0.5253162892713181,
+                "aupr_out": 0.453700960123464,
+                "auroc": 0.48808062595941026,
+                "fpr95": 0.9468888888888889
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer2_mask_p020.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer2_mask_p020/channel_masked_residual_reconstruction/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer2_mask_p020.yaml",
+        "method": null,
+        "name": "cifar100_feature_denoising_resnet18_layer2_mask_p020_10_draw",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer2_mask_p020",
+        "task_index": 7
+      }
+    },
+    {
+      "metrics_path": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer3_mask_p020/evaluations/openood_v1_5/metrics/feature_denoising_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer3_mask_p020/evaluations/openood_v1_5/feature_denoising_scores/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": null,
+        "experiment_name": "feature_denoising_channel_residual_layer3_resnet18_cifar100_mask_p020",
+        "feature_denoising_score_recovery": {
+          "inference_rerun": false,
+          "recovered_scores": [
+            "feature_denoising_absolute_improvement",
+            "feature_denoising_relative_improvement"
+          ],
+          "source": "saved_per_sample_artifacts"
+        },
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "10_draw_reconstruction",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 10000,
+          "mnist_test": 70000,
+          "places365_test": 33773,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 6526
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer3_mask_p020",
+        "scores": {
+          "feature_denoising_absolute_improvement": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.4969635408000508,
+                "aupr_out": 0.5163425477980333,
+                "auroc": 0.5052469888888889,
+                "fpr95": 0.93
+              },
+              "mnist_test": {
+                "aupr_in": 0.9482821402800553,
+                "aupr_out": 0.9981317761121121,
+                "auroc": 0.9880647849206349,
+                "fpr95": 0.05311111111111111
+              },
+              "places365_test": {
+                "aupr_in": 0.3435064053294071,
+                "aupr_out": 0.8371777569891488,
+                "auroc": 0.6162737854367558,
+                "fpr95": 0.8357777777777777
+              },
+              "svhn_test": {
+                "aupr_in": 0.8293427205303034,
+                "aupr_out": 0.9714985433260704,
+                "auroc": 0.9277783433210407,
+                "fpr95": 0.3527777777777778
+              },
+              "texture_test": {
+                "aupr_in": 0.6436225001317174,
+                "aupr_out": 0.562202620826878,
+                "auroc": 0.6125661544523247,
+                "fpr95": 0.9892222222222222
+              },
+              "tin_test": {
+                "aupr_in": 0.6499616035330704,
+                "aupr_out": 0.45824162377984273,
+                "auroc": 0.5561954489733374,
+                "fpr95": 0.8924444444444445
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6911884415678708,
+                "aupr_out": 0.8422526743135523,
+                "auroc": 0.786170767032689,
+                "fpr95": 0.5577222222222222
+              },
+              "near": {
+                "aupr_in": 0.5734625721665606,
+                "aupr_out": 0.487292085788938,
+                "auroc": 0.5307212189311131,
+                "fpr95": 0.9112222222222223
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "feature_denoising_channel_residual_reconstruction_error": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.4736300364793341,
+                "aupr_out": 0.4933535553604257,
+                "auroc": 0.4798354277777778,
+                "fpr95": 0.9435555555555556
+              },
+              "mnist_test": {
+                "aupr_in": 0.06146726028596588,
+                "aupr_out": 0.7337404168311098,
+                "auroc": 0.06636550238095237,
+                "fpr95": 0.9915555555555555
+              },
+              "places365_test": {
+                "aupr_in": 0.19433868428424422,
+                "aupr_out": 0.7391310000711722,
+                "auroc": 0.4389769835864942,
+                "fpr95": 0.9513333333333334
+              },
+              "svhn_test": {
+                "aupr_in": 0.14879779786742503,
+                "aupr_out": 0.5563508698599557,
+                "auroc": 0.11900415300826334,
+                "fpr95": 0.9986666666666667
+              },
+              "texture_test": {
+                "aupr_in": 0.5395591023683437,
+                "aupr_out": 0.46287825244808556,
+                "auroc": 0.447626231284476,
+                "fpr95": 0.9953333333333333
+              },
+              "tin_test": {
+                "aupr_in": 0.5612934699793497,
+                "aupr_out": 0.37566595392280866,
+                "auroc": 0.45709373616644533,
+                "fpr95": 0.949
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.23604071120149472,
+                "aupr_out": 0.6230251348025808,
+                "auroc": 0.26799321756504646,
+                "fpr95": 0.9842222222222222
+              },
+              "near": {
+                "aupr_in": 0.517461753229342,
+                "aupr_out": 0.4345097546416172,
+                "auroc": 0.4684645819721116,
+                "fpr95": 0.9462777777777778
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "feature_denoising_relative_improvement": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.4711930224992255,
+                "aupr_out": 0.48123806067894837,
+                "auroc": 0.46629561666666663,
+                "fpr95": 0.9317777777777778
+              },
+              "mnist_test": {
+                "aupr_in": 0.727486957836214,
+                "aupr_out": 0.9863277277693491,
+                "auroc": 0.9216053634920633,
+                "fpr95": 0.32455555555555554
+              },
+              "places365_test": {
+                "aupr_in": 0.2602546843597139,
+                "aupr_out": 0.8213264357370523,
+                "auroc": 0.5723447379070066,
+                "fpr95": 0.912
+              },
+              "svhn_test": {
+                "aupr_in": 0.24505734253667177,
+                "aupr_out": 0.7661877210891327,
+                "auroc": 0.5113125320118828,
+                "fpr95": 0.9792222222222222
+              },
+              "texture_test": {
+                "aupr_in": 0.6271667373338174,
+                "aupr_out": 0.5815693089734871,
+                "auroc": 0.5944611899133176,
+                "fpr95": 0.9861111111111112
+              },
+              "tin_test": {
+                "aupr_in": 0.6046718578681166,
+                "aupr_out": 0.42201553867985664,
+                "auroc": 0.5165364014029352,
+                "fpr95": 0.9222222222222223
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.4649914305166043,
+                "aupr_out": 0.7888527983922553,
+                "auroc": 0.6499309558310675,
+                "fpr95": 0.8004722222222223
+              },
+              "near": {
+                "aupr_in": 0.537932440183671,
+                "aupr_out": 0.4516267996794025,
+                "auroc": 0.4914160090348009,
+                "fpr95": 0.927
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer3_mask_p020.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer3_mask_p020/channel_masked_residual_reconstruction/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer3_mask_p020.yaml",
+        "method": null,
+        "name": "cifar100_feature_denoising_resnet18_layer3_mask_p020_10_draw",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer3_mask_p020",
+        "task_index": 8
+      }
+    },
+    {
+      "metrics_path": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer4_mask_p020/evaluations/openood_v1_5/metrics/feature_denoising_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer4_mask_p020/evaluations/openood_v1_5/feature_denoising_scores/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": null,
+        "experiment_name": "feature_denoising_channel_residual_layer4_resnet18_cifar100_mask_p020",
+        "feature_denoising_score_recovery": {
+          "inference_rerun": false,
+          "recovered_scores": [
+            "feature_denoising_absolute_improvement",
+            "feature_denoising_relative_improvement"
+          ],
+          "source": "saved_per_sample_artifacts"
+        },
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "10_draw_reconstruction",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 10000,
+          "mnist_test": 70000,
+          "places365_test": 33773,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 6526
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer4_mask_p020",
+        "scores": {
+          "feature_denoising_absolute_improvement": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.773356195852732,
+                "aupr_out": 0.7455001550185488,
+                "auroc": 0.7693585333333333,
+                "fpr95": 0.6305555555555555
+              },
+              "mnist_test": {
+                "aupr_in": 0.41879973456556896,
+                "aupr_out": 0.9303356532205143,
+                "auroc": 0.7159090531746032,
+                "fpr95": 0.6458888888888888
+              },
+              "places365_test": {
+                "aupr_in": 0.5518201571809673,
+                "aupr_out": 0.8986350812325199,
+                "auroc": 0.7578021578710146,
+                "fpr95": 0.6307777777777778
+              },
+              "svhn_test": {
+                "aupr_in": 0.6485198006904959,
+                "aupr_out": 0.8920826927632385,
+                "auroc": 0.7843903870450044,
+                "fpr95": 0.5788888888888889
+              },
+              "texture_test": {
+                "aupr_in": 0.8253386747021834,
+                "aupr_out": 0.6166991741194541,
+                "auroc": 0.7428115149724192,
+                "fpr95": 0.6955555555555556
+              },
+              "tin_test": {
+                "aupr_in": 0.848161974476716,
+                "aupr_out": 0.6546391679926339,
+                "auroc": 0.7800657711036199,
+                "fpr95": 0.5683333333333334
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.6111195917848039,
+                "aupr_out": 0.8344381503339316,
+                "auroc": 0.7502282782657603,
+                "fpr95": 0.6377777777777778
+              },
+              "near": {
+                "aupr_in": 0.810759085164724,
+                "aupr_out": 0.7000696615055914,
+                "auroc": 0.7747121522184766,
+                "fpr95": 0.5994444444444444
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "feature_denoising_channel_residual_reconstruction_error": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.65629984763409,
+                "aupr_out": 0.6298744642644976,
+                "auroc": 0.6503638666666667,
+                "fpr95": 0.8065555555555556
+              },
+              "mnist_test": {
+                "aupr_in": 0.4757847019897756,
+                "aupr_out": 0.9342488927338096,
+                "auroc": 0.7228418055555555,
+                "fpr95": 0.6075555555555555
+              },
+              "places365_test": {
+                "aupr_in": 0.4650973482654893,
+                "aupr_out": 0.8859156481682016,
+                "auroc": 0.7158182867971457,
+                "fpr95": 0.7321111111111112
+              },
+              "svhn_test": {
+                "aupr_in": 0.4843003493401505,
+                "aupr_out": 0.8121421054767868,
+                "auroc": 0.651623151847299,
+                "fpr95": 0.7578888888888888
+              },
+              "texture_test": {
+                "aupr_in": 0.809522095929606,
+                "aupr_out": 0.6330895760994114,
+                "auroc": 0.7383059692671394,
+                "fpr95": 0.7587777777777778
+              },
+              "tin_test": {
+                "aupr_in": 0.8124580768583544,
+                "aupr_out": 0.6184277875866242,
+                "auroc": 0.7356531310654816,
+                "fpr95": 0.6682222222222223
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.5586761238812553,
+                "aupr_out": 0.8163490556195524,
+                "auroc": 0.7071473033667849,
+                "fpr95": 0.7140833333333332
+              },
+              "near": {
+                "aupr_in": 0.7343789622462222,
+                "aupr_out": 0.6241511259255609,
+                "auroc": 0.6930084988660741,
+                "fpr95": 0.7373888888888889
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "feature_denoising_relative_improvement": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.7865184361527653,
+                "aupr_out": 0.7549533246349158,
+                "auroc": 0.7807746833333333,
+                "fpr95": 0.6217777777777778
+              },
+              "mnist_test": {
+                "aupr_in": 0.5413701115925161,
+                "aupr_out": 0.9449743594981264,
+                "auroc": 0.7715841785714287,
+                "fpr95": 0.5254444444444445
+              },
+              "places365_test": {
+                "aupr_in": 0.6152610723461864,
+                "aupr_out": 0.9257306591534696,
+                "auroc": 0.8070794849271443,
+                "fpr95": 0.5763333333333334
+              },
+              "svhn_test": {
+                "aupr_in": 0.6785950196148487,
+                "aupr_out": 0.8877708675484164,
+                "auroc": 0.7973958461380863,
+                "fpr95": 0.5364444444444444
+              },
+              "texture_test": {
+                "aupr_in": 0.8853889488975609,
+                "aupr_out": 0.7169353925463917,
+                "auroc": 0.8234488376674547,
+                "fpr95": 0.5611111111111111
+              },
+              "tin_test": {
+                "aupr_in": 0.8872593986196299,
+                "aupr_out": 0.7347708294981095,
+                "auroc": 0.8319883713011201,
+                "fpr95": 0.4792222222222222
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.680153788112778,
+                "aupr_out": 0.868852819686601,
+                "auroc": 0.7998770868260285,
+                "fpr95": 0.5498333333333334
+              },
+              "near": {
+                "aupr_in": 0.8368889173861975,
+                "aupr_out": 0.7448620770665126,
+                "auroc": 0.8063815273172268,
+                "fpr95": 0.5505
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-openood-cifar-eval-20260828/configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer4_mask_p020.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer4_mask_p020/channel_masked_residual_reconstruction/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer4_mask_p020.yaml",
+        "method": null,
+        "name": "cifar100_feature_denoising_resnet18_layer4_mask_p020_10_draw",
+        "run_dir": "runs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer4_mask_p020",
+        "task_index": 9
+      }
+    },
+    {
+      "metrics_path": "runs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020/evaluations/openood_v1_5/metrics/feature_denoising_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020/evaluations/openood_v1_5/feature_denoising_scores/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": null,
+        "experiment_name": "feature_denoising_patch_token_residual_layer12_vit_base_patch16_224_cifar10_mask_p020",
+        "feature_denoising_score_recovery": {
+          "inference_rerun": false,
+          "recovered_scores": [
+            "feature_denoising_absolute_improvement",
+            "feature_denoising_relative_improvement"
+          ],
+          "source": "saved_per_sample_artifacts"
+        },
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "10_draw_reconstruction",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 9000,
+          "mnist_test": 70000,
+          "places365_test": 35195,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 7793
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020",
+        "scores": {
+          "feature_denoising_absolute_improvement": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8310315809331016,
+                "aupr_out": 0.8849007995463736,
+                "auroc": 0.8627810123456789,
+                "fpr95": 0.6726666666666666
+              },
+              "mnist_test": {
+                "aupr_in": 0.11555043919403526,
+                "aupr_out": 0.8526478812138032,
+                "auroc": 0.4289167238095237,
+                "fpr95": 0.9201111111111111
+              },
+              "places365_test": {
+                "aupr_in": 0.8701751870228085,
+                "aupr_out": 0.990815073826853,
+                "auroc": 0.9643937080709065,
+                "fpr95": 0.21522222222222223
+              },
+              "svhn_test": {
+                "aupr_in": 0.8011413411378979,
+                "aupr_out": 0.9693737470564261,
+                "auroc": 0.9185846458205285,
+                "fpr95": 0.4295555555555556
+              },
+              "texture_test": {
+                "aupr_in": 0.9968188548402183,
+                "aupr_out": 0.9939591245059202,
+                "auroc": 0.9955619582348305,
+                "fpr95": 0.012222222222222223
+              },
+              "tin_test": {
+                "aupr_in": 0.9378520626074573,
+                "aupr_out": 0.9471737182478425,
+                "auroc": 0.9423803912342986,
+                "fpr95": 0.3861111111111111
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.69592145554874,
+                "aupr_out": 0.9516989566507505,
+                "auroc": 0.8268642589839472,
+                "fpr95": 0.3942777777777778
+              },
+              "near": {
+                "aupr_in": 0.8844418217702794,
+                "aupr_out": 0.916037258897108,
+                "auroc": 0.9025807017899887,
+                "fpr95": 0.5293888888888889
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "feature_denoising_patch_token_residual_reconstruction_error": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.6705003422436681,
+                "aupr_out": 0.6790617063567586,
+                "auroc": 0.6803398086419753,
+                "fpr95": 0.8377777777777777
+              },
+              "mnist_test": {
+                "aupr_in": 0.35557690866758473,
+                "aupr_out": 0.9218490114757618,
+                "auroc": 0.6730375095238095,
+                "fpr95": 0.7102222222222222
+              },
+              "places365_test": {
+                "aupr_in": 0.43064641915079377,
+                "aupr_out": 0.9072403984503103,
+                "auroc": 0.7281562232640368,
+                "fpr95": 0.7746666666666666
+              },
+              "svhn_test": {
+                "aupr_in": 0.6328476116944841,
+                "aupr_out": 0.9038030401652699,
+                "auroc": 0.7942797774533907,
+                "fpr95": 0.6308888888888889
+              },
+              "texture_test": {
+                "aupr_in": 0.9107081359252048,
+                "aupr_out": 0.8288379228019306,
+                "auroc": 0.8743848305752563,
+                "fpr95": 0.532
+              },
+              "tin_test": {
+                "aupr_in": 0.7612102685021471,
+                "aupr_out": 0.7153212382319338,
+                "auroc": 0.7404382779417426,
+                "fpr95": 0.7626666666666667
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.5824447688595169,
+                "aupr_out": 0.8904325932233181,
+                "auroc": 0.7674645852041233,
+                "fpr95": 0.6619444444444444
+              },
+              "near": {
+                "aupr_in": 0.7158553053729075,
+                "aupr_out": 0.6971914722943462,
+                "auroc": 0.7103890432918589,
+                "fpr95": 0.8002222222222222
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          },
+          "feature_denoising_relative_improvement": {
+            "datasets": {
+              "cifar100_test": {
+                "aupr_in": 0.8693257127655873,
+                "aupr_out": 0.9126541188484956,
+                "auroc": 0.8957702962962962,
+                "fpr95": 0.5911111111111111
+              },
+              "mnist_test": {
+                "aupr_in": 0.32527310916309093,
+                "aupr_out": 0.9376394866206339,
+                "auroc": 0.6919763722222223,
+                "fpr95": 0.743
+              },
+              "places365_test": {
+                "aupr_in": 0.9108308132205513,
+                "aupr_out": 0.9942049018486515,
+                "auroc": 0.9774405897302332,
+                "fpr95": 0.12155555555555556
+              },
+              "svhn_test": {
+                "aupr_in": 0.9045449402571181,
+                "aupr_out": 0.9841095377197616,
+                "auroc": 0.9596841110086729,
+                "fpr95": 0.2121111111111111
+              },
+              "texture_test": {
+                "aupr_in": 0.9982244154417779,
+                "aupr_out": 0.9954466128745618,
+                "auroc": 0.9973579787234041,
+                "fpr95": 0.005222222222222222
+              },
+              "tin_test": {
+                "aupr_in": 0.9611776165814359,
+                "aupr_out": 0.9643586026275508,
+                "auroc": 0.9628700471933502,
+                "fpr95": 0.2298888888888889
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.7847183195206345,
+                "aupr_out": 0.9778501347659023,
+                "auroc": 0.9066147629211331,
+                "fpr95": 0.2704722222222222
+              },
+              "near": {
+                "aupr_in": 0.9152516646735116,
+                "aupr_out": 0.9385063607380232,
+                "auroc": 0.9293201717448232,
+                "fpr95": 0.41050000000000003
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 9000,
+              "mnist_test": 70000,
+              "places365_test": 35195,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 7793
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020/patch_token_masked_residual_reconstruction/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020.yaml",
+        "method": null,
+        "name": "cifar10_feature_denoising_vit_patch_tokens_layer12_mask_p020_10_draw",
+        "run_dir": "runs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020",
+        "task_index": 10
+      }
+    },
+    {
+      "metrics_path": "runs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020/evaluations/openood_v1_5/metrics/feature_denoising_best.json",
+      "result": {
+        "artifact_manifest": "runs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020/evaluations/openood_v1_5/feature_denoising_scores/manifest.json",
+        "checkpoint": "best",
+        "distillation_method": null,
+        "experiment_name": "feature_denoising_patch_token_residual_layer12_vit_base_patch16_224_cifar100_mask_p020",
+        "feature_denoising_score_recovery": {
+          "inference_rerun": false,
+          "recovered_scores": [
+            "feature_denoising_absolute_improvement",
+            "feature_denoising_relative_improvement"
+          ],
+          "source": "saved_per_sample_artifacts"
+        },
+        "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+        "id_label": 0,
+        "inference_mode": "10_draw_reconstruction",
+        "input_score_orientation": "higher_is_id",
+        "manifest_sizes": {
+          "cifar100_test": 9000,
+          "cifar10_test": 10000,
+          "mnist_test": 70000,
+          "places365_test": 33773,
+          "svhn_test": 26032,
+          "texture_test": 5640,
+          "tin_test": 6526
+        },
+        "ood_label": 1,
+        "positive_class": "ood",
+        "protocol": "openood_v1_5",
+        "run_dir": "runs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020",
+        "scores": {
+          "feature_denoising_absolute_improvement": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.5892710541372924,
+                "aupr_out": 0.6556662642980722,
+                "auroc": 0.6289480666666667,
+                "fpr95": 0.8888888888888888
+              },
+              "mnist_test": {
+                "aupr_in": 0.06622913828225604,
+                "aupr_out": 0.7533780057244785,
+                "auroc": 0.14817401111111114,
+                "fpr95": 0.9792222222222222
+              },
+              "places365_test": {
+                "aupr_in": 0.5412215830232913,
+                "aupr_out": 0.9461453801803339,
+                "auroc": 0.8224184457012012,
+                "fpr95": 0.7172222222222222
+              },
+              "svhn_test": {
+                "aupr_in": 0.43292372598034656,
+                "aupr_out": 0.8256935971591756,
+                "auroc": 0.644450831882128,
+                "fpr95": 0.8117777777777778
+              },
+              "texture_test": {
+                "aupr_in": 0.9542358277006222,
+                "aupr_out": 0.9089285272788773,
+                "auroc": 0.9353326733648542,
+                "fpr95": 0.34044444444444444
+              },
+              "tin_test": {
+                "aupr_in": 0.7921263571488397,
+                "aupr_out": 0.7433757791727442,
+                "auroc": 0.7720662903939797,
+                "fpr95": 0.8057777777777778
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.49865256874662905,
+                "aupr_out": 0.8585363775857163,
+                "auroc": 0.6375939905148236,
+                "fpr95": 0.7121666666666667
+              },
+              "near": {
+                "aupr_in": 0.690698705643066,
+                "aupr_out": 0.6995210217354082,
+                "auroc": 0.7005071785303232,
+                "fpr95": 0.8473333333333333
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "feature_denoising_patch_token_residual_reconstruction_error": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.5503114933868113,
+                "aupr_out": 0.5940785996445083,
+                "auroc": 0.5746521055555556,
+                "fpr95": 0.9026666666666666
+              },
+              "mnist_test": {
+                "aupr_in": 0.1663298613289042,
+                "aupr_out": 0.8460684462375532,
+                "auroc": 0.45209334920634925,
+                "fpr95": 0.8682222222222222
+              },
+              "places365_test": {
+                "aupr_in": 0.2495886903090469,
+                "aupr_out": 0.8110457272911855,
+                "auroc": 0.5380757212368854,
+                "fpr95": 0.9075555555555556
+              },
+              "svhn_test": {
+                "aupr_in": 0.5386382193741898,
+                "aupr_out": 0.8586916169523648,
+                "auroc": 0.7169396149183911,
+                "fpr95": 0.7148888888888889
+              },
+              "texture_test": {
+                "aupr_in": 0.8701001780343832,
+                "aupr_out": 0.7400686737814528,
+                "auroc": 0.8128085303388495,
+                "fpr95": 0.6452222222222223
+              },
+              "tin_test": {
+                "aupr_in": 0.6676245403353184,
+                "aupr_out": 0.5035617493449396,
+                "auroc": 0.5862429087070521,
+                "fpr95": 0.8824444444444445
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.456164237261631,
+                "aupr_out": 0.8139686160656391,
+                "auroc": 0.6299793039251188,
+                "fpr95": 0.7839722222222223
+              },
+              "near": {
+                "aupr_in": 0.6089680168610648,
+                "aupr_out": 0.5488201744947239,
+                "auroc": 0.5804475071313038,
+                "fpr95": 0.8925555555555555
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          },
+          "feature_denoising_relative_improvement": {
+            "datasets": {
+              "cifar10_test": {
+                "aupr_in": 0.6410276043443219,
+                "aupr_out": 0.7027828650640047,
+                "auroc": 0.6883467944444445,
+                "fpr95": 0.8644444444444445
+              },
+              "mnist_test": {
+                "aupr_in": 0.0879759853065147,
+                "aupr_out": 0.7814412167510707,
+                "auroc": 0.23475978174603174,
+                "fpr95": 0.9432222222222222
+              },
+              "places365_test": {
+                "aupr_in": 0.5573990559364317,
+                "aupr_out": 0.9517642560853378,
+                "auroc": 0.8431841592725288,
+                "fpr95": 0.726
+              },
+              "svhn_test": {
+                "aupr_in": 0.5370132628750774,
+                "aupr_out": 0.8697830782950815,
+                "auroc": 0.7314062222563682,
+                "fpr95": 0.738
+              },
+              "texture_test": {
+                "aupr_in": 0.9548278846831837,
+                "aupr_out": 0.8824712113268116,
+                "auroc": 0.9311538022064617,
+                "fpr95": 0.30466666666666664
+              },
+              "tin_test": {
+                "aupr_in": 0.817089986961419,
+                "aupr_out": 0.7541898089836976,
+                "auroc": 0.7985220570708618,
+                "fpr95": 0.7876666666666666
+              }
+            },
+            "groups": {
+              "far": {
+                "aupr_in": 0.5343040472003019,
+                "aupr_out": 0.8713649406145754,
+                "auroc": 0.6851259913703476,
+                "fpr95": 0.6779722222222222
+              },
+              "near": {
+                "aupr_in": 0.7290587956528705,
+                "aupr_out": 0.7284863370238511,
+                "auroc": 0.7434344257576531,
+                "fpr95": 0.8260555555555555
+              }
+            },
+            "sample_counts": {
+              "cifar100_test": 9000,
+              "cifar10_test": 10000,
+              "mnist_test": 70000,
+              "places365_test": 33773,
+              "svhn_test": 26032,
+              "texture_test": 5640,
+              "tin_test": 6526
+            }
+          }
+        },
+        "source_config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020.yaml",
+        "version": 1
+      },
+      "task": {
+        "apply_perturbation": false,
+        "checkpoint": "best",
+        "checkpoint_path": "/home/bogush/distill-ood-detection/runs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020/patch_token_masked_residual_reconstruction/best_student.pt",
+        "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020.yaml",
+        "method": null,
+        "name": "cifar100_feature_denoising_vit_patch_tokens_layer12_mask_p020_10_draw",
+        "run_dir": "runs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020",
+        "task_index": 11
+      }
+    }
+  ],
+  "protocol": "openood_v1_5",
+  "selection_missing": [
+    {
+      "apply_perturbation": true,
+      "checkpoint": "best",
+      "checkpoint_path": null,
+      "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_spatial_aggressive.yaml",
+      "method": "kl_divergence",
+      "name": "cifar10_aggressive_spatial_clip_resnet18_layer4_flatten_kl_50_draw",
+      "reason": "missing metrics artifact: runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_spatial_aggressive/kl_divergence/metrics.json",
+      "run_dir": "runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_spatial_aggressive"
+    },
+    {
+      "apply_perturbation": true,
+      "checkpoint": "best",
+      "checkpoint_path": null,
+      "config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer4_clip_spatial_aggressive.yaml",
+      "method": "kl_divergence",
+      "name": "cifar100_aggressive_spatial_clip_resnet18_layer4_flatten_kl_50_draw",
+      "reason": "missing metrics artifact: runs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer4_clip_spatial_aggressive/kl_divergence/metrics.json",
+      "run_dir": "runs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer4_clip_spatial_aggressive"
+    }
+  ],
+  "source_manifest": "/home/bogush/distill-ood-detection/runs/evaluations/openood_v1_5/selected_variants_manifest.json",
+  "version": 1
+}

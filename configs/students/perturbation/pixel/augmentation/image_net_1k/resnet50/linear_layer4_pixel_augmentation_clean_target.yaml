@@ -1,0 +1,100 @@
+experiment_name: linear_layer4_pixel_augmentation_clean_target_student_resnet50_imagenet1k
+run_dir: runs/students/perturbation/pixel/augmentation/image_net_1k/resnet50/linear_layer4_pixel_augmentation_clean_target
+
+dataset:
+  name: imagenet
+  data_dir: /data/common/ImageNet
+  batch_size: 128
+  num_workers: 8
+  image_lists:
+    train:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/train_imagenet.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+    validation:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/val_imagenet.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+      basename_search_dir: val
+    test:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_imagenet.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+      basename_search_dir: val
+  ood_datasets:
+    - name: ssb_hard
+      split: test
+      group: near
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_ssb_hard.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: ninco
+      split: test
+      group: near
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_ninco.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: inaturalist
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_inaturalist.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: textures
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_textures.txt
+        data_dir: /data/common/dataset_suite/dtddataset/dtd/images
+        strip_prefix: texture
+    - name: openimage_o
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_openimage_o.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+
+teacher:
+  hf_model_id: torchvision/resnet50-imagenet1k-v1
+  architecture: resnet50_imagenet
+  checkpoint_path: /home/bogush/openood/results/imagenet_resnet50_torchvision_v1/resnet50-0676ba61.pth
+  num_classes: 1000
+
+student:
+  kind: linear
+  feature_layer: layer4
+  input_shape: [100358]
+  num_classes: 1000
+
+strategy:
+  name: perturbation
+  perturbation:
+    method: pixel_augmentation
+    teacher_target: clean
+    embedding_pool: flatten
+    rotation_degrees: 10.0
+    translate_fraction: 0.10
+    scale_min: 0.80
+    scale_max: 1.20
+    brightness_delta: 0.30
+    contrast_delta: 0.30
+    evaluation_draws: 16
+
+optimizer:
+  mse_logits:
+    name: sgd
+    learning_rate: 0.005
+    momentum: 0.9
+    weight_decay: 0.001
+
+training:
+  defaults:
+    epochs: 30
+    seed: 0
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: false

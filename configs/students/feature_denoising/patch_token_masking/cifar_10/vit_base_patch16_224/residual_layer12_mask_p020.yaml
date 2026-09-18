@@ -1,0 +1,60 @@
+experiment_name: feature_denoising_patch_token_residual_layer12_vit_base_patch16_224_cifar10_mask_p020
+run_dir: runs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 64
+  num_workers: 2
+  validation_fraction: 0.1
+  pre_size: 224
+  image_size: 224
+  normalization:
+    - [0.5, 0.5, 0.5]
+    - [0.5, 0.5, 0.5]
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar100
+      split: test
+
+teacher:
+  hf_model_id: nateraw/vit-base-patch16-224-cifar10
+  revision: main
+  num_classes: 10
+
+student:
+  kind: feature_residual_denoiser
+  feature_layer: layer12
+  input_shape: [768, 14, 14]
+  hidden_channels: [64]
+  num_classes: 768
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: patch_token_masked_residual_reconstruction
+    mask_probability: 0.2
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: false
+  experiment_name: distill-ood-detection
+  tracking_uri: sqlite:///mlflow.db

@@ -1,0 +1,92 @@
+experiment_name: feature_denoising_channel_residual_layer4_resnet18_imagenet200_mask_p020
+run_dir: runs/students/feature_denoising/feature_masking/image_net_200/resnet18/channel_residual_layer4_mask_p020
+
+dataset:
+  name: imagenet200
+  data_dir: /data/common/ImageNet
+  batch_size: 128
+  num_workers: 8
+  image_lists:
+    train:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet200/train_imagenet200.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+    validation:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet200/val_imagenet200.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+      basename_search_dir: val
+    test:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet200/test_imagenet200.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+      basename_search_dir: val
+  ood_datasets:
+    - name: ssb_hard
+      split: test
+      group: near
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet200/test_ssb_hard.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: ninco
+      split: test
+      group: near
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet200/test_ninco.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: inaturalist
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet200/test_inaturalist.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: textures
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet200/test_textures.txt
+        data_dir: /data/common/dataset_suite/dtddataset/dtd/images
+        strip_prefix: texture
+    - name: openimage_o
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet200/test_openimage_o.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+
+teacher:
+  hf_model_id: openood/imagenet200_resnet18
+  architecture: resnet18_imagenet
+  checkpoint_path: /home/bogush/openood/results/imagenet200_resnet18_224x224_base_e90_lr0.1_default/s0/best.ckpt
+  num_classes: 200
+
+student:
+  kind: feature_residual_denoiser
+  feature_layer: layer4
+  input_shape: [512, 7, 7]
+  num_classes: 512
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: channel_masked_residual_reconstruction
+    mask_probability: 0.2
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 0
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: false

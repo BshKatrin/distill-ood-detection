@@ -1,0 +1,93 @@
+{
+  "experiment_name": "feature_denoising_patch_token_residual_layer12_vit_base_patch16_224_cifar100_mask_p020",
+  "fpr95_definition": "ID false-positive rate at 95% OOD true-positive rate",
+  "id_label": 0,
+  "inference_mode": "raw_image_teacher",
+  "input_score_orientation": "higher_is_id",
+  "manifest_sizes": {
+    "cifar100_test": 9000,
+    "cifar10_test": 10000,
+    "mnist_test": 70000,
+    "places365_test": 33773,
+    "svhn_test": 26032,
+    "texture_test": 5640,
+    "tin_test": 6526
+  },
+  "metrics": {
+    "datasets": {
+      "cifar10_test": {
+        "aupr_in": 0.919908533547185,
+        "aupr_out": 0.9329206398520735,
+        "auroc": 0.9261955555555554,
+        "fpr95": 0.31622222222222224
+      },
+      "mnist_test": {
+        "aupr_in": 0.4162868476623433,
+        "aupr_out": 0.9357403566352687,
+        "auroc": 0.6889973571428571,
+        "fpr95": 0.6622222222222223
+      },
+      "places365_test": {
+        "aupr_in": 0.8839896090637234,
+        "aupr_out": 0.9829370330476235,
+        "auroc": 0.946411179870837,
+        "fpr95": 0.21744444444444444
+      },
+      "svhn_test": {
+        "aupr_in": 0.8735362328110197,
+        "aupr_out": 0.9708927325457984,
+        "auroc": 0.9321475150242438,
+        "fpr95": 0.255
+      },
+      "texture_test": {
+        "aupr_in": 0.9925269520438567,
+        "aupr_out": 0.9825238770111278,
+        "auroc": 0.9880830378250591,
+        "fpr95": 0.07644444444444444
+      },
+      "tin_test": {
+        "aupr_in": 0.9565714869938244,
+        "aupr_out": 0.9141206495256532,
+        "auroc": 0.9380401556168488,
+        "fpr95": 0.2381111111111111
+      }
+    },
+    "groups": {
+      "far": {
+        "aupr_in": 0.7915849103952357,
+        "aupr_out": 0.9680234998099546,
+        "auroc": 0.8889097724657493,
+        "fpr95": 0.3027777777777778
+      },
+      "near": {
+        "aupr_in": 0.9382400102705047,
+        "aupr_out": 0.9235206446888633,
+        "auroc": 0.9321178555862022,
+        "fpr95": 0.2771666666666667
+      }
+    }
+  },
+  "ood_label": 1,
+  "positive_class": "ood",
+  "protocol": "openood_v1_5",
+  "sample_counts": {
+    "cifar100_test": 9000,
+    "cifar10_test": 10000,
+    "mnist_test": 70000,
+    "places365_test": 33773,
+    "svhn_test": 26032,
+    "texture_test": 5640,
+    "tin_test": 6526
+  },
+  "score": "teacher_msp",
+  "source_config": "/home/bogush/distill-ood-vit-openood-20260830/configs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020.yaml",
+  "storage_policy": "aggregate metrics only; no logits, probabilities, images, or score vectors",
+  "teacher": {
+    "architecture": "auto",
+    "checkpoint_path": null,
+    "hf_model_id": "MatanBT/vit-base-patch16-224-cifar100",
+    "num_classes": 100,
+    "revision": "main"
+  },
+  "version": 1
+}

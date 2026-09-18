@@ -1,0 +1,53 @@
+experiment_name: feature_denoising_nmf_latent_stratified_layer4_d055_p025_resnet50_cifar100
+run_dir: runs/students/feature_denoising/channel_group_stratified_masking/nmf_latent_cosine/cifar_100/resnet50/cluster_layer4_d055_p025
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 128
+  num_workers: 0
+  validation_fraction: 0.1
+  ood_datasets:
+    - {name: mnist, split: test}
+    - {name: svhn, split: test}
+    - {name: cifar10, split: test}
+
+teacher:
+  hf_model_id: edadaltocg/resnet50_cifar100
+  revision: main
+  num_classes: 100
+
+student:
+  kind: feature_residual_denoiser
+  feature_layer: layer4
+  input_shape: [2048, 4, 4]
+  hidden_channels: [64]
+  num_classes: 2048
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: channel_group_stratified_masked_residual_reconstruction
+    channel_group_path: runs/channel_grouping/nmf_latent_cosine/cifar_100/resnet50/channel_groups/layer4.pt
+    channel_group_distance_threshold: 0.55
+    channel_group_min_size: 1
+    channel_group_mask_fraction: 0.25
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: false

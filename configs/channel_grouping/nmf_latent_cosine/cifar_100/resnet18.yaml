@@ -1,0 +1,29 @@
+experiment_name: channel_groups_nmf_latent_cosine_resnet18_cifar100
+run_dir: runs/channel_grouping/nmf_latent_cosine/cifar_100/resnet18
+device: auto
+seed: 42
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar100
+  revision: main
+  num_classes: 100
+
+method: nmf_latent_cosine
+layers:
+  - layer1
+  - layer2
+  - layer3
+  - layer4
+
+nmf_components: 32
+nmf_batch_size: 65536
+nmf_epochs: 2
+linkage_method: average
+cut_thresholds: []

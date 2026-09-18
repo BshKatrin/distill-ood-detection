@@ -1,0 +1,43 @@
+experiment_name: knn_layer34_spatial_clip_resnet50_cifar100
+run_dir: runs/embedding_distances/perturbation/embedding/clipping/cifar_100/resnet50_spatial_flatten
+device: auto
+seed: 42
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 4
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar10
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet50_cifar100
+  revision: main
+  num_classes: 100
+
+perturbation:
+  method: clipping
+  teacher_target: clean
+  embedding_pool: flatten
+  clipping_layers:
+    layer3:
+      clipping_mode: spatial_dependent
+      u_min: 0.5
+      u_max: 1.0
+    layer4:
+      clipping_mode: spatial_dependent
+      u_min: 0.5
+      u_max: 1.0
+  evaluation_draws: 50
+query_perturbed: true
+
+k_neighbors: 10
+embedding_shard_size: 4096
+search_batch_size: 8192

@@ -1,0 +1,31 @@
+experiment_name: channel_groups_top_activation_correlation_resnet18_cifar10
+run_dir: runs/channel_grouping/top_activation_correlation/cifar_10/resnet18
+device: auto
+seed: 42
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar10
+  revision: main
+  num_classes: 10
+
+layers:
+  - layer1
+  - layer2
+  - layer3
+  - layer4
+
+profile_top_fraction: 0.1
+standardization_epsilon: 1.0e-6
+linkage_method: average
+cut_thresholds:
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.5

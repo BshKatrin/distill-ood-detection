@@ -1,0 +1,40 @@
+experiment_name: knn_affine_layer4_resnet50_cifar10
+run_dir: runs/embedding_distances/perturbation/pixel/augmentation/cifar_10/resnet50
+device: auto
+seed: 42
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 4
+  validation_fraction: 0.1
+  ood_datasets:
+    - name: mnist
+      split: test
+    - name: svhn
+      split: test
+    - name: cifar100
+      split: test
+
+teacher:
+  hf_model_id: edadaltocg/resnet50_cifar10
+  revision: main
+  num_classes: 10
+
+perturbation:
+  method: pixel_augmentation
+  teacher_target: clean
+  embedding_pool: flatten
+  rotation_degrees: 10.0
+  translate_fraction: 0.10
+  scale_min: 0.80
+  scale_max: 1.20
+  brightness_delta: 0.30
+  contrast_delta: 0.30
+  evaluation_draws: 16
+query_perturbed: false
+
+k_neighbors: 10
+embedding_shard_size: 4096
+search_batch_size: 8192

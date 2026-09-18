@@ -1,0 +1,18 @@
+experiment_name: nmf_channel_cluster_audit_resnet18_cifar100
+run_dir: runs/channel_cluster_audit/nmf_latent_cosine/cifar_100/resnet18
+dataset: cifar100
+seed: 42
+epochs: 50
+fraction: 0.25
+fractional_min_cluster_size: 4
+fractional_evaluation_draws: 10
+layers:
+  layer2:
+    template_config: configs/students/feature_denoising/channel_group_masking/nmf_latent_cosine/cifar_100/resnet18/cluster_layer2_d070.yaml
+    distance_threshold: 0.7
+  layer3:
+    template_config: configs/students/feature_denoising/channel_group_masking/nmf_latent_cosine/cifar_100/resnet18/cluster_layer3_d060.yaml
+    distance_threshold: 0.6
+  layer4:
+    template_config: configs/students/feature_denoising/channel_group_masking/nmf_latent_cosine/cifar_100/resnet18/cluster_layer4_d060.yaml
+    distance_threshold: 0.6

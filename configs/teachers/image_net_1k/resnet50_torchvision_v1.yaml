@@ -1,0 +1,67 @@
+experiment_name: teacher_resnet50_imagenet1k_torchvision_v1
+run_dir: runs/teachers/image_net_1k/resnet50_torchvision_v1
+device: auto
+seed: 0
+
+dataset:
+  name: imagenet
+  data_dir: /data/common/ImageNet
+  batch_size: 128
+  num_workers: 8
+  image_lists:
+    train:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/train_imagenet.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+    validation:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/val_imagenet.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+      basename_search_dir: val
+    test:
+      imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_imagenet.txt
+      data_dir: /data/common/ImageNet
+      strip_prefix: imagenet_1k
+      basename_search_dir: val
+  ood_datasets:
+    - name: ssb_hard
+      split: test
+      group: near
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_ssb_hard.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: ninco
+      split: test
+      group: near
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_ninco.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: inaturalist
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_inaturalist.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+    - name: textures
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_textures.txt
+        data_dir: /data/common/dataset_suite/dtddataset/dtd/images
+        strip_prefix: texture
+    - name: openimage_o
+      split: test
+      group: far
+      image_list:
+        imglist_path: /home/bogush/openood/data/benchmark_imglist/imagenet/test_openimage_o.txt
+        data_dir: /home/bogush/openood/data/images_largescale
+
+teacher:
+  hf_model_id: torchvision/resnet50-imagenet1k-v1
+  architecture: resnet50_imagenet
+  checkpoint_path: /home/bogush/openood/results/imagenet_resnet50_torchvision_v1/resnet50-0676ba61.pth
+  num_classes: 1000
+
+layers:
+  - layer3
+  - layer4

@@ -1,0 +1,54 @@
+experiment_name: feature_denoising_nmf_global_layer4_resnet18_cifar100_k32_mask_p020
+run_dir: runs/students/feature_denoising/nmf_concept_masking/cifar_100/resnet18/global_layer4_k32_mask_p020
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 256
+  num_workers: 2
+  validation_fraction: 0.1
+  ood_datasets:
+    - {name: mnist, split: test}
+    - {name: svhn, split: test}
+    - {name: cifar10, split: test}
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar100
+  revision: main
+  num_classes: 100
+
+student:
+  kind: feature_residual_denoiser
+  feature_layer: layer4
+  input_shape: [512, 4, 4]
+  num_classes: 512
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: nmf_concept_masked_residual_reconstruction
+    nmf_components: 32
+    nmf_mask_probability: 0.2
+    nmf_activation_path: runs/teachers/cifar_100/resnet18/teacher_activations/cifar100_train/layer4.pt
+    nmf_batch_size: 1024
+    nmf_max_iter: 200
+    nmf_encoding_max_iter: 200
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: false

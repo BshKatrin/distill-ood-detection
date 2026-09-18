@@ -1,0 +1,61 @@
+protocol: openood_v1_5
+
+variants:
+  - name: cifar10_affine_resnet50_linear_clean_target_mse_logits_clean_inference
+    config: configs/students/perturbation/pixel/augmentation/cifar_10/resnet50/linear_layer4_pixel_augmentation_clean_target.yaml
+    method: mse_logits
+    checkpoint: best
+    apply_perturbation: false
+  - name: cifar100_affine_resnet50_linear_clean_target_mse_logits_clean_inference
+    config: configs/students/perturbation/pixel/augmentation/cifar_100/resnet50/linear_layer4_pixel_augmentation_clean_target.yaml
+    method: mse_logits
+    checkpoint: best
+    apply_perturbation: false
+
+  - name: cifar10_channel_clip_resnet18_layers34_flatten_kl_clean_inference
+    config: configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_layer4_clip_channel_flatten.yaml
+    method: kl_divergence
+    checkpoint: best
+    apply_perturbation: false
+  - name: cifar100_channel_clip_resnet18_layers34_flatten_kl_clean_inference
+    config: configs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer3_layer4_clip_channel_flatten.yaml
+    method: kl_divergence
+    checkpoint: best
+    apply_perturbation: false
+
+  - name: cifar10_aggressive_spatial_clip_resnet18_layer4_flatten_kl_50_draw
+    config: configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_spatial_aggressive.yaml
+    method: kl_divergence
+    checkpoint: best
+    apply_perturbation: true
+  - name: cifar100_aggressive_spatial_clip_resnet18_layer4_flatten_kl_50_draw
+    config: configs/students/perturbation/embedding/clipping/cifar_100/resnet18/linear_layer4_clip_spatial_aggressive.yaml
+    method: kl_divergence
+    checkpoint: best
+    apply_perturbation: true
+
+  - name: cifar10_feature_denoising_resnet18_layer2_mask_p020_10_draw
+    config: configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer2_mask_p020.yaml
+    checkpoint: best
+  - name: cifar10_feature_denoising_resnet18_layer3_mask_p020_10_draw
+    config: configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer3_mask_p020.yaml
+    checkpoint: best
+  - name: cifar10_feature_denoising_resnet18_layer4_mask_p020_10_draw
+    config: configs/students/feature_denoising/feature_masking/cifar_10/resnet18/channel_residual_layer4_mask_p020.yaml
+    checkpoint: best
+  - name: cifar100_feature_denoising_resnet18_layer2_mask_p020_10_draw
+    config: configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer2_mask_p020.yaml
+    checkpoint: best
+  - name: cifar100_feature_denoising_resnet18_layer3_mask_p020_10_draw
+    config: configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer3_mask_p020.yaml
+    checkpoint: best
+  - name: cifar100_feature_denoising_resnet18_layer4_mask_p020_10_draw
+    config: configs/students/feature_denoising/feature_masking/cifar_100/resnet18/channel_residual_layer4_mask_p020.yaml
+    checkpoint: best
+
+  - name: cifar10_feature_denoising_vit_patch_tokens_layer12_mask_p020_10_draw
+    config: configs/students/feature_denoising/patch_token_masking/cifar_10/vit_base_patch16_224/residual_layer12_mask_p020.yaml
+    checkpoint: best
+  - name: cifar100_feature_denoising_vit_patch_tokens_layer12_mask_p020_10_draw
+    config: configs/students/feature_denoising/patch_token_masking/cifar_100/vit_base_patch16_224/residual_layer12_mask_p020.yaml
+    checkpoint: best

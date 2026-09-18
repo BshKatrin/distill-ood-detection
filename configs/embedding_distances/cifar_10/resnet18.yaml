@@ -22,13 +22,6 @@ teacher:
   revision: main
   num_classes: 10
 
-layers:
-  - layer1
-  - layer2
-  - layer3
-  - layer4
 k_neighbors: 10
 embedding_shard_size: 4096
-query_block_size: 1024
-reference_block_size: 8192
-standardization_epsilon: 1.0e-6
+search_batch_size: 8192

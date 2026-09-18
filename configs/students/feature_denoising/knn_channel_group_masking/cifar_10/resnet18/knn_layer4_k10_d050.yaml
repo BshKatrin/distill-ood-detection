@@ -1,0 +1,44 @@
+experiment_name: feature_denoising_knn_channel_group_layer4_resnet18_cifar10_k10_d050
+run_dir: runs/students/feature_denoising/knn_channel_group_masking/cifar_10/resnet18/knn_layer4_k10_d050
+
+dataset:
+  name: cifar10
+  data_dir: data
+  batch_size: 256
+  num_workers: 4
+  validation_fraction: 0.1
+  ood_datasets:
+    - {name: mnist, split: test}
+    - {name: svhn, split: test}
+    - {name: cifar100, split: test}
+
+teacher:
+  hf_model_id: edadaltocg/resnet18_cifar10
+  revision: main
+  num_classes: 10
+
+student:
+  kind: knn
+  feature_layer: layer4
+  input_shape: [512, 4, 4]
+  num_classes: 512
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: channel_group_masked_knn_reconstruction
+    activation_path: runs/teachers/cifar_10/resnet18/teacher_activations/cifar10_train/layer4.pt
+    channel_group_path: runs/channel_grouping/top_activation_correlation/cifar_10/resnet18/channel_groups/layer4.pt
+    channel_group_distance_threshold: 0.5
+    evaluation_draws: 10
+    k_neighbors: 10
+    knn_query_batch_size: 256
+    knn_reference_chunk_size: 50000
+
+training:
+  defaults:
+    seed: 42
+    device: auto
+
+mlflow:
+  enabled: false

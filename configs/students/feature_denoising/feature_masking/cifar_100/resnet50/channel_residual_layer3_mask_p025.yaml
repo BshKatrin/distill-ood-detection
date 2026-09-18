@@ -1,0 +1,50 @@
+experiment_name: feature_denoising_channel_residual_layer3_resnet50_cifar100_mask_p025
+run_dir: runs/students/feature_denoising/feature_masking/cifar_100/resnet50/channel_residual_layer3_mask_p025
+
+dataset:
+  name: cifar100
+  data_dir: data
+  batch_size: 128
+  num_workers: 0
+  validation_fraction: 0.1
+  ood_datasets:
+    - {name: mnist, split: test}
+    - {name: svhn, split: test}
+    - {name: cifar10, split: test}
+
+teacher:
+  hf_model_id: edadaltocg/resnet50_cifar100
+  revision: main
+  num_classes: 100
+
+student:
+  kind: feature_residual_denoiser
+  feature_layer: layer3
+  input_shape: [1024, 8, 8]
+  hidden_channels: [64]
+  num_classes: 1024
+
+strategy:
+  name: feature_denoising
+  feature_denoising:
+    method: channel_masked_residual_reconstruction
+    mask_probability: 0.25
+    evaluation_draws: 10
+
+optimizer:
+  pca_masked_reconstruction:
+    name: adamw
+    learning_rate: 0.001
+    weight_decay: 0.0001
+
+training:
+  defaults:
+    epochs: 50
+    seed: 42
+    device: auto
+    log_every_steps: 50
+  methods:
+    mse_logits: {}
+
+mlflow:
+  enabled: false
