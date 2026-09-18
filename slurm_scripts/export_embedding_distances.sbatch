@@ -19,6 +19,7 @@ trap 'status=$?; echo "[$(date --iso-8601=seconds)] Failed at line ${LINENO} wit
 
 PROJECT_DIR="${PROJECT_DIR:-${SLURM_SUBMIT_DIR}}"
 SOURCE_DIR="${EMBEDDING_DISTANCE_SOURCE_DIR:-${PROJECT_DIR}}"
+GPU_ENV_DIR="${EMBEDDING_DISTANCE_GPU_ENV_DIR:-${PROJECT_DIR}/envs/gpu}"
 export PYTHONPATH="${SOURCE_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 cd "${PROJECT_DIR}"
 
@@ -28,10 +29,10 @@ CONFIG_PATH="${1:?Usage: sbatch slurm_scripts/export_embedding_distances.sbatch 
 
 echo "[$(date --iso-8601=seconds)] Syncing uv GPU environment"
 uv --version
-uv sync --project envs/gpu --locked
+uv sync --project "${GPU_ENV_DIR}" --locked
 
 echo "[$(date --iso-8601=seconds)] Exporting embedding distances: ${CONFIG_PATH}"
-uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli \
+uv run --project "${GPU_ENV_DIR}" --no-sync python -m distill_ood_detection.cli \
   export-embedding-distances \
   --config "${CONFIG_PATH}"
 

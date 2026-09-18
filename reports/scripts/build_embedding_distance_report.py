@@ -1,4 +1,4 @@
-"""Build the layerwise k-NN neighbor-output OOD Score report."""
+"""Build the layer4 FAISS k-NN neighbor-output OOD Score report."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ SUMMARY_PATH = (
 )
 BEGIN_MARKER = "<!-- BEGIN GENERATED RESULTS -->"
 END_MARKER = "<!-- END GENERATED RESULTS -->"
-LAYERS = ("layer1", "layer2", "layer3", "layer4")
+LAYERS = ("layer4",)
 SCORE_NAMES = (
     "student_teacher_kl_divergence",
     "absolute_max_probability_difference",
@@ -41,7 +41,7 @@ SCORE_NAMES = (
     "ensemble_predictive_entropy",
     "ensemble_bald",
 )
-SPACES = ("raw", "id_standardized")
+SPACES = ("raw",)
 DATASET_LABELS = {
     "cifar10_test": "CIFAR-10",
     "cifar100_test": "CIFAR-100",
@@ -121,7 +121,7 @@ def values(
     spec: RunSpec,
     dataset: str,
     layer: str,
-    space: str = "id_standardized",
+    space: str = "raw",
     score_name: str = "student_teacher_kl_divergence",
 ) -> np.ndarray:
     """Load one per-sample sign-adjusted OOD Score vector as NumPy."""
@@ -255,10 +255,10 @@ def class_name(spec: RunSpec, label: int) -> str:
 
 
 def top_nearest_classes(spec: RunSpec, count: int = 5) -> str:
-    """Return the most frequent standardized layer4 nearest-neighbor ID classes."""
+    """Return the most frequent layer4 nearest-neighbor ID classes."""
 
     artifact = load_artifact(spec, spec.near_dataset, "layer4")
-    labels = artifact["distances"]["id_standardized"]["nearest_neighbor_label"]
+    labels = artifact["distances"]["raw"]["nearest_neighbor_label"]
     frequencies = torch.bincount(labels.to(torch.long))
     top_counts, top_labels = frequencies.topk(min(count, frequencies.numel()))
     total = labels.numel()
@@ -269,10 +269,16 @@ def top_nearest_classes(spec: RunSpec, count: int = 5) -> str:
 
 
 def build_distribution_plot() -> None:
-    """Plot standardized-space KL-divergence OOD Score distributions."""
+    """Plot raw-space KL-divergence OOD Score distributions."""
 
     sns.set_theme(style="whitegrid", context="notebook")
-    figure, axes = plt.subplots(4, 4, figsize=(16, 13), sharey=False)
+    figure, axes = plt.subplots(
+        len(RUNS),
+        len(LAYERS),
+        figsize=(5 * len(LAYERS), 13),
+        sharey=False,
+        squeeze=False,
+    )
     rng = np.random.default_rng(42)
     for row, spec in enumerate(RUNS):
         for column, layer in enumerate(LAYERS):
@@ -334,9 +340,9 @@ def generated_markdown() -> str:
         "![Layerwise neighbor-output score distributions](embedding_distance_distributions.png)",
         "",
         "The figure shows the sign-adjusted KL score using neighbors",
-        "selected in the ID-standardized embedding space.",
+        "selected in the raw post-GAP layer4 embedding space.",
         "",
-        "### Best Near-OOD Layer by Score",
+        "### Layer4 Near-OOD Results by Score",
         "",
     ]
     for spec in RUNS:
@@ -373,32 +379,13 @@ def generated_markdown() -> str:
             lines,
             (
                 "OOD Score",
-                "Best layer",
+                "Layer",
                 f"Near: {DATASET_LABELS[spec.near_dataset]}",
                 "Far: MNIST",
                 "Far: SVHN",
             ),
             rows,
         )
-
-    lines.extend(
-        (
-            "### Raw Versus ID-Standardized Neighbor Selection",
-            "",
-            "This comparison uses the KL score at layer4. Only neighbor",
-            "selection changes; query and reference classifier outputs are unchanged.",
-            "",
-        )
-    )
-    rows = []
-    for spec in RUNS:
-        cells = []
-        for space in ("raw", "id_standardized"):
-            id_scores = values(spec, spec.id_dataset, "layer4", space)
-            near_scores = values(spec, spec.near_dataset, "layer4", space)
-            cells.append(format_pair(metric_pair(id_scores, near_scores)))
-        rows.append((spec.title, *cells))
-    add_table(lines, ("Setting", "Raw", "ID-standardized"), rows)
 
     lines.extend(
         (

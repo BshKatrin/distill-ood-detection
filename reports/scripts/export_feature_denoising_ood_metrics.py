@@ -16,8 +16,12 @@ import yaml
 from distill_ood_detection.evaluation.ood_metrics import ood_detection_metrics
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT_PATH = ROOT / "reports" / "outputs" / "latex" / "metrics_feature_denoising.tex"
-DEFAULT_JSON_OUTPUT = ROOT / "reports" / "outputs" / "json" / "feature_denoising_ood_metrics.json"
+DEFAULT_OUTPUT_PATH = (
+    ROOT / "reports" / "outputs" / "latex" / "metrics_feature_denoising.tex"
+)
+DEFAULT_JSON_OUTPUT = (
+    ROOT / "reports" / "outputs" / "json" / "feature_denoising_ood_metrics.json"
+)
 SCORES = (
     "default",
     "negative_identity_error",
@@ -38,7 +42,12 @@ def main() -> None:
     """Run the Feature Denoising OOD metric exporter."""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("configs", nargs="*", type=Path, default=[ROOT / "configs" / "students" / "feature_denoising"])
+    parser.add_argument(
+        "configs",
+        nargs="*",
+        type=Path,
+        default=[ROOT / "configs" / "students" / "feature_denoising"],
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--json-output", type=Path, default=DEFAULT_JSON_OUTPUT)
     parser.add_argument(
@@ -88,25 +97,30 @@ def available_configs(config_paths: Iterable[Path]) -> list[dict[str, Any]]:
         if config.get("strategy", {}).get("name") not in {"feature_denoising", "jepa"}:
             continue
         if score_artifact_dir(config).is_none:
-            print(f"Skipping {path}: missing Feature Denoising score artifacts", file=sys.stderr)
+            print(
+                f"Skipping {path}: missing Feature Denoising score artifacts",
+                file=sys.stderr,
+            )
             continue
         config["_path"] = str(path.relative_to(ROOT))
         configs.append(config)
     return configs
 
 
-def metrics_for_config(config: dict[str, Any], score: str, eps: float) -> dict[str, Any]:
+def metrics_for_config(
+    config: dict[str, Any], score: str, eps: float
+) -> dict[str, Any]:
     """Compute OOD metrics for one Feature Denoising run."""
 
     run_dir = ROOT / config["run_dir"]
     score_dir = score_artifact_dir(config).path
     id_key = f"{config['dataset']['name']}_test"
-    id_artifact = load_score_artifact(score_dir / id_key / "student_best.pt")
+    id_artifact = load_score_artifact(score_artifact_path(score_dir, id_key))
     id_scores, score_name = artifact_scores(id_artifact, score, eps)
     ood_results = []
     for ood_dataset in config["dataset"].get("ood_datasets", []):
         ood_key = f"{ood_dataset['name']}_{ood_dataset['split']}"
-        ood_artifact = load_score_artifact(score_dir / ood_key / "student_best.pt")
+        ood_artifact = load_score_artifact(score_artifact_path(score_dir, ood_key))
         ood_scores, _ = artifact_scores(ood_artifact, score, eps)
         labels = np.concatenate(
             [
@@ -158,19 +172,31 @@ def artifact_scores(
     """Return one ID-oriented score vector from a score artifact."""
 
     if score == "default":
-        score_name = artifact.get("metadata", {}).get("score", "feature_denoising_pca_reconstruction_error")
+        score_name = artifact.get("metadata", {}).get(
+            "score", "feature_denoising_pca_reconstruction_error"
+        )
         return to_numpy(artifact["scores"]), str(score_name)
     if score == "negative_identity_error":
-        return -to_numpy(required_artifact_value(artifact, "identity_error")), "negative_identity_error"
+        return -to_numpy(
+            required_artifact_value(artifact, "identity_error")
+        ), "negative_identity_error"
     if score == "relative_improvement":
+        if "relative_improvement" in artifact:
+            return to_numpy(artifact["relative_improvement"]), "relative_improvement"
         identity_error = to_numpy(required_artifact_value(artifact, "identity_error"))
-        reconstruction_error = to_numpy(required_artifact_value(artifact, "raw_reconstruction_error"))
+        reconstruction_error = to_numpy(
+            required_artifact_value(artifact, "raw_reconstruction_error")
+        )
         denominator = np.maximum(identity_error, eps)
-        return (identity_error - reconstruction_error) / denominator, "relative_improvement"
+        return (
+            identity_error - reconstruction_error
+        ) / denominator, "relative_improvement"
     if score == "improvement":
         return to_numpy(required_artifact_value(artifact, "improvement")), "improvement"
     if score == "cosine_similarity":
-        return to_numpy(required_artifact_value(artifact, "cosine_similarity")), "cosine_similarity"
+        return to_numpy(
+            required_artifact_value(artifact, "cosine_similarity")
+        ), "cosine_similarity"
     raise ValueError(f"Unsupported score: {score}")
 
 
@@ -188,6 +214,14 @@ def load_score_artifact(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Missing Feature Denoising score artifact: {path}")
     return torch.load(path, map_location="cpu", weights_only=False)
+
+
+def score_artifact_path(score_dir: Path, dataset: str) -> Path:
+    """Return the k-NN or best-student score artifact for one dataset."""
+
+    dataset_dir = score_dir / dataset
+    knn_path = dataset_dir / "knn.pt"
+    return knn_path if knn_path.exists() else dataset_dir / "student_best.pt"
 
 
 def to_numpy(value: Any) -> np.ndarray:
@@ -219,7 +253,9 @@ def write_latex(path: Path, rows: list[dict[str, Any]]) -> None:
     for row in rows:
         run = latex_escape(row["experiment_name"])
         for ood in row["ood"]:
-            dataset = latex_escape(DATASET_LABELS.get(ood["ood_dataset"], ood["ood_dataset"]))
+            dataset = latex_escape(
+                DATASET_LABELS.get(ood["ood_dataset"], ood["ood_dataset"])
+            )
             metrics = ood["metrics"]
             value = f"{metrics['roc_auc']:.2f} / {metrics['fpr_at_95_tpr']:.2f}"
             lines.append(f"{run} & {dataset} & {value} " + r"\\")

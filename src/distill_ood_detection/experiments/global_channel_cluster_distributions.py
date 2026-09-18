@@ -16,13 +16,25 @@ from distill_ood_detection.evaluation.global_channel_cluster_distributions impor
     boxplot_summary,
     teacher_model_name,
 )
+from distill_ood_detection.evaluation.channel_cluster_audit import (
+    id_ood_point_metrics,
+)
 from distill_ood_detection.utils import resolve_device, set_seed, write_json
 
 if TYPE_CHECKING:
     from distill_ood_detection.distillation.feature_denoising import ChannelGroups
 
 CheckpointSelection = Literal["best", "latest"]
-SCORES = ("absolute_improvement", "relative_improvement")
+SCORES = (
+    "raw_reconstruction_error",
+    "absolute_improvement",
+    "relative_improvement",
+)
+SCORE_SIGNS = {
+    "raw_reconstruction_error": -1.0,
+    "absolute_improvement": 1.0,
+    "relative_improvement": 1.0,
+}
 DATASET_LABELS = {
     "cifar10": "CIFAR-10",
     "cifar100": "CIFAR-100",
@@ -171,6 +183,7 @@ def summarize_global_channel_cluster_distributions(
     import pandas as pd
 
     rows: list[dict[str, object]] = []
+    metric_rows: list[dict[str, object]] = []
     for config_path in config_paths:
         config = load_config(config_path)
         artifact_dir = Path(config.run_dir) / "global_channel_cluster_distributions"
@@ -178,11 +191,13 @@ def summarize_global_channel_cluster_distributions(
             f"{config.dataset.name}_test",
             *(f"{item.name}_{item.split}" for item in config.dataset.ood_datasets),
         ]
+        artifacts: dict[str, dict[str, object]] = {}
         for dataset_name in dataset_names:
             path = artifact_dir / dataset_name / f"student_{checkpoint}.pt"
             if not path.is_file():
                 raise FileNotFoundError(f"Missing cluster distribution artifact: {path}")
             artifact = torch.load(path, map_location="cpu", weights_only=False)
+            artifacts[dataset_name] = artifact
             metadata = artifact.get("metadata")
             if not isinstance(metadata, dict):
                 raise ValueError(f"Missing metadata in {path}")
@@ -216,18 +231,58 @@ def summarize_global_channel_cluster_distributions(
                             **boxplot_summary(array[:, column]),
                         }
                     )
+        id_artifact_name = f"{config.dataset.name}_test"
+        id_artifact = artifacts[id_artifact_name]
+        id_metadata = id_artifact["metadata"]
+        clusters = id_metadata["clusters"]
+        for ood_artifact_name in dataset_names[1:]:
+            ood_artifact = artifacts[ood_artifact_name]
+            distribution, distribution_order, dataset_label = _distribution_context(
+                config.dataset.name,
+                ood_artifact_name,
+            )
+            for score in SCORES:
+                id_values = id_artifact[score].numpy().astype(np.float64, copy=False)
+                ood_values = ood_artifact[score].numpy().astype(np.float64, copy=False)
+                sign = SCORE_SIGNS[score]
+                for column, cluster in enumerate(clusters):
+                    metrics = id_ood_point_metrics(
+                        id_values[:, column] * sign,
+                        ood_values[:, column] * sign,
+                    )
+                    metric_rows.append(
+                        {
+                            "teacher_model": id_metadata["teacher_model"],
+                            "id_dataset": config.dataset.name,
+                            "layer": id_metadata["feature_layer"],
+                            "score": score,
+                            "ood_distribution": distribution,
+                            "ood_distribution_order": distribution_order,
+                            "ood_dataset": ood_artifact_name.rsplit("_", 1)[0],
+                            "ood_dataset_label": dataset_label,
+                            **cluster,
+                            **metrics,
+                        }
+                    )
     frame = pd.DataFrame(rows)
     if frame.empty:
         raise ValueError("No global cluster distribution rows were generated")
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = output_dir / "boxplot_summaries.parquet"
     frame.to_parquet(summary_path, index=False)
+    metric_frame = pd.DataFrame(metric_rows)
+    if metric_frame.empty:
+        raise ValueError("No global cluster OOD metric rows were generated")
+    metric_path = output_dir / "ood_metrics.parquet"
+    metric_frame.to_parquet(metric_path, index=False)
     manifest = {
         "artifact_version": 1,
         "config_paths": [str(path) for path in config_paths],
         "checkpoint": checkpoint,
         "row_count": len(rows),
         "summary_path": str(summary_path),
+        "ood_metric_row_count": len(metric_rows),
+        "ood_metric_path": str(metric_path),
     }
     write_json(output_dir / "manifest.json", manifest)
     return manifest

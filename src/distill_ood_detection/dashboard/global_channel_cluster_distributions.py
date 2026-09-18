@@ -14,6 +14,7 @@ LAYERS = ("layer2", "layer3", "layer4")
 MODEL_LABELS = {"ResNet-18": "resnet18", "ResNet-50": "resnet50"}
 ID_DATASET_LABELS = {"CIFAR-10": "cifar10", "CIFAR-100": "cifar100"}
 SCORE_LABELS = {
+    "Raw reconstruction error": "raw_reconstruction_error",
     "Absolute improvement": "absolute_improvement",
     "Relative improvement": "relative_improvement",
 }
@@ -58,7 +59,7 @@ def build_dashboard(summary_dir: Path) -> pn.template.FastListTemplate:
             if value in available_datasets
         },
     )
-    score = pn.widgets.Select(name="Improvement", options=SCORE_LABELS)
+    score = pn.widgets.Select(name="Score", options=SCORE_LABELS)
 
     @pn.depends(model.param.value, id_dataset.param.value, score.param.value)
     def cluster_distributions(
@@ -69,8 +70,9 @@ def build_dashboard(summary_dir: Path) -> pn.template.FastListTemplate:
         return pn.Column(
             pn.pane.Markdown(
                 "Each box summarizes one value per image, averaged over ten "
-                "independent masking draws. Positive improvement means the "
-                "student reconstructs masked channels better than identity."
+                "independent masking draws. Raw reconstruction error is the "
+                "masked-channel MSE; positive improvement means the student "
+                "reconstructs masked channels better than identity."
             ),
             *(
                 _cluster_boxplot(
@@ -86,7 +88,7 @@ def build_dashboard(summary_dir: Path) -> pn.template.FastListTemplate:
         )
 
     return pn.template.FastListTemplate(
-        title="Global NMF Student: Cluster Improvements",
+        title="Global NMF Student: Cluster Scores",
         sidebar=[model, id_dataset, score],
         main=[cluster_distributions],
         sidebar_width=270,

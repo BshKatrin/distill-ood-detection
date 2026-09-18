@@ -18,7 +18,9 @@ set -x
 trap 'status=$?; echo "[$(date --iso-8601=seconds)] Failed at line ${LINENO} with exit status ${status}"; exit "${status}"' ERR
 
 PROJECT_DIR="${PROJECT_DIR:-${SLURM_SUBMIT_DIR}}"
-export PYTHONPATH="${PROJECT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
+SOURCE_DIR="${SOURCE_DIR:-${PROJECT_DIR}}"
+GPU_ENV_DIR="${GPU_ENV_DIR:-${SOURCE_DIR}/envs/gpu}"
+export PYTHONPATH="${SOURCE_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 cd "${PROJECT_DIR}"
 
 mkdir -p slurm
@@ -69,11 +71,11 @@ if [ "${SKIP_UV_SYNC}" = "1" ]; then
   echo "[$(date --iso-8601=seconds)] Reusing existing uv GPU environment"
 else
   echo "[$(date --iso-8601=seconds)] Syncing uv GPU environment"
-  uv sync --project envs/gpu --locked
+  uv sync --project "${GPU_ENV_DIR}" --locked
 fi
 
 run_distill_ood() {
-  uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli "$@"
+  uv run --project "${GPU_ENV_DIR}" --no-sync python -m distill_ood_detection.cli "$@"
 }
 
 get_allocated_gpu_count() {
@@ -107,16 +109,31 @@ is_tree_config() {
 
 is_feature_denoising_config() {
   local config="$1"
-  [[ "${config}" == configs/students/feature_denoising/* ]]
+  [[ "${config}" == configs/students/feature_denoising/* ]] ||
+    [[ "${config}" == */configs/students/feature_denoising/* ]]
+}
+
+is_knn_feature_denoising_config() {
+  local config="$1"
+  [[ "${config}" == configs/students/feature_denoising/knn_channel_masking/* ]] ||
+    [[ "${config}" == */configs/students/feature_denoising/knn_channel_masking/* ]] ||
+    [[ "${config}" == configs/students/feature_denoising/knn_channel_group_masking/* ]] ||
+    [[ "${config}" == */configs/students/feature_denoising/knn_channel_group_masking/* ]]
 }
 
 is_subspace_ensemble_config() {
   local config="$1"
-  [[ "${config}" == configs/students/subspace_ensemble/* ]]
+  [[ "${config}" == configs/students/subspace_ensemble/* ]] ||
+    [[ "${config}" == */configs/students/subspace_ensemble/* ]]
 }
 
 train_config() {
   local config="$1"
+
+  if is_knn_feature_denoising_config "${config}"; then
+    echo "[$(date --iso-8601=seconds)] k-NN Feature Denoising is inference-only: ${config}"
+    return
+  fi
 
   if is_tree_config "${config}"; then
     echo "[$(date --iso-8601=seconds)] Training tree student: ${config}"
