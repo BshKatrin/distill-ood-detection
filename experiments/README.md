@@ -44,9 +44,11 @@ when changing benchmark or metric conventions.
 
 ## Add a curated result
 
-Keep a short narrative beside its selected JSON and figures. Record the config,
+Keep a short narrative and links to the generating source. Record the config,
 resolved run directory, checkpoint, seed, inference mode, generating command,
 benchmark manifests, score definition, metric convention, units, and aggregation.
 Link reusable method explanations from `docs/` instead of duplicating them.
-Working exports continue to use `reports/outputs/`; only the selected evidence
-belongs here. Add a catalogue row when a result contributes to a deliverable.
+Working exports continue to use ignored output paths. Do not commit generated
+JSON, plots, caches, or checkpoints; existing historical snapshots remain as
+the numerical record. Add a catalogue row when a result contributes to a
+deliverable. See [regeneration](../docs/reproduction.md) for fresh-clone workflows.

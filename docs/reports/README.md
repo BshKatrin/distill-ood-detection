@@ -28,17 +28,19 @@ across historical reports and OpenOOD evaluations.
 | `reports/presentations/internship/` | Final slides PDF | Tracked |
 | `reports/recaps/YYYY-MM-DD/` | Progress sources and delivered `main.pdf` | New recaps trackable; six historical folders remain ignored |
 | `reports/final-report/archive/` | Separate legacy PDF export | Local/ignored |
-| `experiments/` | Curated narratives, result JSON, and supporting figures | Tracked when selected for the research record |
-| `reports/outputs/latex/` | Existing generated LaTeX tables | Tracked |
-| `reports/outputs/cache/` | Reusable metric caches | Existing two snapshots retained; new cache files ignored |
+| `experiments/` | Curated narratives and existing historical result snapshots | Existing snapshots retained; new generated JSON/figures ignored |
+| `reports/outputs/latex/` | Generated LaTeX tables | Existing snapshots retained; new tables ignored |
+| `reports/outputs/cache/` | Reusable metric caches | Existing snapshots retained; new cache files ignored |
 | `reports/outputs/json/`, `reports/outputs/plots/` | Working numeric/plot exports | Ignored |
 | `reports/outputs/pdf/`, `reports/outputs/notebooks/` | Rendered tables and generated notebooks | Ignored |
 | `reports/build/` | Compiler/rendering scratch files | Ignored |
 
-An output becomes a curated result by copying the selected JSON or figure into
-its corresponding `experiments/<family>/` record and documenting its generating
-command, config, checkpoint, score, metric convention, and units. Keep script
-default output paths unchanged; do not commit every working export.
+Commit source, configurations, generating commands, and experiment narratives.
+Do not add generated experiment artifacts, caches, numeric exports, or plots.
+Keep existing historical snapshots as the numerical record and keep script
+default output paths unchanged. The final report and slides are the explicitly
+requested deliverables. See [regeneration](../reproduction.md) for rerun steps
+and the limits of exact historical reproduction.
 
 ## Render metric tables
 

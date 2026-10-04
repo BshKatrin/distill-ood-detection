@@ -9,9 +9,12 @@ slurm/
 reports/outputs/plots
 reports/outputs/json
 reports/outputs/cache/*
-# Preserve previously tracked cache snapshots; new caches are disposable.
-!reports/outputs/cache/ood_metrics.json
-!reports/outputs/cache/pixmix_pixel_perturbation_ood_metrics.json
+# Generated research outputs stay local. Existing tracked historical results
+# remain tracked; ignore rules prevent adding new generated artifacts.
+reports/outputs/latex/
+experiments/**/*.json
+experiments/**/*.png
+experiments/**/*.pdf
 # Historical recap archives remain local, as before this reorganisation.
 /reports/recaps/2026-07-09/
 /reports/recaps/2026-07-17/

@@ -70,8 +70,8 @@ when reproducing a specific experiment.
 - [Reporting](docs/reports/README.md) covers metric exports and analysis notebooks.
 - [Activation-subspace workflow](docs/workflows/activation_subspace.md) uses
   dedicated inference and score commands.
-- [Archive and restore](docs/archive.md) explains what a fresh clone restores
-  and how to preserve local research artifacts before removing a checkout.
+- [Regeneration from a fresh clone](docs/reproduction.md) explains how to rebuild
+  experiment artifacts from source, configs, and external datasets/teacher weights.
 - [HPC operations](docs/hpc/README.md) apply when cluster access is needed;
   keep host-specific values in the ignored local configuration.
 
