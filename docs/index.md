@@ -42,6 +42,8 @@ in `reports/`.
 
 ## Operations
 
+- [Archive and restore](archive.md): final dependency locks, local-only artifacts,
+  and fresh-clone verification before removing a checkout.
 - [HPC](hpc/README.md): cluster access and local configuration. Read when HPC
   or GPU cluster access is requested.
 - [SLURM jobs](hpc/slurm-jobs.md): reusable config-driven jobs.

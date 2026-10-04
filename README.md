@@ -31,8 +31,8 @@ the focused environments do not install the repository package, so put `src/`
 on `PYTHONPATH`. Run these commands from the repository root:
 
 ```bash
-uv sync --project envs/gpu
-uv sync --project envs/notebooks
+uv sync --project envs/gpu --locked
+uv sync --project envs/notebooks --locked
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 
 uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student \
@@ -57,8 +57,9 @@ MLflow is disabled and configuration loading rejects `mlflow.enabled: true`.
 The resolved config, histories, metrics, and checkpoints in each run directory
 are the authoritative experiment record. See [configs](docs/configs.md) for
 the run hierarchy and [environments](docs/envs.md) for platform dependencies.
-Dependency lock files are currently ignored; keep the local environment lock
-and resolved run config when recording an exact reproduction.
+The root and focused-environment `uv.lock` files are tracked. Use `--locked`
+to restore the recorded dependency resolution and retain the resolved run config
+when reproducing a specific experiment.
 
 ## Other workflows
 
@@ -69,12 +70,14 @@ and resolved run config when recording an exact reproduction.
 - [Reporting](docs/reports/README.md) covers metric exports and analysis notebooks.
 - [Activation-subspace workflow](docs/workflows/activation_subspace.md) uses
   dedicated inference and score commands.
+- [Archive and restore](docs/archive.md) explains what a fresh clone restores
+  and how to preserve local research artifacts before removing a checkout.
 - [HPC operations](docs/hpc/README.md) apply when cluster access is needed;
   keep host-specific values in the ignored local configuration.
 
 Run CPU correctness tests with:
 
 ```bash
-uv sync --project envs/tests
+uv sync --project envs/tests --locked
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/tests --no-sync pytest
 ```

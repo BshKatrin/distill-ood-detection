@@ -29,8 +29,7 @@ reports/**/*.fdb_latexmk
 reports/**/*.synctex.gz
 slurm_scripts/*.txt
 
-# uv
-**/uv.lock
+# uv lock files are tracked to preserve the final dependency resolutions.
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
