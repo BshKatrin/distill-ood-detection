@@ -1,8 +1,9 @@
 # Activation-Subspace Students
 
-This document is the self-contained implementation guide for the project's
-ActSub-inspired student-distillation experiments. Read it before changing the
-activation-subspace configs, training, inference, scoring, or reports.
+This reference defines the project's ActSub-inspired student methods.
+Use the [workflow](../workflows/activation_subspace.md) for commands and artifact
+contracts, and the [experiment record](../../experiments/activation_subspace/resnet18_cifar10_cifar100.md)
+for measured results.
 
 ## Provenance
 
@@ -10,8 +11,10 @@ The decomposition is based on **Activation Subspaces for Out-of-Distribution
 Detection**, Barış Zöngür, Robin Hesse, and Stefan Roth, ICCV 2025:
 
 - [CVF paper](https://openaccess.thecvf.com/content/ICCV2025/html/Zongur_Activation_Subspaces_for_Out-of-Distribution_Detection_ICCV_2025_paper.html)
-- [Local Markdown copy](../../papers/md/Zongur_Activation_Subspaces_for_Out-of-Distribution_Detection_ICCV_2025_paper.md)
 - [Official implementation: `visinf/actsub`](https://github.com/visinf/actsub/)
+
+A local Markdown copy may be kept under `papers/md/`; that ignored folder is
+not included in a Git clone. Use the public paper link above as the reference.
 
 The official repository provides separate OpenOOD and standard evaluation
 setups. This repository does not copy those pipelines; it implements a new
@@ -246,121 +249,17 @@ mean the autoencoder predicts classes. Similarly, the insignificant configs
 enable `training.methods.mse_logits` to select the shared training schedule;
 the activation-subspace branch still uses feature reconstruction MSE.
 
-## Shared training settings
-
-Current configs use:
-
-- 50 epochs;
-- batch size 256;
-- AdamW;
-- learning rate `1e-3`;
-- weight decay `1e-4`;
-- seed 42;
-- best checkpoint selected by minimum ID validation loss;
-- MLflow enabled with a separate SQLite database per run.
-
-Linear-logit validation/test artifacts also record classification accuracy.
-Autoencoder metrics record reconstruction loss only.
-
-## Configs
-
-```text
-configs/students/activation_subspace/decisive/...
-configs/students/activation_subspace/insignificant/...
-```
-
-For the GPU cluster, read `docs/hpc/README.md` and the private local HPC
-configuration first. `slurm_scripts/run_configs.sbatch` accepts multiple
-configs. Use `MODE=train`; generic inference is not valid for this strategy.
-
-## Training artifacts
-
-Every config has a distinct `run_dir`. Its important files are
-
-```text
-<run_dir>/
-  resolved_config.json
-  teacher_metrics.json
-  activation_subspace.pt
-  summary.json
-  mlflow.db
-  <decisive-or-insignificant>/
-    best_student.pt
-    latest_student.pt
-    history.json
-    metrics.json
-```
-
-`activation_subspace.pt` contains:
-
-- `right_basis`: complete `V^T` basis;
-- `singular_values`;
-- `decisive_dimension` and `insignificant_dimension`;
-- `norm_gaps`: the norm-balance objective for every candidate split;
-- component, fit-sample count, classifier-weight shape, and selection metadata.
-
-Do not mix a checkpoint with another run's SVD artifact, even when dimensions
-match.
-
-## Raw ID/OOD inference
-
-Activation-subspace students cannot use the generic probability inference
-path because they consume SVD coordinates rather than images or flattened raw
-features. Use
-
-```text
-export-activation-subspace-inference
-```
-
-and pass all same-teacher configs by repeating `--config`. The exporter:
-
-1. loads one frozen teacher per ID dataset;
-2. exports clean pooled layer4 embeddings once for ID test and all configured
-   OOD datasets;
-3. loads each run's own SVD basis and best/latest checkpoint;
-4. projects embeddings into the configured component;
-5. exports raw student outputs and provenance manifests.
-
-Shared teacher artifacts:
-
-```text
-runs/teachers/<id_dataset>/resnet18/activation_subspace_embeddings/
-  manifest.json
-  student_inference_manifest.json
-  <dataset>/embeddings.pt
-```
-
-Each `embeddings.pt` contains `embeddings`, `labels`, and metadata. Student
-artifacts are
-
-```text
-<run_dir>/activation_subspace_inference/
-  manifest.json
-  <dataset>/student_best.pt
-```
-
-Projected-logit files contain `logits`, `probabilities`, `labels`, and
-metadata. Both decisive and insignificant coordinate-autoencoder files contain
-`reconstructed_coordinates`, `labels`, and metadata. Metadata records
-`component` and `target` and links the exact checkpoint, SVD file, and teacher
-embedding used.
-
-The reusable cluster entrypoint is
-`slurm_scripts/export_activation_subspace_inference.sbatch`. It groups configs
-by CIFAR ID dataset and evaluates both teachers in parallel on two GPUs.
-
 ## OOD Scores and metrics
 
-Run `export-activation-subspace-scores` only after raw inference exists. The
-reusable cluster entrypoint is
-`slurm_scripts/export_activation_subspace_scores.sbatch`.
+Score export follows the [inference workflow](../workflows/activation_subspace.md).
+See [aggregate metrics](../evaluation/metrics.md) for the historical ID-positive convention.
 
 ### Projected-logit scores
 
 Teacher logits are reconstructed as `W a + b` from the clean full embedding;
 for this ResNet head this is equivalent to the standard clean-image teacher
 forward. Student logits come from the decisive student. The exporter computes
-all classifier scores in `docs/ood_scores/README.md`:
+all classifier scores in `docs/evaluation/ood-scores.md`:
 
 - teacher MSP and energy;
 - `KL(teacher || student)`;
@@ -383,68 +282,6 @@ Reconstruction metrics receive sign `-1`; cosine similarity receives sign
 `+1`. Every exported OOD Score therefore follows the project convention:
 higher means more ID-like. These definitions apply to coordinate
 autoencoders in either the decisive or insignificant subspace.
-
-Score artifacts are
-
-```text
-<run_dir>/activation_subspace_scores/
-  manifest.json
-  <dataset>/student_best.pt
-```
-
-Each tensor file contains `raw_metrics`, sign-adjusted `ood_scores`, `labels`,
-and provenance metadata. The manifest computes ROC-AUC and FPR@95 for every
-ID/OOD pair and arithmetic macro averages over the three OOD datasets. ID is
-the positive class.
-
-Teacher-level group manifests live beside the shared embeddings as
-`score_manifest.json`.
-
-## Current result and report
-
-The full training and OOD tables are in
-[the experiment report](../../experiments/activation_subspace/resnet18_cifar10_cifar100.md).
-Compact metric manifests synchronized from the cluster are
-
-```text
-reports/outputs/json/activation_subspace_cifar10_resnet18_metrics.json
-reports/outputs/json/activation_subspace_cifar100_resnet18_metrics.json
-```
-
-The main current observation is that insignificant cosine similarity and
-relative reconstruction error are substantially stronger than raw
-reconstruction error. CIFAR-10 ID is especially strong; CIFAR-100 ID still
-struggles on Near-OOD CIFAR-10. The decisive coordinate autoencoder is near
-chance in aggregate for CIFAR-10 ID. For CIFAR-100 ID it is competitive with
-the insignificant autoencoder and is strongest on SVHN, but remains weaker in
-macro ROC-AUC. The results do not support a simple Far-OOD/decisive versus
-Near-OOD/insignificant division. No combined decisive-plus-insignificant score
-has been implemented yet.
-
-## Implementation map
-
-- SVD and `k` selection:
-  [`evaluation/activation_subspaces.py`](../../src/distill_ood_detection/evaluation/activation_subspaces.py)
-- Fixed embedding collection, targets, losses, training, and SVD persistence:
-  [`distillation/activation_subspace.py`](../../src/distill_ood_detection/distillation/activation_subspace.py)
-- Linear and autoencoder student definitions:
-  [`models/student.py`](../../src/distill_ood_detection/models/student.py)
-- Strategy dispatch and training orchestration:
-  [`experiments/train_student.py`](../../src/distill_ood_detection/experiments/train_student.py)
-- Shared distillation loss, including cross-entropy alpha/temperature:
-  [`distillation/losses.py`](../../src/distill_ood_detection/distillation/losses.py)
-- ID/OOD raw inference:
-  [`experiments/export_activation_subspace_inference.py`](../../src/distill_ood_detection/experiments/export_activation_subspace_inference.py)
-- Score and aggregate metric export:
-  [`experiments/export_activation_subspace_scores.py`](../../src/distill_ood_detection/experiments/export_activation_subspace_scores.py)
-- Config parsing and validation:
-  [`config.py`](../../src/distill_ood_detection/config.py)
-- CLI commands: [`cli.py`](../../src/distill_ood_detection/cli.py)
-- Tests:
-  `tests/test_activation_subspaces.py`,
-  `tests/test_activation_subspace_training.py`,
-  `tests/test_activation_subspace_inference.py`, and
-  `tests/test_activation_subspace_scores.py`.
 
 ## Invariants and common mistakes
 
@@ -476,7 +313,7 @@ When adding another dataset, teacher, layer, or architecture:
    computation;
 3. fit the full SVD and inspect the norm-gap curve;
 4. record the selected non-empty dimensions in config guards;
-5. add separate run directories and MLflow databases;
+5. add separate run directories with `mlflow.enabled: false`;
 6. add ID/OOD inference before score export;
 7. test artifact shapes, signs, and provenance;
 8. update the experiment report rather than treating incomparable loss scales

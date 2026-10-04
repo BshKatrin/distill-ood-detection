@@ -14,16 +14,16 @@ images and Near/Far grouping.
 
 ## Data layout
 
-The cluster setup uses these read-only shared datasets:
-
-- `/data/common/ImageNet` for the ImageNet-1K images selected by the ID manifests.
-- `/data/common/dataset_suite/dtddataset/dtd/images` for the 5,160 DTD images
-  selected by `test_texture.txt`.
-
-The remaining assets live under `/home/bogush/openood`:
+Use locally configured paths for the ImageNet image root, the shared DTD image
+root, and the OpenOOD asset root. On a cluster, keep machine-specific values in
+`docs/hpc/hpc.local.md`, following the existing local-configuration policy.
+The checked-in teacher configs record the original cluster paths; create a local
+config copy and set `dataset.data_dir`, each split/OOD `imglist_path`, OOD
+`data_dir`, and `teacher.checkpoint_path` to your actual locations.
+`DISTILL_OOD_DATA_DIR` does not relocate manifest or checkpoint paths.
 
 ```text
-openood/
+<openood-root>/
   archives/
   data/
     benchmark_imglist/imagenet200/
@@ -32,18 +32,24 @@ openood/
     imagenet200_resnet18_224x224_base_e90_lr0.1_default/s0/best.ckpt
 ```
 
-Submit the restartable download job from the repository root:
+The ImageNet image root supplies ID images selected by the manifests. The DTD
+image root supplies the 5,160 images selected by `test_texture.txt`; no extra
+copy of the shared DTD dataset is downloaded.
+
+When cluster access is needed, read the [HPC guide](../../hpc/README.md) and
+configure local paths before submitting the restartable download job:
 
 ```bash
-mkdir -p /home/bogush/openood/logs
-sbatch slurm_scripts/download_openood_imagenet200.sbatch /home/bogush/openood
+openood_asset_root=/path/to/openood
+mkdir -p "$openood_asset_root/logs"
+sbatch slurm_scripts/download_openood_imagenet200.sbatch "$openood_asset_root"
 ```
 
-The job downloads 6.71 GB of archives and validates every byte count and ZIP
-archive before extraction. On clusters where compute nodes cannot reach Google
-Drive, run it once with `OPENOOD_DOWNLOAD_ONLY=1` on the transfer/login side,
-then submit the same script normally to validate and extract. It does not write
-to `/data/common` and deliberately does not download a second copy of DTD.
+The explicit argument overrides the script's original cluster default. The job
+downloads 6.71 GB of archives and validates byte counts and ZIP archives before
+extraction. If compute nodes cannot reach Google Drive, run the script once with
+`OPENOOD_DOWNLOAD_ONLY=1` on the transfer/login side, then submit it normally to
+validate and extract. Downloads and extraction stay under the asset root.
 
 ## Fixed benchmark splits
 
@@ -87,7 +93,8 @@ groups = {item.name: item.group for item in ood_loaders if item.group is not Non
 results = evaluate_openood_scores(id_scores, ood_scores, groups)
 ```
 
-Higher scores must mean more ID-like. The evaluator returns FPR95, AUROC,
+Higher scores must mean more ID-like. Evaluation uses the OOD-positive
+[comparison convention](../metrics.md). The evaluator returns FPR95, AUROC,
 AUPR-IN, and AUPR-OUT as fractions, plus arithmetic macro averages for the Near
 and Far groups. Dataset-level results remain available, so a macro average never
 hides a failed or missing benchmark subset.

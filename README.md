@@ -1,108 +1,80 @@
 # distill-ood-detection
 
-Research code for distilling Hugging Face CIFAR ResNet-18 teachers into simple
-student models for OOD-detection experiments.
+Research code for Out-of-Distribution detection using model distillation.
+Experiments cover CIFAR ResNet and ViT teachers, classical output distillation,
+embedding and pixel perturbations, Feature Denoising, activation-subspace
+students, and subspace ensembles. Fixed OpenOOD evaluations cover CIFAR,
+ImageNet-200, and ImageNet-1K.
+
+Start with the [documentation index](docs/index.md), the
+[experiment catalogue](experiments/README.md), or the
+[final report and slides](reports/README.md).
 
 ## Repository layout
 
-- `src/distill_ood_detection/`: importable Python package.
-- `configs/`: reproducible YAML experiment definitions.
-- `envs/`: focused `uv` environments for GPU jobs, notebooks, and tests.
-- `runs/`: generated metrics, checkpoints, and resolved configs.
-- `docs/`: project documentation, strategy notes, objectives, and OOD Score definitions.
-- `AGENTS.md`: instructions for AI agents working in this repository.
+| Directory | Responsibility |
+| --- | --- |
+| `src/distill_ood_detection/` | Importable training, inference, and evaluation code |
+| `configs/` | Explicit experiment definitions and run directories |
+| `envs/` | Focused `uv` environments for GPU jobs, notebooks, tests, and dashboards |
+| `experiments/` | Curated experiment records, result JSON, and supporting figures |
+| `reports/` | Final deliverables, dated recaps, and reporting tools |
+| `docs/` | Method references, evaluation conventions, and operating workflows |
+| `runs/` | Local/generated configs, histories, checkpoints, and inference artifacts |
+| `slurm_scripts/` | Existing cluster job and submission scripts |
+| `tests/` | Automated correctness checks |
 
-For project terminology, research strategy documentation, objective definitions,
-and OOD Score conventions, start with [`docs/index.md`](docs/index.md).
+## Reproduce a baseline
 
-## Environment
-
-Dependencies are managed with `uv`.
+Dependencies use `uv`. Sync the required environment before using `--no-sync`;
+the focused environments do not install the repository package, so put `src/`
+on `PYTHONPATH`. Run these commands from the repository root:
 
 ```bash
-uv sync --project envs/notebooks
-uv sync --project envs/tests
 uv sync --project envs/gpu
-```
-
-The focused environments do not install the repository package during sync.
-Put `src/` on `PYTHONPATH` when running project modules:
-
-```bash
+uv sync --project envs/notebooks
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+
+uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student \
+  --config configs/students/baseline/cifar_100/resnet18/linear.yaml --method mse_logits
+
+uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli infer-probabilities \
+  --config configs/students/baseline/cifar_100/resnet18/linear.yaml --checkpoint best --method mse_logits
+
+uv run --project envs/notebooks --no-sync python reports/scripts/export_metrics_table.py \
+  configs/students/baseline/cifar_100/resnet18/linear.yaml
 ```
 
-Run `uv sync --project <env> --locked` once before using `uv run --no-sync`.
-For example:
+This checked-in config selects a CUDA device, seed 42, CIFAR-100 ID, and
+CIFAR-10/MNIST/SVHN OOD test splits. The teacher is downloaded from Hugging Face;
+data and checkpoints must be available to the execution host. The commands
+train, save inference artifacts, and export a historical ID-positive metric
+table; see [metric conventions](docs/evaluation/metrics.md) before comparing
+FPR@95 with OpenOOD results. Training uses the config's explicit `run_dir`;
+the report command writes under `reports/outputs/latex/`.
+
+MLflow is disabled and configuration loading rejects `mlflow.enabled: true`.
+The resolved config, histories, metrics, and checkpoints in each run directory
+are the authoritative experiment record. See [configs](docs/configs.md) for
+the run hierarchy and [environments](docs/envs.md) for platform dependencies.
+Dependency lock files are currently ignored; keep the local environment lock
+and resolved run config when recording an exact reproduction.
+
+## Other workflows
+
+- [Methods](docs/strategies/README.md) and [objectives](docs/objectives/README.md)
+  define student inputs, targets, and losses.
+- [Evaluation](docs/evaluation/README.md) defines score signs, metrics, and
+  fixed benchmark splits.
+- [Reporting](docs/reports/README.md) covers metric exports and analysis notebooks.
+- [Activation-subspace workflow](docs/workflows/activation_subspace.md) uses
+  dedicated inference and score commands.
+- [HPC operations](docs/hpc/README.md) apply when cluster access is needed;
+  keep host-specific values in the ignored local configuration.
+
+Run CPU correctness tests with:
 
 ```bash
-uv sync --project envs/gpu --locked
-PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli ...
+uv sync --project envs/tests
+PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/tests --no-sync pytest
 ```
-
-See [`docs/envs.md`](docs/envs.md) for the environment split. On macOS,
-PyTorch resolves from PyPI. On Linux x86_64, the focused environment files
-configure `uv` to resolve `torch` and `torchvision` from the official CUDA 12.8
-PyTorch wheel index.
-
-## Training
-
-### PyTorch-based students
-
-```bash
-uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config <CONFIG_PATH> [--method <METHOD>]
-```
-
-See [`docs/objectives/README.md`](docs/objectives/README.md) for objective definitions.
-
-MLflow logging is enabled in the YAML config. View logged runs with:
-
-```bash
-uv run --project envs/notebooks --no-sync mlflow ui --backend-store-uri sqlite:///mlflow.db
-```
-
-### Tree Students
-
-Train sklearn random-forest students from teacher outputs:
-
-```text
-uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-tree-student --config <CONFIG_PATH>
-```
-
-The tree config supports one mode:
-
-- `logits`: fit a multi-output random-forest regressor to centered teacher logits.
-
-## Probability Inference
-
-After training, save teacher and student logits/probabilities for the ID and OOD datasets test splits :
-
-```text
-uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli infer-probabilities --config <CONFIG_PATH> [--checkpoint {latest,checkpoint}] [--include-train] [--include-validation]
-```
-
-Artifacts are written under the config's explicit `run_dir`, with probability
-artifacts below `<run_dir>/probabilities/`. See
-[`docs/configs.md`](docs/configs.md) for the run hierarchy.
-
-<!-- ## CIFAR-100 ID Experiments
-
-The CIFAR-100 experiment configs use `edadaltocg/resnet18_cifar100` as teacher,
-train 100-class students, and evaluate CIFAR-10, MNIST, and SVHN as OOD
-datasets.
-
-```bash
-uv run distill-ood train-student --config configs/distill_linear_cifar100.yaml
-uv run distill-ood train-student --config configs/distill_mlp_cifar100.yaml
-uv run distill-ood train-student --config configs/distill_feature_linear_layer3_cifar100.yaml
-uv run distill-ood train-tree-student --config configs/distill_random_forest_cifar100.yaml
-```
-
-After training, save best-checkpoint probabilities:
-
-```bash
-uv run distill-ood infer-probabilities --config configs/distill_linear_cifar100.yaml
-uv run distill-ood infer-probabilities --config configs/distill_mlp_cifar100.yaml
-uv run distill-ood infer-probabilities --config configs/distill_feature_linear_layer3_cifar100.yaml
-uv run distill-ood infer-probabilities --config configs/distill_random_forest_cifar100.yaml
-``` -->

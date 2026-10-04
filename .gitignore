@@ -3,11 +3,30 @@
 
 TODO.md
 papers/
-recap/
+/recap/
 tmp/
 slurm/
 reports/outputs/plots
 reports/outputs/json
+reports/outputs/cache/*
+# Preserve previously tracked cache snapshots; new caches are disposable.
+!reports/outputs/cache/ood_metrics.json
+!reports/outputs/cache/pixmix_pixel_perturbation_ood_metrics.json
+# Historical recap archives remain local, as before this reorganisation.
+/reports/recaps/2026-07-09/
+/reports/recaps/2026-07-17/
+/reports/recaps/2026-07-28/
+/reports/recaps/2026-08-17/
+/reports/recaps/2026-08-26/
+/reports/recaps/2026-08-31/
+/reports/final-report/archive/
+# Compiler scratch files belong in reports/build/, never among deliverables.
+reports/**/*.aux
+reports/**/*.out
+reports/**/*.toc
+reports/**/*.fls
+reports/**/*.fdb_latexmk
+reports/**/*.synctex.gz
 slurm_scripts/*.txt
 
 # uv

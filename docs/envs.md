@@ -29,6 +29,11 @@ uv sync --project envs/tests
 uv sync --project envs/dashboard
 ```
 
+`uv.lock` files are currently ignored by Git. A fresh checkout must resolve an
+environment before `--locked` can be used; keep the generated local lock with
+the experiment's reproduction record. Use `uv sync --locked` only when that
+matching lock is available.
+
 The environment projects set `tool.uv.package = false`. They do not install the
 repository package during sync, which avoids resolving build requirements on the
 cluster. Run project code by putting `src/` on `PYTHONPATH`.
@@ -64,7 +69,7 @@ directory for traceability.
 For a GPU-cluster training run from the repository root:
 
 ```bash
-uv sync --project envs/gpu --locked
+uv sync --project envs/gpu
 PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" uv run --project envs/gpu --no-sync python -m distill_ood_detection.cli train-student --config configs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer3_clip_constant.yaml
 ```
 

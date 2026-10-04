@@ -38,8 +38,10 @@ Students per ID dataset:
 ## Scores
 
 All tables report `ROC-AUC / FPR@95`. Scores use the project convention where
-higher means more ID-like. Decisive students use all classifier scores from
-`docs/ood_scores/README.md`.
+higher means more ID-like. Evaluation uses the historical ID-positive convention,
+with an arithmetic macro over the three OOD datasets. Decisive students use
+all classifier scores from
+`docs/evaluation/ood-scores.md`.
 
 Insignificant students use:
 
@@ -255,6 +257,13 @@ uses alpha `0.5`, which is stronger than alpha `0.8` for both ID datasets.
   better FPR tradeoff but does not solve near-OOD CIFAR-10.
 
 ## Artifacts
+
+Compact historical metric manifests were also exported to these local working paths:
+
+```text
+reports/outputs/json/activation_subspace_cifar10_resnet18_metrics.json
+reports/outputs/json/activation_subspace_cifar100_resnet18_metrics.json
+```
 
 Raw embeddings and inference outputs:
 

@@ -24,6 +24,8 @@ Avoid introducing frameworks or patterns unless they reduce duplication across m
 - `src/distill_ood_detection/experiments/`: executable entrypoints.
 - `configs/`: experiment configuration files. See `docs/configs.md` for the config directory structure.
 - `docs/`: project documentation, strategy notes, objectives, and OOD Score definitions.
+- `experiments/`: curated experiment records, result JSON, and supporting figures. Start with `experiments/README.md`.
+- `reports/`: final deliverables, dated recaps, and report-generation tools. See `reports/README.md` and `docs/reports/README.md`.
 - `runs/`: training artifacts, including `.json` files containing training histories and `.pt` files containing saved model checkpoints.
 
 ### Project documentation (docs)

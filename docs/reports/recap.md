@@ -1,88 +1,62 @@
-# Recap Reports
+# Recaps and final-report builds
 
-Weekly or ad-hoc recap reports live under `reports/recap/`. These are short
-LaTeX reports meant for human progress updates, for example a report to a
-professor or supervisor.
+The final internship report lives in `reports/final-report/`; progress reports
+live in `reports/recaps/YYYY-MM-DD/`. Use ISO dates for new recaps. Keep the
+main source and report-specific supporting sources/data together, and reference
+shared tables or experiment figures through their existing locations.
 
-## Folder Layout
+## Build commands
 
-Each recap should have its own dated subfolder:
+From the repository root, with `latexmk` and a compatible TeX installation:
 
-```text
-reports/recap/
-  Makefile
-  09072026/
-    main.tex
-    schema.tex
-    main.pdf
+```bash
+make -C reports final-report
+make -C reports recap DATE=2026-07-09
+# Equivalent direct recap command:
+make -C reports/recaps 2026-07-09
 ```
 
-Use the date folder as the report identifier. The existing folder name
-`09072026` follows the current project convention. Keep all source files needed
-for that recap inside the dated folder unless they are shared report outputs
-from `reports/outputs/`.
+Builds are explicit requests to regenerate the delivered PDF. The final report
+uses `\today`, so a later build can change its title-page date; preserve the
+committed delivery PDF when only organising files or consulting findings.
 
-The usual files are:
-
-| Path | Purpose | Tracked |
+| Report | Compiler output | Delivered PDF |
 | --- | --- | --- |
-| `reports/recap/<date>/main.tex` | Main report source | Yes |
-| `reports/recap/<date>/schema.tex` | Small standalone diagram or supporting figure source | Yes |
-| `reports/recap/<date>/main.pdf` | Compiled recap deliverable | Yes |
-| `reports/build/recap/<date>/` | LaTeX build artifacts and intermediate PDFs | No |
+| Final | `reports/build/final-report/main.pdf` | `reports/final-report/main.pdf` |
+| Recap | `reports/build/recaps/<date>/main.pdf` | `reports/recaps/<date>/main.pdf` |
 
-## Build With Make
+The recap Makefile runs from `reports/recaps/`. Diagram sources are built before
+the main document and found through its build-directory graphic path. The
+2026-07-28 recap also builds its table appendices. The 2026-08-17 recap requires
+the experiment plots and local `runs/` dendrogram images referenced by its source.
 
-Compile recaps from the `reports/recap/` directory:
+## Tracking and scratch files
 
-```bash
-make -C reports/recap 09072026
-```
+Track new recap sources, necessary supporting assets, and the delivered
+`main.pdf`. The six historical recap folders retain their previous ignored
+status; their Makefile targets require those local archives to be present.
+See the [catalogue](../../reports/README.md) for the date mapping and
+[tracking policy](README.md#artifact-ownership-and-git-policy).
 
-The Makefile first builds `schema.tex`, then builds `main.tex`, and finally
-copies the compiled PDF back to the dated recap folder:
-
-```text
-reports/build/recap/09072026/main.pdf
-reports/recap/09072026/main.pdf
-```
-
-The first path is the compiler output under the scratch build tree. The second
-path is the report deliverable that should be kept with the recap sources.
-
-## Build Artifacts
-
-LaTeX scratch files should stay under:
-
-```text
-reports/build/recap/<date>/
-```
-
-This includes files such as `.aux`, `.fdb_latexmk`, `.fls`, `.log`, `.out`, and
-intermediate PDFs. Do not keep these files inside `reports/recap/<date>/`.
-
-The only generated file expected in the dated recap folder is `main.pdf`,
-because it is the easy-to-open final report.
-
-Clean recap build artifacts with:
+Compiler files such as `.aux`, `.out`, `.toc`, `.log`, `.fls`, and
+`.fdb_latexmk` belong under `reports/build/`. Existing scratch files were moved
+into `legacy/` subfolders there without changing delivered PDFs. Earlier build
+directories are preserved in `previous-build/` subfolders under the new paths.
 
 ```bash
-make -C reports/recap clean
+make -C reports clean
+# Only recap scratch files:
+make -C reports/recaps clean
 ```
 
-This removes `reports/build/recap/` and the copied recap PDF for the currently
-listed Makefile target.
+Cleanup removes build scratch directories and preserves deliverable PDFs.
 
-## Adding A New Recap
+## Add a recap
 
-To add another recap:
-
-1. Create a new dated folder under `reports/recap/`.
-2. Add at least `main.tex`; add `schema.tex` if the report needs a compiled
-   diagram.
-3. Add a Makefile target for the new date.
-4. Make the target write compiler artifacts to `reports/build/recap/<date>/`.
-5. Copy the final `main.pdf` back into `reports/recap/<date>/`.
-
-Keep the source simple and explicit. Recaps are meant to be quick progress
-summaries, not reusable report-generation infrastructure.
+1. Create `reports/recaps/YYYY-MM-DD/main.tex` and supporting files.
+2. Add an explicit dated target to `reports/recaps/Makefile`.
+3. Compile from the recap root, writing scratch files below
+   `reports/build/recaps/YYYY-MM-DD/`; build required diagrams/appendices first.
+4. Copy only the final `main.pdf` back to the dated source folder.
+5. Record the datasets, configs, checkpoints, OOD Scores, metric convention,
+   units, and source experiment records alongside the narrative.

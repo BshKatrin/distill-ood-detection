@@ -2,6 +2,10 @@
 
 An OOD Score is defined per sample. It quantifies whether the sample is more ID-like or more OOD-like.
 
+ROC-AUC, FPR@95, and AUPR are [aggregate metrics](metrics.md), rather than
+per-sample scores. That reference defines the historical ID-positive and
+OpenOOD comparison OOD-positive conventions and their units.
+
 In this project, use the following convention:
 
 - Higher OOD Score = more ID-like.
@@ -14,7 +18,7 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
 - `sign: +1`: Use the raw metric value directly.
 - `sign: -1`: Multiply the raw metric value by `-1`.
 
-## Scores
+## Classifier scores
 
 - MSP (Maximum Softmax Probability): Maximum softmax probability of the
   **teacher** model from standard raw-image inference. MSP is the baseline OOD
@@ -30,7 +34,7 @@ The `sign` field defines how to convert a raw metric value into the final OOD Sc
   `T * logsumexp(logits / T)` so that higher values are more ID-like.
   - `sign: +1`
 
-- KL (teacher \ student): KL divergence from the teacher probability distribution to the student probability distribution.
+- KL (teacher || student): KL divergence from the teacher probability distribution to the student probability distribution.
   When logits are available, reports compute the equivalent log-softmax form
   to avoid zeros caused by floating-point softmax underflow.
   - `sign: -1`
@@ -92,6 +96,12 @@ Artifacts retain neighbor indices, distances, mean probabilities, mean logits,
 raw metrics, and sign-adjusted `ood_scores`. The sign-adjusted values follow the
 project convention that higher values are more ID-like.
 
+## Feature Denoising reconstruction scores
+
+Feature-map reconstruction uses [hidden-element MSE](../strategies/feature_denoising/feature_masking.md#ood-score):
+sum the masked squared error and divide by the number of hidden scalar elements.
+The following methods define different target spaces and masks.
+
 - Feature Denoising PCA reconstruction error: Hidden-component reconstruction error in
   whitened PCA space from PCA Masked Reconstruction. The raw error increases
   when a sample is less predictable from ID teacher-feature structure, so it is
@@ -138,17 +148,44 @@ project convention that higher values are more ID-like.
   Prediction.
   - `sign: -1`
 
-- Activation-subspace insignificant reconstruction error: Per-sample MSE
-  between reconstructed and target insignificant SVD coordinates.
+### Improvement and identity scores
+
+For methods exporting identity diagnostics, let `e_pred` be reconstruction MSE
+and `e_identity` the MSE of the corrupted input against the clean target, using
+the same hidden elements. Available sign-adjusted scores include:
+
+| Exported score | Definition | Direction |
+| --- | --- | --- |
+| Default reconstruction | `-e_pred` | Higher means more ID-like |
+| Negative identity error | `-e_identity` | Higher means more ID-like |
+| Improvement | `e_identity - e_pred` | Higher means more ID-like |
+| Relative improvement | `(e_identity - e_pred) / max(e_identity, eps)` | Higher means more ID-like |
+| Cosine similarity (embedding methods) | `cosine(prediction, clean_target)` | Higher means more ID-like |
+
+The primary Feature Denoising exporter averages relative improvements per draw,
+with an identity-error floor of `1e-12`. The report exporter can also calculate a
+ratio from stored mean errors when an older artifact lacks per-draw relative
+improvement. Those calculations differ; preserve which artifact/definition a
+report used. The method-specific exporter defines which diagnostic fields exist.
+
+## Activation-subspace reconstruction scores
+
+These scores apply to coordinate autoencoders in either the decisive or
+insignificant subspace; see the [method reference](../strategies/activation_subspace.md).
+
+- Activation-subspace reconstruction error: Per-sample MSE
+  between reconstructed and target SVD coordinates.
   - `sign: -1`
 
-- Activation-subspace insignificant relative reconstruction error: Per-sample
+- Activation-subspace relative reconstruction error: Per-sample
   `L2(reconstruction - target) / max(L2(target), eps)`.
   - `sign: -1`
 
-- Activation-subspace insignificant cosine similarity: Per-sample cosine
+- Activation-subspace cosine similarity: Per-sample cosine
   similarity between reconstructed and target insignificant SVD coordinates.
   - `sign: +1`
+
+## Ensemble scores
 
 - Ensemble predictive entropy: Shannon entropy of the mean probability
   distribution across the 16 subspace students,
@@ -162,4 +199,7 @@ project convention that higher values are more ID-like.
 ## Implementation
 
 - OOD Score functions are implemented in [ood_scores.py](../../src/distill_ood_detection/evaluation/ood_scores.py).
-- Aggregate OOD detection metrics, such as ROC-AUC and FPR@95 TPR, are implemented in [ood_metrics.py](../../src/distill_ood_detection/evaluation/ood_metrics.py).
+- Reconstruction and identity diagnostics are implemented in
+  [feature_denoising.py](../../src/distill_ood_detection/distillation/feature_denoising.py).
+- Aggregate metrics and their implementations are documented separately in
+  [metrics](metrics.md).

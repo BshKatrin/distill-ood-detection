@@ -56,7 +56,7 @@ Average the selected examples' teacher probabilities and teacher logits
 separately, then treat those means as the local classifier prediction.
 
 Compute exactly seven scores from
-[`docs/ood_scores/README.md`](../../docs/ood_scores/README.md): KL (teacher ||
+[`docs/evaluation/ood-scores.md`](../../docs/evaluation/ood-scores.md): KL (teacher ||
 neighbor mean), absolute maximum probability difference, absolute energy gap,
 Student MSP, Student energy, predictive entropy, and BALD. The latter two treat
 the selected neighbor probability distributions as a local ensemble. Save raw

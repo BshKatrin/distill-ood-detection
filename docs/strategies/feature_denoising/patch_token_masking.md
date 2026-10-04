@@ -40,4 +40,4 @@ draws. The OOD Score is named
 `-1`, so larger signed values remain more ID-like.
 
 The CIFAR-10 and CIFAR-100 variants are included in the fixed OpenOOD CIFAR
-evaluation selection described in [OpenOOD CIFAR](../../openood_cifar.md).
+evaluation selection described in [OpenOOD CIFAR](../../evaluation/openood/cifar.md).

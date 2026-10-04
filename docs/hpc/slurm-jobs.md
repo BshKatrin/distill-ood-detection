@@ -258,7 +258,7 @@ The jobs reuse the existing GPU environment and project checkpoints. Set
 checkout, and set `OPENOOD_ROOT`, `MANIFEST`, or `MAX_CONCURRENT` to override
 their documented defaults. Missing checkpoints remain in the manifest's
 `missing` list and are never silently substituted. Protocol details and exact
-sample counts are in [OpenOOD CIFAR](../openood_cifar.md).
+sample counts are in [OpenOOD CIFAR](../evaluation/openood/cifar.md).
 
 When compute nodes have no outbound access to the OpenOOD archive host, run
 `slurm_scripts/launch_openood_cifar_after_transfer.sh` in the background on the

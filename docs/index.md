@@ -1,39 +1,58 @@
 # Project documentation
 
-This folder contains the project knowledge that agents and humans should consult before making changes.
+Use this index before changing an experiment. Method references describe
+implemented behaviour; sections marked **Not implemented** describe planned
+work. Curated results live in `experiments/`, while report deliverables live
+in `reports/`.
 
-Sections marked "Not implemented" describe planned work. All other sections correspond to implemented functionality.
+## Setup and experiment identity
 
-## Start here
+- [Root README](../README.md): repository layout and a baseline reproduction.
+- [Vocabulary](vocabulary.md): project terminology, including ID, OOD, and OOD Score.
+- [Environments](envs.md): focused `uv` projects and dependencies.
+- [Configs](configs.md): config layout, run directories, and artifact ownership.
 
-- [Strategies](strategies/README.md): OOD distillation training strategies and their rationale.
-- [Activation-Subspace Students](strategies/activation_subspace.md):
-  self-contained ActSub paper background, project-specific student variant,
-  training/inference/scoring workflow, and artifact contracts.
-- [Disjoint Subspace Ensembles](strategies/subspace_ensemble.md): channel and
-  whitened GAP-PCA ensembles with predictive-entropy and BALD OOD Scores.
-- [Feature Denoising channel grouping](strategies/feature_denoising/channel_grouping/README.md):
-  methods for building semantic channel candidates before grouped masking.
-- [Feature Denoising NMF concept masking](strategies/feature_denoising/nmf_concept_masking.md):
-  global non-negative concept directions, complete-direction masking, and
-  residual reconstruction scoring.
-- [ViT patch-token masked reconstruction](strategies/feature_denoising/patch_token_masking.md):
-  layer-12 patch grids, Bernoulli masking, and residual CNN reconstruction.
+## Methods
+
+- [Strategies](strategies/README.md): baseline, perturbation, Feature Denoising,
+  activation-subspace students, and subspace ensembles.
+- [Objectives](objectives/README.md): output-distillation loss definitions.
+- [Feature Denoising](strategies/feature_denoising/README.md): method catalogue,
+  target representations, masking, and subspace diagnostics.
+- [Channel grouping](strategies/feature_denoising/channel_grouping/README.md):
+  correlation and NMF hierarchy construction.
+- [Activation-subspace reference](strategies/activation_subspace.md) and
+  [workflow](workflows/activation_subspace.md): decomposition, students, and artifacts.
+- [Disjoint subspace ensembles](strategies/subspace_ensemble.md): channel and
+  whitened GAP-PCA students, predictive entropy, and BALD.
+
+## Evaluation
+
+- [Evaluation overview](evaluation/README.md): scores, metrics, and protocols.
+- [OOD Scores](evaluation/ood-scores.md): per-sample definitions and signs.
+- [Aggregate metrics](evaluation/metrics.md): ID+/OOD+ FPR@95, units, and averaging.
+- [OpenOOD CIFAR](evaluation/openood/cifar.md): fixed manifests and selected students.
+- [OpenOOD ImageNet](evaluation/openood/imagenet.md): ImageNet-200/ImageNet-1K evaluation.
+
+## Reporting
+
+- [Deliverable catalogue](../reports/README.md): final report, slides, and recap archive.
+- [Reporting workflows](reports/README.md): exports, notebooks, builds, and Git policy.
+- [Recaps and final-report builds](reports/recap.md): ISO dates and compiler scratch files.
+
+## Operations
+
+- [HPC](hpc/README.md): cluster access and local configuration. Read when HPC
+  or GPU cluster access is requested.
+- [SLURM jobs](hpc/slurm-jobs.md): reusable config-driven jobs.
+- [Dashboards](hpc/panel-dashboards.md): summary generation, serving, and SSH tunnels.
+- [Sync run artifacts](hpc/sync-runs.md): selected remote run transfers.
 - [NMF channel-cluster audit](strategies/feature_denoising/channel_grouping/channel_cluster_audit.md):
-  269 fixed-cluster specialists, audit metrics, restartable arrays, and the
-  minimal remote Panel score application.
-- [Configs](configs.md): Experiment configuration layout and naming conventions.
-- [Environments](envs.md): Focused `uv` environments for GPU jobs, notebooks, and tests.
-- [HPC](hpc/README.md): High-performance computing cluster access. Read this only when HPC or GPU cluster access is requested.
-- [SLURM jobs](hpc/slurm-jobs.md): Submit reusable config-driven sbatch jobs.
-- [Panel dashboards on SLURM](hpc/panel-dashboards.md): build summaries, serve
-  both cluster dashboards, and connect through SSH tunnels.
-- [Syncing run artifacts from the GPU cluster](hpc/sync-runs.md): Copy selected remote `runs/` folders into local `runs/`.
-- [Objectives](objectives/README.md): Distillation objective functions for deep-learning students.
-- [OOD Scores](ood_scores/README.md): Per-sample scores that quantify whether a sample is more ID-like or OOD-like.
-- [OpenOOD ImageNet](openood_imagenet200.md): fixed ImageNet-200/ImageNet-1K
-  ID/OOD manifests, pretrained ResNets, and pluggable score evaluation.
-- [OpenOOD CIFAR](openood_cifar.md): fixed CIFAR-10/CIFAR-100 manifests,
-  OOD-positive metrics, existing-student evaluation, and restartable SLURM jobs.
-- [Reports](reports/README.md): Export metric reports, render report outputs,
-  and generate analysis notebooks.
+  specialist tasks, restartable arrays, metrics, and dashboard contracts.
+
+## Experiment results
+
+- [Experiment catalogue](../experiments/README.md): report sections mapped to
+  experiment records and configurations.
+- [Final report](../reports/final-report/main.pdf): internship findings and convention audit.
+- [Presentation](../reports/presentations/internship/presentation.pdf): final slides.

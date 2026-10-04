@@ -23,7 +23,8 @@ the torchvision test split.
 
 ## Metric convention
 
-Saved metrics follow the OpenOOD comparison convention:
+Saved metrics follow the project's OpenOOD comparison convention (OOD+).
+See [aggregate metrics](../metrics.md) for its distinction from historical ID+ reports:
 
 - OOD is the positive class (`1`).
 - ID is the negative class (`0`).

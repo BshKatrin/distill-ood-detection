@@ -6,7 +6,7 @@ This directory contains different distillation (student-training) strategies.
 - [Perturbation](perturbation.md): Perturbation-based strategy, including
   [embedding-space](embedding/README.md) and
   [pixel-space](pixel/README.md) perturbations.
-- [Feature Denoising](feature_denoising.md): representation-prediction strategy,
+- [Feature Denoising](feature_denoising/README.md): representation-prediction strategy,
   including [PCA Masked Reconstruction](feature_denoising/pca_masking.md) and
   [Feature Masked Reconstruction](feature_denoising/feature_masking.md).
 - [Activation-Subspace Students](activation_subspace.md): self-contained

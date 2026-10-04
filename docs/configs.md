@@ -67,7 +67,7 @@ select the number of neighbors, FAISS query batch size, and pooled-embedding
 shard size. One exact `IndexFlatL2` index is built from raw ID training
 embeddings and reused for every query dataset. The
 selected ID neighbors' mean probabilities and logits produce the classifier-based OOD
-Scores documented under [OOD Scores](ood_scores/README.md#k-nn-output-aggregation).
+Scores documented under [OOD Scores](evaluation/ood-scores.md#k-nn-output-aggregation).
 They write to
 `runs/embedding_distances/<id_dataset>/<teacher_architecture>/`.
 
@@ -128,8 +128,8 @@ experiment_name: perturbation_linear_layer4_student_resnet18_cifar10_clip_channe
 run_dir: runs/students/perturbation/embedding/clipping/cifar_10/resnet18/linear_layer4_clip_channel
 ```
 
-`experiment_name` is a globally unique display and tracking label used by
-MLflow and manifests. `run_dir` is the authoritative artifact location. Do not
+`experiment_name` is a globally unique display label recorded in manifests.
+MLflow is disabled. `run_dir` is the authoritative artifact location. Do not
 construct paths by combining `runs/` with `experiment_name`.
 
 ## Teacher artifacts

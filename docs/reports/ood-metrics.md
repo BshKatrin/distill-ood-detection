@@ -4,6 +4,10 @@ The OOD metric exporter computes ROC-AUC and FPR@95 from saved probability
 artifacts under student `run_dir` paths. It uses experiment configs for report
 metadata and writes one LaTeX report per strategy.
 
+This exporter uses the historical **ID-positive** ROC/FPR convention. Metrics
+are fractions in `[0, 1]`. See [aggregate metrics](../evaluation/metrics.md) before
+comparing its FPR@95 with the OOD-positive OpenOOD comparison evaluator.
+
 ## Group-balanced macro metrics
 
 When a report aggregates results across Near-OOD and Far-OOD datasets, compute
