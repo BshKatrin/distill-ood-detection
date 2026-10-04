@@ -1,0 +1,174 @@
+\section{Experimental progression}
+
+\headingindent
+The initial CIFAR experiments explored many combinations of teacher
+architecture, student model, feature layer, perturbation, training objective,
+inference protocol, and OOD Score. For brevity, this report retains only the
+best-performing variant within each method family and ID dataset.
+Feature-denoising experiments are reported separately in Section~5.
+
+AUROC is the main ranking metric used in OOD detection. Under the
+ID-positive convention used here, it measures how often a randomly selected ID
+sample receives a higher score than a randomly selected OOD sample. It is
+threshold-independent. FPR@95 instead describes a particular operating point:
+the threshold is chosen to correctly accept 95\% of ID samples, and the metric
+reports the proportion of OOD samples that incorrectly pass that threshold and
+are accepted as ID. Thus, higher AUROC and lower FPR@95 are better.
+
+% Each table follows the grouped layout used in the full results report. The
+% opposite CIFAR dataset is Near-OOD, while MNIST and SVHN form the Far-OOD
+% group. The Far-OOD average is the mean over MNIST and SVHN, and the overall
+% macro is the unweighted mean over all three OOD datasets. Every metric cell
+% reports \textbf{AUROC / FPR@95} under the ID-positive convention. Teacher
+% baselines always use maximum softmax probability (MSP), never energy.
+
+\clearpage
+\begin{landscape}
+
+\subsection{CIFAR-10 as ID}
+
+\headingindent
+Table~\ref{tab:progression-cifar10} reports the selected configuration for each
+method family. 
+% Dropout and multi-layer clipping were the strongest
+% student-based variants by the compromise criterion. Their gains came from
+% different inference protocols: the selected dropout model averaged perturbed
+% draws, whereas the selected clipping model used clipped inference after
+% training against a clean teacher target.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{3.2pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\linewidth}{@{}L{2.25cm}YL{2.15cm}ccccc@{}}
+\toprule
+\multicolumn{3}{c}{} &
+\multicolumn{1}{c}{\cellcolor{neargreen}\textbf{Near-OOD}} &
+\multicolumn{3}{c}{\cellcolor{farorange}\textbf{Far-OOD}} &
+\multicolumn{1}{c}{\cellcolor{macroblue}\textbf{Overall}} \\
+\cmidrule(lr){4-4}\cmidrule(lr){5-7}\cmidrule(lr){8-8}
+Method family & Best-performing variant & Selected OOD Score &
+\cellcolor{neargreen}CIFAR-100 &
+\cellcolor{farorange}MNIST & \cellcolor{farorange}SVHN &
+\cellcolor{faraverage}Average & \cellcolor{macroblue}Macro \\
+\midrule
+Teacher baseline & ResNet-18; no student & Teacher MSP &
+\nearcell{\metric{0.879}{0.624}} &
+\farcell{\metric{0.918}{0.556}} & \farcell{\metric{0.904}{0.598}} &
+\faravg{\metric{0.911}{0.577}} & \balanced{\metric{0.900}{0.593}} \\
+Teacher baseline & ResNet-50; no student & Teacher MSP &
+\nearcell{\metric{0.873}{0.628}} &
+\farcell{\metric{0.897}{0.622}} & \farcell{\metric{0.891}{0.680}} &
+\faravg{\metric{0.894}{0.651}} & \balanced{\metric{0.887}{0.643}} \\
+\addlinespace
+Clean distillation & ResNet-18 layer 4; 100-tree random forest; output
+regression & Student energy &
+\nearcell{\metric{0.870}{0.550}} &
+\farcell{\metric{0.920}{0.490}} & \farcell{\metric{0.900}{0.550}} &
+\faravg{\metric{0.910}{0.520}} & \balanced{\metric{0.895}{0.531}} \\
+MC dropout & ResNet-18 layer 4; channel dropout $p=0.8$; logit MSE; dropout
+inference & Student energy &
+\nearcell{\metric{0.885}{0.498}} &
+\farcell{\metric{0.958}{0.252}} & \farcell{\metric{0.930}{0.380}} &
+\faravg{\metric{0.944}{0.316}} & \balanced{\metric{0.924}{0.376}} \\
+Multi-layer clipping & ResNet-18 layers 3--4; channel/flatten; clean target;
+KL; clipped inference & Student energy &
+\nearcell{\metric{0.859}{0.581}} &
+\farcell{\metric{0.998}{0.001}} & \farcell{\metric{0.897}{0.482}} &
+\faravg{\metric{0.948}{0.242}} & \balanced{\metric{0.918}{0.355}} \\
+Affine pixel perturbation & ResNet-50 layer 4; clean target; logit MSE; clean
+inference & Student energy &
+\nearcell{\metric{0.871}{0.552}} &
+\farcell{\metric{0.906}{0.528}} & \farcell{\metric{0.960}{0.247}} &
+\faravg{\metric{0.933}{0.388}} & \balanced{\metric{0.912}{0.442}} \\
+Subspace-student ensemble & 16 ResNet-18 linear students; ordered disjoint
+channel-GAP subspaces; KL & Predictive entropy &
+\nearcell{\metric{0.884}{0.574}} &
+\farcell{\metric{0.930}{0.468}} & \farcell{\metric{0.905}{0.554}} &
+\faravg{\metric{0.918}{0.511}} & \balanced{\metric{0.906}{0.532}} \\
+\bottomrule
+\end{tabularx}
+\caption{Best-performing variant in each method family with CIFAR-10 as ID.
+Cells report AUROC / FPR@95 on the initial CIFAR protocol.}
+\label{tab:progression-cifar10}
+\end{table}
+
+\clearpage
+\vspace*{0.8cm}
+\subsection{CIFAR-100 as ID}
+
+\headingindent
+Table~\ref{tab:progression-cifar100} repeats the selection independently with
+CIFAR-100 as ID.
+% This setting was consistently harder. Affine pixel
+% perturbation and multi-layer clipping gave the strongest student-based
+% compromises, while dropout and the subspace-student ensemble were less stable
+% than on CIFAR-10.
+
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{3.2pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\linewidth}{@{}L{2.25cm}YL{2.15cm}ccccc@{}}
+\toprule
+\multicolumn{3}{c}{} &
+\multicolumn{1}{c}{\cellcolor{neargreen}\textbf{Near-OOD}} &
+\multicolumn{3}{c}{\cellcolor{farorange}\textbf{Far-OOD}} &
+\multicolumn{1}{c}{\cellcolor{macroblue}\textbf{Overall}} \\
+\cmidrule(lr){4-4}\cmidrule(lr){5-7}\cmidrule(lr){8-8}
+Method family & Best-performing variant & Selected OOD Score &
+\cellcolor{neargreen}CIFAR-10 &
+\cellcolor{farorange}MNIST & \cellcolor{farorange}SVHN &
+\cellcolor{faraverage}Average & \cellcolor{macroblue}Macro \\
+\midrule
+Teacher baseline & ResNet-18; no student & Teacher MSP &
+\nearcell{\metric{0.792}{0.794}} &
+\farcell{\metric{0.701}{0.956}} & \farcell{\metric{0.806}{0.812}} &
+\faravg{\metric{0.754}{0.884}} & \balanced{\metric{0.767}{0.854}} \\
+Teacher baseline & ResNet-50; no student & Teacher MSP &
+\nearcell{\metric{0.792}{0.781}} &
+\farcell{\metric{0.811}{0.823}} & \farcell{\metric{0.758}{0.793}} &
+\faravg{\metric{0.785}{0.808}} & \balanced{\metric{0.787}{0.799}} \\
+\addlinespace
+Clean distillation & ResNet-18 layer 4; 100-tree random forest; output
+regression & Student energy &
+\nearcell{\metric{0.790}{0.810}} &
+\farcell{\metric{0.710}{0.940}} & \farcell{\metric{0.840}{0.630}} &
+\faravg{\metric{0.775}{0.785}} & \balanced{\metric{0.780}{0.793}} \\
+MC dropout & ResNet-18 layer 4; spatial dropout $p=0.8$; KL; clean inference &
+KL mismatch &
+\nearcell{\metric{0.768}{0.881}} &
+\farcell{\metric{0.772}{0.821}} & \farcell{\metric{0.812}{0.854}} &
+\faravg{\metric{0.792}{0.838}} & \balanced{\metric{0.784}{0.852}} \\
+Multi-layer clipping & ResNet-18 layers 3--4; channel/flatten; clean target;
+KL; clean inference & Student energy &
+\nearcell{\metric{0.751}{0.842}} &
+\farcell{\metric{0.797}{0.879}} & \farcell{\metric{0.940}{0.340}} &
+\faravg{\metric{0.869}{0.610}} & \balanced{\metric{0.829}{0.687}} \\
+Affine pixel perturbation & ResNet-50 layer 4; clean target; logit MSE; clean
+inference & Student energy &
+\nearcell{\metric{0.779}{0.797}} &
+\farcell{\metric{0.875}{0.698}} & \farcell{\metric{0.925}{0.431}} &
+\faravg{\metric{0.900}{0.565}} & \balanced{\metric{0.860}{0.642}} \\
+Subspace-student ensemble & 16 ResNet-18 linear students; ordered disjoint
+flattened-channel subspaces; logit MSE & Predictive entropy &
+\nearcell{\metric{0.779}{0.818}} &
+\farcell{\metric{0.760}{0.947}} & \farcell{\metric{0.874}{0.688}} &
+\faravg{\metric{0.817}{0.818}} & \balanced{\metric{0.804}{0.818}} \\
+\bottomrule
+\end{tabularx}
+\caption{Best-performing variant in each method family with CIFAR-100 as ID.
+Cells report AUROC / FPR@95 on the initial CIFAR protocol.}
+\label{tab:progression-cifar100}
+\end{table}
+
+Across both ID datasets, no student family dominated every setting. The
+selected variant changed with the ID dataset, and strong AUROC did not always
+coincide with low FPR@95. This instability motivated the later emphasis on
+feature reconstruction pipeline.
+% and on fixed OpenOOD evaluation.
+
+\end{landscape}
+\clearpage

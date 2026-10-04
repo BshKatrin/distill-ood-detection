@@ -1,0 +1,175 @@
+\section{Transition to fixed OpenOOD evaluation}
+\label{sec:openood-transition}
+
+\headingindent
+Near the end of the internship, we replaced the evaluation based on standard
+\code{torchvision} test splits with the fixed OpenOOD v1.5 image-list
+manifests \cite{yang2022openood,zhang2023openood}. As summarized in
+Table~\ref{tab:dataset-protocols}, this transition added the benchmark's
+Near-OOD and Far-OOD datasets and fixed the exact images used for every
+comparison. For CIFAR-10 and CIFAR-100, the manifests add TIN as Near-OOD and
+Textures and Places365 as Far-OOD. For ImageNet-200, they specify SSB-hard and
+NINCO as Near-OOD and curated subsets of iNaturalist, Textures, and OpenImage-O
+as Far-OOD. This standardized protocol prevents accidental changes in dataset
+size and makes results more directly comparable with published OpenOOD values.
+
+While moving to this evaluation, we found that the metric convention was still
+not fully standardized. In particular, papers and even different OpenOOD
+artifacts alternate between treating ID or OOD samples as the positive class.
+The convention does not change AUROC when labels and score direction are
+reversed together, but it changes the operating point used by FPR@95. One
+convention can therefore produce a substantially lower FPR@95 for exactly the
+same predictions without representing a better detector.
+
+\subsection{Two definitions of FPR@95}
+
+\headingindent
+Let $s_{\mathrm{ID}}$ increase with ID-likeness and let
+$s_{\mathrm{OOD}}=-s_{\mathrm{ID}}$. Two different operating points are
+called FPR@95 in the literature.
+
+\begin{table}[H]
+\centering
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabularx}{\textwidth}{@{}L{1.6cm}L{2.5cm}YY@{}}
+\toprule
+Name & Positive / negative & Threshold condition & Reported false-positive rate \\
+\midrule
+\idpos & ID / OOD &
+$\Pr(s_{\mathrm{ID}}\ge\tau_{\mathrm{ID}}\mid\mathrm{ID})=0.95$ &
+$\fprid=\Pr(s_{\mathrm{ID}}\ge\tau_{\mathrm{ID}}\mid\mathrm{OOD})$ \\
+\oodpos & OOD / ID &
+$\Pr(s_{\mathrm{OOD}}\ge\tau_{\mathrm{OOD}}\mid\mathrm{OOD})=0.95$ &
+$\fprood=\Pr(s_{\mathrm{OOD}}\ge\tau_{\mathrm{OOD}}\mid\mathrm{ID})$ \\
+\bottomrule
+\end{tabularx}
+\caption{The two operating points commonly called FPR@95.}
+\label{tab:fpr-conventions}
+\end{table}
+
+Under \idpos, FPR@95 is the share of OOD inputs accepted as ID while 95\% of
+ID inputs are retained. Under \oodpos, it is the share of ID inputs flagged as
+OOD while 95\% of OOD inputs are detected. They use different thresholds and
+are not complements.
+
+AUROC is not influenced by the convention because it measures ranking. Let
+$X_{\mathrm{ID}}$ and $X_{\mathrm{OOD}}$ be independently sampled ID and OOD
+examples. Under \idpos, a score $s_{\mathrm{ID}}$ increases with ID-likeness,
+\[
+  \operatorname{AUROC}_{\mathrm{ID+}}
+  = \Pr\!\left(s_{\mathrm{ID}}(X_{\mathrm{ID}})
+    > s_{\mathrm{ID}}(X_{\mathrm{OOD}})\right).
+\]
+Under \oodpos, the score direction is reversed,
+$s_{\mathrm{OOD}}=-s_{\mathrm{ID}}$, and the OOD example is the positive one.
+Therefore,
+\begin{align*}
+  \operatorname{AUROC}_{\mathrm{OOD+}}
+  &= \Pr\!\left(s_{\mathrm{OOD}}(X_{\mathrm{OOD}})
+    > s_{\mathrm{OOD}}(X_{\mathrm{ID}})\right) \\
+  &= \Pr\!\left(-s_{\mathrm{ID}}(X_{\mathrm{OOD}})
+    > -s_{\mathrm{ID}}(X_{\mathrm{ID}})\right) \\
+  &= \Pr\!\left(s_{\mathrm{ID}}(X_{\mathrm{ID}})
+    > s_{\mathrm{ID}}(X_{\mathrm{OOD}})\right)
+   = \operatorname{AUROC}_{\mathrm{ID+}}.
+\end{align*}
+
+% FPR@95 is asymmetric: it reads the ROC curve at 95\% recall for one class or
+% the other. The same score vectors can therefore give the same AUROC and very
+% different FPR@95 values.
+
+\subsection{OpenOOD version mismatch}
+
+\headingindent
+OpenOOD cannot be assigned one convention without naming the artifact and
+date. Its v1.0 paper used \idpos. The v1.5 paper and published spreadsheet use
+\oodpos, but the tagged \code{v1.5} evaluator still encoded ID as positive.
+The evaluator on the later \code{main} branch switched to OOD as positive.
+This history explains why our early project values and the OpenOOD spreadsheet
+could have matching AUROC but different FPR@95.
+
+\begin{table}[ht]
+\centering
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabularx}{\textwidth}{@{}L{4.5cm}L{2.0cm}Y@{}}
+\toprule
+Source & Convention & Consequence \\
+\midrule
+OpenOOD v1.0 paper & \idpos & -- \\
+OpenOOD v1.5 paper & \oodpos & -- \\
+GitHub tag \code{v1.5} & \idpos & Tagged code disagrees with the v1.5 paper. \\
+Later and current \code{main} & \oodpos & Code follows the v1.5 paper. \\
+Published v1.5 spreadsheet & \oodpos & Reference numbers match the OOD-positive calculation. \\
+\bottomrule
+\end{tabularx}
+\caption{OpenOOD convention timeline.}
+\label{tab:openood-convention-timeline}
+\end{table}
+
+We verified the spreadsheet convention with the three released CIFAR-10
+ResNet-18 seeds. Mean AUROC was 87.16 under either simultaneous label and score
+reversal. Mean \fprid was 61.01, while mean \fprood was 53.12. The spreadsheet
+reported $53.08\pm4.86$, which matches the OOD-positive calculation. Thus, the
+apparently lower FPR@95 came from evaluating a different operating point, not
+from improved predictions.
+
+\subsection{The problem persists in recent work}
+
+\headingindent
+An audit of representative and recent papers found both conventions. Most of
+the classical methods used \idpos, sometimes only implicitly. Several recent
+methods and the later OpenOOD evaluator used \oodpos. Some papers did not state
+enough information to decide.
+
+\begin{table}[H]
+\centering
+\begin{minipage}{9cm}
+\centering
+\footnotesize
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabular}{@{}L{5.8cm}L{2.2cm}@{}}
+\toprule
+Paper or method & Convention \\
+\midrule
+MSP \cite{hendrycks2017baseline} & \idpos \\
+Mahalanobis \cite{lee2018mahalanobis} & \idpos, implicit \\
+Deep $k$-NN \cite{sun2022knn} & \idpos \\
+PixMix \cite{hendrycks2022pixmix} & Not specified \\
+ReAct \cite{sun2021react} & \idpos \\
+ASH \cite{djurisic2023ash} & \idpos \\
+InterNeg, CVPR 2026 \cite{xu2026interneg} & \oodpos \\
+Extended Logit Normalization, CVPR 2026 \cite{ding2026elogitnorm} & \oodpos \\
+RankOOD, CVPR 2026 \cite{denipitiyage2026rankood} & \idpos \\
+\bottomrule
+\end{tabular}
+\caption{Examples from the convention audit in different papers. Recent publication date does not
+resolve the ambiguity.}
+\label{tab:paper-convention-audit}
+\end{minipage}
+\end{table}
+
+% \subsection{Reporting policy}
+
+% \headingindent
+% This project keeps \idpos as its primary operational convention because its
+% scores increase with ID-likeness and its main question is OOD false acceptance
+% at fixed ID coverage. Future reports should use the explicit label
+% \textbf{FPR@95-ID-TPR}. For external comparisons, they should also compute
+% \fprood from the same saved per-sample scores.
+
+% Every result should record the positive class, score direction, threshold
+% population, false-positive population, benchmark version, checkpoint,
+% preprocessing, image lists, and aggregation rule. AUPR should be labeled
+% AUPR-IN or AUPR-OUT. Raw scores and labels should remain available so that
+% both FPR conventions can be recomputed without rerunning inference.
+
+\subsection{Full results under both conventions}
+
+\headingindent
+Tables~\ref{tab:openood-cifar10-full}--\ref{tab:openood-imagenet200-full}
+reproduce the full OpenOOD comparisons from the final experiment recap. Every
+cell reports AUROC/FPR@95 as a fraction. Blue variant cells denote \idpos and
+red variant cells denote \oodpos. Missing entries correspond to datasets that
+were not part of the earlier, non-OpenOOD evaluation.
+
+\input{06_openood_tables}

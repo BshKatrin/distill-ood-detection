@@ -1,0 +1,100 @@
+\section{Introduction}
+
+\headingindent
+Modern image classifiers assume that test inputs resemble the data used for
+training, these inputs are called In-Distribution (ID). That assumption fails in open environments. A medical classifier may
+receive an image from another acquisition protocol, and a driving system may
+encounter an object or visual condition absent from its training set. These abnormal inputs are called Out-Of-Distribution (OOD). A network
+can then return a confident prediction even though none of its classes provides
+a valid description of the input. Out-of-distribution detection adds a scalar
+score and a rejection rule to identify such cases before the prediction is
+used.
+
+This internship started from a proposal to use model distillation as an
+OOD detector, since this area is yet poorly explored in OOD detection related scientific papers. A high-capacity teacher is fixed after training on in-distribution
+data. A smaller student learns only from those data and tries to reproduce a
+teacher output or representation. If the student captures regularities that
+hold on the training distribution, teacher-student disagreement may increase
+on OOD inputs. 
+% The original internship brief proposed this disagreement as an
+% uncertainty score and set three tasks: implement the student training pipeline,
+% build a reproducible evaluation protocol, and compare the resulting scores
+% with established baselines.
+
+The project also explored two extensions beyond matching the teacher's class
+outputs. In the subspace-student ensemble, each student is trained on a fixed
+or randomly sampled subset of an internal teacher representation. Disagreement
+across the ensemble measures how predictions change when each student receives
+only part of the representation. Feature denoising follows a different
+pipeline and diverges from classical knowledge distillation: a student
+receives a corrupted teacher feature and learns to reconstruct its clean
+version. This direction was partly inspired by LeCun's proposal for predictive
+representation learning and by joint-embedding predictive architectures
+(JEPA), which predict representations from incomplete context rather than
+reconstructing raw pixels \cite{lecun2022path,assran2023ijepa}.
+
+\subsection{Progression of OOD detection methods}
+
+\headingindent
+% The papers named in the internship brief trace a change in where OOD evidence
+% is sought.
+The exploration of methods to detect OOD inputs has been in progress since 2017. Early work used the final softmax output. Later methods measured
+distance in representation space, changed the training distribution, or
+modified internal activations at inference time.
+
+\begin{table}[ht]
+\centering
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabularx}{\textwidth}{@{}L{1.3cm}L{3.0cm}Y@{}}
+\toprule
+Year & Method & Main idea \\
+\midrule
+2017 & Maximum softmax probability (MSP) \cite{hendrycks2017baseline} &
+Use the largest predicted class probability as an ID-confidence score. The
+method needs no retraining, but a classifier can remain confident on OOD data. \\
+2018 & Mahalanobis distance \cite{lee2018mahalanobis} &
+Fit class-conditional Gaussian statistics to features from several network
+layers. Score a test point by its distance to the closest class mean. \\
+2021 & ReAct \cite{sun2021react} &
+Clip unusually large penultimate activations before computing a confidence
+score. The clipping threshold comes from ID data and reduces OOD
+overconfidence. \\
+2022 & Deep $k$-NN \cite{sun2022knn} &
+Normalize deep features and measure the distance to nearby ID training
+features. This removes the Gaussian assumption of Mahalanobis scoring. \\
+2022 & PixMix \cite{hendrycks2022pixmix} &
+Train with random compositions of images and structurally complex mixing
+images. The method changes training data to improve several safety measures,
+including anomaly detection. \\
+\bottomrule
+\end{tabularx}
+\caption{A short timeline of the methods that motivated the internship.}
+\label{tab:ood-timeline}
+\end{table}
+
+These methods served as inspiration for some of the experimental axes explored
+here. MSP is a teacher-only baseline. Mahalanobis and $k$-NN motivate representation-space
+scores. ReAct motivates activation clipping. PixMix motivates pixel
+perturbation and feature prediction under image corruption.
+% The
+% internship asked whether a student trained only on ID data could turn these
+% ideas into a family of teacher-student OOD Scores.
+
+\subsection{Research questions}
+
+\headingindent
+The work addressed the following questions.
+
+\begin{enumerate}
+    \item Does a small student disagree with its teacher more often on OOD
+    inputs than on ID inputs?
+    \item Does corruption during student training expose a stronger signal than clean distillation?
+    \item Should students reproduce class outputs, reconstruct internal
+    features, or form an ensemble trained on different feature subspaces?
+    \item How stable are the conclusions across teacher architectures, ID
+    datasets, OOD datasets, score definitions, and evaluation conventions?
+\end{enumerate}
+
+% The last question became central. The final experiments showed that benchmark
+% version and metric polarity can change an apparent comparison even when the
+% underlying scores are unchanged.

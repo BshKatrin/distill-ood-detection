@@ -1,0 +1,71 @@
+\section{Conclusion}
+
+\headingindent
+During this internship, we investigated several ways of using model
+distillation for OOD detection: classical output-level distillation,
+distillation under pixel- and embedding-level perturbations, ensembles of
+students trained on fixed feature subspaces, and feature denoising. The last
+direction departed from classical distillation by asking a student to recover
+a clean teacher representation from a corrupted one. Together, these
+experiments examined whether the information lost, distorted, or disagreed
+upon by a restricted student could provide a reliable indication that an
+input does not belong to the training distribution.
+
+The experiments show that such signals do exist. Teacher--student mismatch,
+student confidence, ensemble disagreement, and feature reconstruction all
+separated ID and OOD samples to some extent. Feature denoising was particularly
+effective on several Far-OOD datasets, where the distribution shift is large.
+Output-level distillation was generally more competitive on Near-OOD datasets,
+where the student could still exploit class-related information. These results
+suggest that the two families capture different aspects of distribution shift:
+feature predictability is useful for large structural changes, whereas logits
+and probabilities remain more sensitive to changes close to the teacher's
+decision boundary. This qualitative Near/Far split is consistent with the
+findings of Activation Subspaces \cite{zongur2025actsub}. That work reports
+that classifier-insignificant activation components are especially useful for
+Far-OOD detection, while decisive, class-related components are more useful
+for Near-OOD detection.
+% Although the methods are different, both sets of
+% experiments indicate that weakly class-dependent representation information
+% helps with large distribution shifts, whereas class-decisive information
+% remains important when OOD samples are close to the ID distribution.
+
+However, no student-based method consistently surpassed the teacher MSP
+baseline across CIFAR-10, CIFAR-100, and ImageNet-200. The main difficulty was
+Near-OOD detection, especially when ID and OOD samples shared similar visual
+and semantic structure. The tested distillation objectives did not preserve a
+sufficiently strong signal for these subtle differences, and their results
+also remained below several established OOD methods.
+% Consequently, the
+% experiments do not validate the original idea in its current form: model
+% distillation alone did not produce a detector that was both stronger than the
+% teacher and stable across datasets.
+
+In the final discussion with my supervisor, we considered whether the results
+were promising enough to continue along the same path. We concluded that the
+current formulation was not working sufficiently well to justify only scaling
+up the same experiments and that this is a normal point in an exploratory research
+project: once the main hypothesis has been tested and its limitations become
+clear, the next step is usually to revise the hypothesis, modify the learning
+objective, or pivot toward the part of the approach that showed the strongest
+signal. Here, that could involve a more targeted study of Near-OOD failure
+cases, a different objective for preserving subtle representation-level
+differences, or a reformulation of feature denoising.
+
+An additional and unexpected outcome of the internship concerned evaluation
+methodology. The positive-class convention used for FPR@95--ID positive or
+OOD positive--is still not standardized, despite the effort represented by
+the OpenOOD benchmark. Even papers published at the same recent conference can
+use different conventions. As demonstrated empirically in the OOD detection field,
+changing the convention can produce a substantially lower FPR@95 from exactly
+the same predictions, while AUROC remains unchanged. Without an explicit
+definition of the positive class and threshold population, this difference
+can be mistaken for a genuine improvement over another method.
+
+% The internship therefore produced both a negative scientific result and a
+% useful methodological one. The proposed distillation approach requires a
+% substantial revision before it can become competitive, but the experiments
+% identified its main failure mode and clarified which components retain useful
+% OOD information. At the same time, the fixed evaluation pipeline, explicit
+% metric conventions, and saved per-sample results provide a reproducible basis
+% for any future reformulation of the idea.

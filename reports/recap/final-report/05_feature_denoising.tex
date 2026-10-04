@@ -1,0 +1,260 @@
+\section{Feature denoising}
+
+\subsection{Motivation}
+
+\headingindent
+Feature denoising is not classical logit distillation. It follows the
+predictive-representation idea associated with joint-embedding predictive
+architectures: predict a target representation from a partial or corrupted
+context instead of reconstructing raw pixels
+\cite{lecun2022path,assran2023ijepa}. Here the teacher remains fixed. A small
+student learns an ID-conditional prediction rule in the teacher's feature
+space. An OOD input should be harder to reconstruct because its feature
+relations were absent from student training.
+
+For a clean teacher feature $z$, a corruption produces $\widetilde z$. The
+student predicts $\widehat z=S(\widetilde z)$ and minimizes an MSE on all or
+only hidden coordinates. We used three reconstruction scores:
+\begin{align*}
+s_{\mathrm{rec}}&=-\|\widehat z-z\|_2^2,\\
+s_{\mathrm{abs}}&=\|\widetilde z-z\|_2^2-\|\widehat z-z\|_2^2,\\
+s_{\mathrm{cos}}&=\frac{\widehat z^\top z}{\|\widehat z\|_2\|z\|_2}.
+\end{align*}
+These are respectively the negative reconstruction error, the absolute
+improvement over the zero-filled or otherwise corrupted input, and cosine
+similarity. The results below use absolute improvement because it directly
+measures how much the trained denoiser corrects the corruption.
+
+\subsection{Tested variants}
+
+\headingindent
+The experiments predicted clean pooled embeddings from affine-augmented,
+PixMix, or block-masked images, and reconstructed masked channels, masked
+spatial positions, or ViT patch tokens. ResNet feature-map denoisers used
+residual CNNs. The ViT patch-token model received a $14\times14$ grid of
+768-dimensional layer-12 tokens and used three $3\times3$ convolutions
+$768\to64\to64\to768$. A Bernoulli mask hid 20\% of patch tokens, and the loss
+was evaluated only at hidden positions.
+
+\begin{table}[ht]
+\centering
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabularx}{\textwidth}{@{}L{3.0cm}L{3.4cm}YY@{}}
+\toprule
+Variant & Corruption & Student target & Score candidates \\
+\midrule
+Pixel-to-embedding & Affine or PixMix image & Clean pooled feature &
+Negative reconstruction error, absolute improvement, cosine similarity \\
+Channel masking & Hidden feature-map channels & Clean feature map &
+Negative reconstruction error, absolute improvement \\
+Spatial masking & Hidden positions or blocks & Clean feature map &
+Negative reconstruction error, absolute improvement \\
+ViT patch masking & Hidden layer-12 patch tokens & Clean patch-token grid &
+Negative reconstruction error, absolute improvement \\
+\bottomrule
+\end{tabularx}
+\caption{Feature-denoising variants retained in this report.}
+\label{tab:feature-denoising-variants}
+\end{table}
+
+\subsection{Layerwise results on the initial CIFAR protocol}
+
+\headingindent
+For the ResNet-18 channel-masking pipeline, each channel was independently
+hidden with probability $0.2$, and a residual CNN reconstructed the clean
+feature map. We evaluated the performance on several internal teacher layers: layers 2, 3, and 4. Layer 3
+was strongest overall for CIFAR-10 as ID and gave particularly strong SVHN
+separation; layer 4 was strongest on MNIST. With CIFAR-100 as ID, layer 3 gave
+the best compromise, despite remaining weak on Near-OOD.
+
+\begin{table}[ht]
+\centering
+\small
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabularx}{\textwidth}{@{}L{1.75cm}L{1.1cm}*{4}{>{\centering\arraybackslash}X}@{}}
+\toprule
+ID dataset & Layer & MNIST & SVHN & Near-OOD CIFAR & Macro \\
+\midrule
+CIFAR-10 & 2 & \metric{0.597}{0.918} & \metric{0.937}{0.271} &
+\metric{0.542}{0.913} & \metric{0.655}{0.754} \\
+CIFAR-10 & 3 & \metric{0.846}{0.835} & \metric{0.962}{0.217} &
+\metric{0.841}{0.662} & \best{\metric{0.872}{0.594}} \\
+CIFAR-10 & 4 & \metric{0.979}{0.115} & \metric{0.893}{0.458} &
+\metric{0.773}{0.740} & \metric{0.855}{0.513} \\
+\midrule
+\mbox{CIFAR-100} & 2 & \metric{0.881}{0.545} & \metric{0.900}{0.421} &
+\metric{0.552}{0.950} & \metric{0.721}{0.716} \\
+\mbox{CIFAR-100} & 3 & \metric{0.994}{0.022} & \metric{0.936}{0.283} &
+\metric{0.504}{0.967} & \best{\metric{0.735}{0.560}} \\
+\mbox{CIFAR-100} & 4 & \metric{0.621}{0.981} & \metric{0.806}{0.760} &
+\metric{0.774}{0.825} & \metric{0.744}{0.848} \\
+\bottomrule
+\end{tabularx}
+\caption{Residual-CNN results with uniform 20\% channel masking and absolute
+improvement as the OOD Score. Cells report AUROC / FPR@95 under the original
+ID-positive convention.}
+\label{tab:channel-denoising-results}
+\end{table}
+
+\subsection{Combining layer scores}
+
+\headingindent
+Since layer 3 performed better on Far-OOD and layer 4 performed better on Near-OOD, 
+it motivated a composition
+of their absolute-improvement scores. This experiment was inspired by HEAT,
+which composes several energy terms through a generalized energy operator
+\cite{lafon2023heat}. We standardized each layer score using its mean and
+population standard deviation on ID data, then computed
+\[
+ s_\beta(z_3,z_4)=\frac{1}{\beta}
+ \log\left(e^{\beta z_3}+e^{\beta z_4}\right),\qquad \beta\ne0,
+ \qquad
+ s_0=\frac{z_3+z_4}{2}.
+\]
+Negative $\beta$ emphasizes the smaller standardized score, positive $\beta$
+emphasizes the larger score, and values near zero produce a smoother balance.
+
+\begin{table}[ht]
+\centering
+\small
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabularx}{0.76\textwidth}{@{}L{2.0cm}*{2}{>{\centering\arraybackslash}X}@{}}
+\toprule
+$\beta$ & CIFAR-10 ID macro & CIFAR-100 ID macro \\
+\midrule
+$-100$ & \metric{0.893}{0.513} & \metric{0.830}{0.547} \\
+$-10$  & \metric{0.895}{0.511} & \metric{0.830}{0.546} \\
+$-1$   & \metric{0.916}{0.400} & \metric{0.836}{0.512} \\
+$-0.1$ & \metric{0.920}{0.359} & \best{\metric{0.831}{0.502}} \\
+$0$    & \metric{0.920}{0.359} & \metric{0.829}{0.505} \\
+$0.1$  & \best{\metric{0.920}{0.358}} & \metric{0.827}{0.510} \\
+$1$    & \metric{0.917}{0.356} & \metric{0.802}{0.581} \\
+$10$   & \metric{0.902}{0.424} & \metric{0.762}{0.697} \\
+$100$  & \metric{0.901}{0.440} & \metric{0.760}{0.704} \\
+\bottomrule
+\end{tabularx}
+\caption{HEAT-inspired composition of ResNet-18 layer-3 and layer-4 absolute-
+improvement scores. Cells report balanced-macro AUROC / FPR@95 under the
+ID-positive convention.}
+\label{tab:heat-beta-r18}
+\end{table}
+
+The useful range was concentrated near zero. With CIFAR-10 as ID,
+$\beta=0.1$ reached \metric{0.920}{0.358}; with CIFAR-100 as ID,
+$\beta=-0.1$ reached \metric{0.831}{0.502}, a better performance than on each layer separately without the composition.
+
+\subsection{ViT patch-token denoising}
+
+\headingindent
+We tested ViT patch-token denoising quickly during the final days of the
+internship, after moving to the OpenOOD-inspired evaluation described in
+Section~\ref{sec:openood-transition}. At that point, we also changed the metric
+convention from ID-positive to OOD-positive so that the evaluation matched the
+OpenOOD benchmark convention.
+% These results should therefore be read as a
+% late-stage exploratory experiment rather than as a directly comparable part
+% of the initial CIFAR study.
+
+Patch-token denoising remained below the teacher-only ViT MSP baseline. The
+table reports absolute improvement for the denoiser, consistently with the
+ResNet reconstruction results above.
+
+\clearpage
+\begin{landscape}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.7pt}
+\renewcommand{\arraystretch}{1.12}
+\caption{CIFAR-10 as the ID dataset. ViT patch-token denoising and the
+teacher-only MSP baseline on OpenOOD v1.5; cells report AUROC / FPR@95 under
+the stated positive-class convention.}
+\begin{tabularx}{\linewidth}{@{}L{2.75cm}L{1.15cm}L{2.1cm}*{9}{>{\centering\arraybackslash}X}@{}}
+\toprule
+Variant & Conv. & OOD Score &
+\multicolumn{3}{c}{\cellcolor{neargreen}\textbf{Near-OOD}} &
+\multicolumn{5}{c}{\cellcolor{farorange}\textbf{Far-OOD}} &
+\cellcolor{macroblue}\textbf{Balanced} \\
+\cmidrule(lr){4-6}\cmidrule(lr){7-11}\cmidrule(lr){12-12}
+& & &
+\cellcolor{neargreen}CIFAR-100 & \cellcolor{neargreen}TIN &
+\cellcolor{nearaverage}\textbf{Average} &
+\cellcolor{farorange}MNIST & \cellcolor{farorange}Places365 &
+\cellcolor{farorange}SVHN & \cellcolor{farorange}Textures &
+\cellcolor{faraverage}\textbf{Average} & \cellcolor{macroblue}\textbf{Macro} \\
+\midrule
+\cellcolor{selectedblue!55}\textbf{Teacher ViT-B/16} & \idpos & MSP &
+\nearcell{\metric{0.971}{0.124}} & \nearcell{--} & \nearavg{--} &
+\farcell{\metric{0.993}{0.024}} & \farcell{--} &
+\farcell{\metric{0.991}{0.035}} & \farcell{--} & \faravg{--} &
+\balanced{\metric{0.985}{0.061}} \\
+\cellcolor{conventionred}\textbf{Teacher ViT-B/16} & \oodpos & MSP &
+\nearcell{\metric{0.971}{0.138}} & \nearcell{\metric{0.991}{0.042}} &
+\nearavg{\metric{0.981}{0.090}} &
+\farcell{\metric{0.995}{0.020}} & \farcell{\metric{0.995}{0.024}} &
+\farcell{\metric{0.991}{0.041}} & \farcell{\metric{0.999}{0.0003}} &
+\faravg{\metric{0.995}{0.021}} & \balanced{\metric{0.988}{0.056}} \\
+\addlinespace
+\cellcolor{conventionred}\textbf{Patch-token denoising L12} & \oodpos &
+Absolute improvement &
+\nearcell{\metric{0.863}{0.673}} & \nearcell{\metric{0.942}{0.386}} &
+\nearavg{\metric{0.903}{0.529}} &
+\farcell{\metric{0.429}{0.920}} & \farcell{\metric{0.964}{0.215}} &
+\farcell{\metric{0.919}{0.430}} & \farcell{\metric{0.996}{0.012}} &
+\faravg{\metric{0.827}{0.394}} & \balanced{\metric{0.865}{0.462}} \\
+\bottomrule
+\end{tabularx}
+\label{tab:vit-patch-results-c10}
+\end{table}
+
+\vfill
+
+\begin{table}[H]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.7pt}
+\renewcommand{\arraystretch}{1.12}
+\caption{CIFAR-100 as the ID dataset. ViT patch-token denoising and the
+teacher-only MSP baseline on OpenOOD v1.5; cells report AUROC / FPR@95 under
+the stated positive-class convention.}
+\begin{tabularx}{\linewidth}{@{}L{2.75cm}L{1.15cm}L{2.1cm}*{9}{>{\centering\arraybackslash}X}@{}}
+\toprule
+Variant & Conv. & OOD Score &
+\multicolumn{3}{c}{\cellcolor{neargreen}\textbf{Near-OOD}} &
+\multicolumn{5}{c}{\cellcolor{farorange}\textbf{Far-OOD}} &
+\cellcolor{macroblue}\textbf{Balanced} \\
+\cmidrule(lr){4-6}\cmidrule(lr){7-11}\cmidrule(lr){12-12}
+& & &
+\cellcolor{neargreen}CIFAR-10 & \cellcolor{neargreen}TIN &
+\cellcolor{nearaverage}\textbf{Average} &
+\cellcolor{farorange}MNIST & \cellcolor{farorange}Places365 &
+\cellcolor{farorange}SVHN & \cellcolor{farorange}Textures &
+\cellcolor{faraverage}\textbf{Average} & \cellcolor{macroblue}\textbf{Macro} \\
+\midrule
+\cellcolor{selectedblue!55}\textbf{Teacher ViT-B/16} & \idpos & MSP &
+\nearcell{\metric{0.926}{0.375}} & \nearcell{--} & \nearavg{--} &
+\farcell{\metric{0.684}{0.845}} & \farcell{--} &
+\farcell{\metric{0.930}{0.414}} & \farcell{--} & \faravg{--} &
+\balanced{\metric{0.847}{0.545}} \\
+\cellcolor{conventionred}\textbf{Teacher ViT-B/16} & \oodpos & MSP &
+\nearcell{\metric{0.926}{0.316}} & \nearcell{\metric{0.938}{0.238}} &
+\nearavg{\metric{0.932}{0.277}} &
+\farcell{\metric{0.689}{0.662}} & \farcell{\metric{0.946}{0.217}} &
+\farcell{\metric{0.932}{0.255}} & \farcell{\metric{0.988}{0.076}} &
+\faravg{\metric{0.889}{0.303}} & \balanced{\metric{0.911}{0.290}} \\
+\addlinespace
+\cellcolor{conventionred}\textbf{Patch-token denoising L12} & \oodpos &
+Absolute improvement &
+\nearcell{\metric{0.629}{0.889}} & \nearcell{\metric{0.772}{0.806}} &
+\nearavg{\metric{0.701}{0.847}} &
+\farcell{\metric{0.148}{0.979}} & \farcell{\metric{0.822}{0.717}} &
+\farcell{\metric{0.644}{0.812}} & \farcell{\metric{0.935}{0.340}} &
+\faravg{\metric{0.638}{0.712}} & \balanced{\metric{0.669}{0.780}} \\
+\bottomrule
+\end{tabularx}
+\label{tab:vit-patch-results-c100}
+\end{table}
+
+\end{landscape}
+\clearpage

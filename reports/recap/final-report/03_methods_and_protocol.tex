@@ -1,0 +1,97 @@
+\section{Methods and experimental protocol}
+
+\subsection{Models and datasets}
+
+\headingindent
+The experiments used ResNet-18, ResNet-50, and ViT-B/16 teachers. ResNet
+students consumed flattened feature maps, globally averaged features, or
+selected feature coordinates. ViT feature-denoising students used CLS
+embeddings or patch-token grids. The student family included linear models,
+multilayer perceptrons, random forests, and residual convolutional denoisers.
+
+The first evaluation used CIFAR-10 and CIFAR-100. The
+opposite CIFAR dataset was Near-OOD, while MNIST and SVHN were Far-OOD. The
+last phase adopted the OpenOOD v1.5 benchmark \cite{zhang2023openood}. OpenOOD
+is an effort to standardize OOD evaluation through fixed datasets, image-list
+splits, and aggregation groups. Many papers about OOD detection often use
+different OOD datasets or different splits under the same benchmark name,
+making their reported metrics impossible to compare directly. OpenOOD v1.5
+added Tiny ImageNet (TIN), Textures, and Places365 to the CIFAR protocol, and
+introduced ImageNet-200 with SSB-hard and NINCO as Near-OOD and iNaturalist,
+Textures, and OpenImage-O as Far-OOD.
+
+\begin{table}[ht]
+\centering
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabularx}{\textwidth}{@{}L{2.2cm}L{2.9cm}YY@{}}
+\toprule
+Phase & ID dataset & Near-OOD & Far-OOD \\
+\midrule
+Initial CIFAR & CIFAR-10 & CIFAR-100 & MNIST, SVHN \\
+Initial CIFAR & CIFAR-100 & CIFAR-10 & MNIST, SVHN \\
+OpenOOD CIFAR-10 & CIFAR-10 & CIFAR-100, TIN & MNIST, SVHN, Textures,
+Places365 \\
+OpenOOD CIFAR-100 & CIFAR-100 & CIFAR-10, TIN & MNIST, SVHN, Textures,
+Places365 \\
+OpenOOD ImageNet & ImageNet-200 & SSB-hard, NINCO & iNaturalist, Textures,
+OpenImage-O \\
+\bottomrule
+\end{tabularx}
+\caption{Dataset protocols used during the internship.}
+\label{tab:dataset-protocols}
+\end{table}
+
+\subsection{Baseline distillation}
+
+\headingindent
+The baseline student receives a clean teacher feature and predicts teacher
+logits or probabilities. We compared linear, MLP, and random-forest students.
+This establishes whether limited capacity alone creates an OOD signal before
+any explicit corruption is added.
+
+\subsection{Embedding perturbations}
+
+\headingindent
+Embedding perturbations modify an intermediate teacher activation before the
+student sees it. The tested operations were percentile clipping, Monte Carlo
+dropout, PCA projection, and masked PCA projection. Clipping was applied to a
+single internal teacher layer or sequentially to several internal teacher layers. Its threshold could be global,
+channel-dependent, or spatially dependent. Training targets were either the
+clean teacher output or the teacher output after the same perturbation.
+The student received perturbed feature vectors concatenated with perturbation parameters.
+
+\subsection{Pixel perturbations}
+
+\headingindent
+Pixel perturbation was tested with affine and photometric augmentation and
+with PixMix. The affine pipeline sampled rotation, translation, scaling,
+brightness, and contrast. The student received a feature extracted from the
+perturbed image concatenated with normalized transformation
+parameters. PixMix repeatedly combined a crop-and-flip view with an
+augmentation or an external structurally complex image. These experiments
+tested whether prediction stability under input changes separates ID and OOD
+examples.
+
+\subsection{Subspace-student ensemble}
+
+\headingindent
+The ensemble trained 16 linear students on channel or whitened PCA subspaces.
+One variant used fixed ordered partitions; another used seeded random
+partitions. In both cases, the 512 feature coordinates were divided among the
+students so that each coordinate was assigned to exactly one student.
+Predictive entropy and BALD measured uncertainty and disagreement across the
+16 predictions \cite{houlsby2011bald}.
+
+% \subsection{Selection and metrics}
+
+% \headingindent
+% Early reports selected a configuration by
+% \[
+%   C=\tfrac12\left(\mathrm{macro\ AUROC}
+%   +1-\mathrm{macro\ FPR95}\right).
+% \]
+% Later reports first averaged within the Near-OOD and Far-OOD groups, then gave
+% each group half of the macro weight. Results in the next sections are reported
+% as \textbf{AUROC / FPR@95}. Higher AUROC and lower FPR@95 are better. Section
+% \ref{sec:metric-conventions} distinguishes the two FPR@95 definitions that
+% were encountered near the end of the internship.

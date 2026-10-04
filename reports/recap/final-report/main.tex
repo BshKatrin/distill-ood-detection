@@ -1,0 +1,94 @@
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage[margin=2.1cm]{geometry}
+\usepackage[table]{xcolor}
+\usepackage{microtype}
+\usepackage{pdflscape}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{rowblue}{RGB}{225,239,250}
+\definecolor{bestgreen}{RGB}{225,244,230}
+\definecolor{warningorange}{RGB}{255,240,220}
+\definecolor{neargreen}{RGB}{238,248,240}
+\definecolor{nearaverage}{RGB}{207,235,214}
+\definecolor{farorange}{RGB}{255,246,230}
+\definecolor{faraverage}{RGB}{248,221,176}
+\definecolor{macroblue}{RGB}{214,229,244}
+\definecolor{selectedblue}{RGB}{174,205,233}
+\definecolor{conventionred}{RGB}{247,217,217}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\metric}[2]{#1\,/\,#2}
+\newcommand{\best}[1]{\cellcolor{bestgreen}\textbf{#1}}
+\newcommand{\nearcell}[1]{\cellcolor{neargreen}#1}
+\newcommand{\nearavg}[1]{\cellcolor{nearaverage}\textbf{#1}}
+\newcommand{\farcell}[1]{\cellcolor{farorange}#1}
+\newcommand{\faravg}[1]{\cellcolor{faraverage}\textbf{#1}}
+\newcommand{\balanced}[1]{\cellcolor{macroblue}\textbf{#1}}
+\newcommand{\selectedbalanced}[1]{\cellcolor{selectedblue}\textbf{#1}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\idpos}{\textsc{ID+}}
+\newcommand{\oodpos}{\textsc{OOD+}}
+\newcommand{\fprid}{\ensuremath{\mathrm{FPR95}_{\mathrm{ID+}}}}
+\newcommand{\fprood}{\ensuremath{\mathrm{FPR95}_{\mathrm{OOD+}}}}
+\newcommand{\headingindent}{\hspace*{2em}}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.45em}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.14}
+\pagestyle{plain}
+
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+    \centering
+    \vspace*{\fill}
+
+    \includegraphics[width=0.25\linewidth]{isir-logo.png}
+
+    \vspace{1.8cm}
+    {\Huge \textbf{M1 Internship}\par}
+
+    \vspace{0.6cm}
+    {\LARGE \textbf{Out-of-distribution detection by model distillation}\par}
+
+    \vspace{2.4cm}
+    {\LARGE Ekaterina Bogush\par}
+
+    \vspace{0.6cm}
+    {\large \textbf{Supervised by:} Cl\'ement Rambour\par}
+
+    \vspace{2cm}
+    {\large \today\par}
+
+    \vspace*{\fill}
+    \thispagestyle{empty}
+\end{titlepage}
+\newpage
+\hypersetup{pageanchor=true}
+
+\tableofcontents
+\clearpage
+
+\input{01_introduction}
+\input{02_distillation_framework}
+\input{03_methods_and_protocol}
+\input{04_experimental_progression}
+\input{05_feature_denoising}
+\input{06_openood_evaluation}
+\input{08_conclusion}
+\input{references}
+
+\end{document}

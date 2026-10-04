@@ -1,0 +1,116 @@
+\section{Distillation framework}
+
+\subsection{Teacher and student}
+
+\headingindent
+Classical knowledge distillation compresses a teacher into a smaller student
+by matching softened class distributions \cite{hinton2015distilling}. Let $x$
+be an input and let $C$ be the number of classes. The teacher and student
+produce logit vectors $z_T(x),z_S(x)\in\mathbb R^C$, where the subscripts $T$
+and $S$ identify the teacher and student. The component $z_{T,c}(x)$ is the
+teacher logit for class $c$, and $z_{S,c}(x)$ is defined analogously. For a
+temperature $\tau>0$, their softened class probabilities are
+\[
+    p_T^{(\tau)}(c\mid x)=\frac{\exp(z_{T,c}(x)/\tau)}
+    {\sum_{j=1}^{C}\exp(z_{T,j}(x)/\tau)},\qquad
+    p_S^{(\tau)}(c\mid x)=\frac{\exp(z_{S,c}(x)/\tau)}
+    {\sum_{j=1}^{C}\exp(z_{S,j}(x)/\tau)}.
+\]
+Here $c$ is the class whose probability is evaluated and $j$ indexes all
+$C$ classes in the denominator. A temperature above one exposes relative
+probabilities among classes that may be almost invisible at $\tau=1$. Hinton
+et al. multiply the soft-target loss by $\tau^2$ to compensate for the
+temperature-dependent gradient scale.
+
+% Our use differs from compression for deployment. The student is deliberately
+% limited, and its failure to follow the teacher is part of the detector.
+During
+training, both teacher and student see only ID data. During evaluation, a scalar score, called OOD score, is
+computed from the teacher, the student, or their difference.
+
+\subsection{Training objectives}
+
+\headingindent
+The project implemented centered-logit mean squared error, soft and hard
+cross-entropy, and Kullback--Leibler (KL) divergence. To simplify notation, the
+dependence on $x$ is omitted below. For $M\in\{T,S\}$, define the mean logit
+$\overline z_M=C^{-1}\sum_{c=1}^{C}z_{M,c}$, and let
+$\mathbf 1\in\mathbb R^C$ be the vector of ones. The centered-logit loss is
+\[
+  \mathcal L_{\mathrm{MSE}}
+  =\left\|\left(z_S-\overline z_S\mathbf 1\right)
+  -\left(z_T-\overline z_T\mathbf 1\right)\right\|_2^2.
+\]
+The squared Euclidean norm $\|\cdot\|_2^2$ measures the distance between the
+two centered logit vectors. Centering removes any constant logit offset, which
+softmax ignores. The mixed cross-entropy objective is
+\[
+  \mathcal L_{\mathrm{CE}}
+  =\alpha \tau^2 H\!\left(p_T^{(\tau)},p_S^{(\tau)}\right)
+   +(1-\alpha)H\!\left(y,p_S^{(1)}\right),
+\]
+where $H(q,p)=-\sum_{c=1}^{C}q(c)\log p(c)$ is cross-entropy,
+$\alpha\in[0,1]$ controls the balance between the soft teacher target and the
+hard label, and $y$ is the one-hot ID class label. The first term transfers the
+teacher's full class distribution; the second retains ordinary supervised
+classification. We also used the forward KL objective
+\[
+  \mathcal L_{\mathrm{KL}}
+  =D_{\mathrm{KL}}\!\left(p_T\parallel p_S\right).
+\]
+Here $p_T=p_T^{(1)}$ and $p_S=p_S^{(1)}$ unless another shared temperature is
+specified. The divergence is
+\[
+  D_{\mathrm{KL}}(p_T\parallel p_S)
+  =\sum_{c=1}^{C}p_T(c)\log\!\left(\frac{p_T(c)}{p_S(c)}\right).
+\]
+Minimizing it makes the student distribution approach the fixed teacher
+distribution.
+
+% \subsection{KL divergence and cross-entropy}
+
+% \headingindent
+% For a fixed teacher distribution $p_T$, soft-target cross-entropy and forward
+% KL divergence differ by the teacher entropy:
+% \begin{align*}
+% H(p_T,p_S)
+% &=-\sum_c p_T(c)\log p_S(c),\\
+% D_{\mathrm{KL}}(p_T\parallel p_S)
+% &=\sum_c p_T(c)\log\frac{p_T(c)}{p_S(c)}\\
+% &=H(p_T,p_S)-H(p_T).
+% \end{align*}
+% Because $H(p_T)$ does not depend on the student, both objectives have the same
+% student gradients when they use the same temperature and reduction. They are
+% not numerically equal, and the mixed distillation loss adds a separate
+% hard-label term. These details matter when comparing logged loss values, but
+% not when comparing the optima of the pure soft-target objectives.
+
+\subsection{OOD Scores}
+
+\headingindent
+OOD Score is oriented so that a larger value means more ID-like.
+Raw distances, errors, and uncertainties are negated. We evaluated four score
+families. Teacher-only scores serve as reference baselines.
+
+\begin{table}[ht]
+\centering
+\rowcolors{2}{rowblue!35}{white}
+\begin{tabularx}{\textwidth}{@{}L{3.0cm}L{4.0cm}Y@{}}
+\toprule
+Family & Examples & Interpretation \\
+\midrule
+Teacher-only baseline & MSP; energy \cite{liu2020energy} & Reference confidence
+of the fixed teacher without a student. \\
+Student-only & Student MSP; student energy & Confidence learned by the limited student. \\
+Teacher--student mismatch & $-D_{\mathrm{KL}}(p_T\parallel p_S)$; negative
+centered-logit distance; signed or absolute MSP and energy gaps & Agreement
+between teacher and student outputs. \\
+Reconstruction and ensemble & Negative reconstruction error; absolute or
+relative reconstruction improvement; cosine similarity; negative predictive
+entropy; negative BALD & Predictability of a clean feature or agreement among
+students trained on fixed or randomly sampled feature subspaces. \\
+\bottomrule
+\end{tabularx}
+\caption{OOD Score families implemented during the internship.}
+\label{tab:score-families}
+\end{table}

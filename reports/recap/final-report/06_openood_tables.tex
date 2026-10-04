@@ -1,0 +1,156 @@
+\clearpage
+\begin{landscape}
+\begin{table}[H]
+\centering
+\tiny
+\setlength{\tabcolsep}{2.25pt}
+\renewcommand{\arraystretch}{1.08}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}>{\columncolor{conventionred}\bfseries}L{2.45cm}>{\columncolor{rowblue!20}}c>{\columncolor{rowblue!20}}L{1.65cm}
+>{\columncolor{neargreen}}c>{\columncolor{neargreen}}c>{\columncolor{nearaverage}\bfseries}c
+>{\columncolor{farorange}}c>{\columncolor{farorange}}c>{\columncolor{farorange}}c>{\columncolor{farorange}}c
+>{\columncolor{faraverage}\bfseries}c>{\columncolor{macroblue}\bfseries}c@{}}
+\toprule
+\cellcolor{rowblue!35}Variant & \cellcolor{rowblue!35}Conv. & \cellcolor{rowblue!35}Selected OOD score &
+\multicolumn{3}{>{\columncolor{neargreen}}c}{Near-OOD} &
+\multicolumn{5}{>{\columncolor{farorange}}c}{Far-OOD} & \cellcolor{macroblue}Balanced \\
+\cmidrule(lr){4-6}\cmidrule(lr){7-11}
+\cellcolor{rowblue!35} & \cellcolor{rowblue!35} & \cellcolor{rowblue!35} & CIFAR-100 & TIN & Average & MNIST & Places365 & SVHN & Textures & Average & Macro \\
+\midrule
+\cellcolor{selectedblue!55}Teacher MSP (R18) & \idpos & MSP & .879/.624 & -- & -- & .918/.556 & -- & .904/.598 & -- & -- & .895/.601 \\
+\cellcolor{conventionred}Teacher MSP (R18) & \oodpos & MSP & .880/.437 & .891/.378 & .885/.408 & .925/.230 & .894/.373 & .918/.266 & .885/.412 & .906/.321 & .896/.364 \\
+\cellcolor{selectedblue!55}Teacher energy (R18) & \idpos & Energy & .879/.506 & -- & -- & .958/.260 & -- & .918/.412 & -- & -- & .908/.421 \\
+\cellcolor{conventionred}Teacher energy (R18) & \oodpos & Energy & .879/.541 & .897/.461 & .888/.501 & .963/.159 & .909/.418 & .935/.298 & .879/.549 & .921/.356 & .905/.429 \\
+\cellcolor{selectedblue!55}Teacher MSP (R50) & \idpos & MSP & .873/.628 & -- & -- & .897/.622 & -- & .891/.680 & -- & -- & .884/.639 \\
+\cellcolor{conventionred}Teacher MSP (R50) & \oodpos & MSP & .873/.472 & .889/.382 & .881/.427 & .920/.237 & .895/.352 & .889/.304 & .876/.417 & .895/.328 & .888/.377 \\
+\cellcolor{selectedblue!55}Teacher energy (R50) & \idpos & Energy & .868/.517 & -- & -- & .932/.408 & -- & .911/.517 & -- & -- & .895/.490 \\
+\cellcolor{conventionred}Teacher energy (R50) & \oodpos & Energy & .868/.598 & .896/.475 & .882/.536 & .955/.176 & .913/.392 & .908/.325 & .868/.539 & .911/.358 & .897/.447 \\
+\midrule
+\cellcolor{selectedblue!55}Affine pixels (R50) & \idpos & Student energy & .871/.552 & -- & -- & .906/.528 & -- & .960/.247 & -- & -- & .902/.469 \\
+\cellcolor{conventionred}Affine pixels (R50) & \oodpos & Student energy & .871/.565 & .891/.468 & .881/.517 & .931/.255 & .905/.400 & .961/.146 & .847/.619 & .911/.355 & .896/.436 \\
+\cellcolor{selectedblue!55}Channel clipping (R18) & \idpos & Student energy & .843/.554 & -- & -- & .946/.288 & -- & .910/.424 & -- & -- & .886/.455 \\
+\cellcolor{conventionred}Channel clipping (R18) & \oodpos & Student energy & .844/.639 & .878/.544 & .861/.592 & .937/.302 & .880/.547 & .907/.480 & .893/.508 & .904/.459 & .883/.525 \\
+\cellcolor{selectedblue!55}Feature denoising L2 (R18) & \idpos & Absolute improvement & .542/.913 & -- & -- & .597/.918 & -- & .937/.271 & -- & -- & .655/.754 \\
+\cellcolor{conventionred}Feature denoising L2 (R18) & \oodpos & Absolute improvement & .541/.953 & .599/.896 & .570/.924 & .753/.652 & .590/.901 & .958/.211 & .647/.993 & .737/.689 & .653/.807 \\
+\cellcolor{selectedblue!55}Feature denoising L3 (R18) & \idpos & Absolute improvement & .841/.662 & -- & -- & .846/.835 & -- & .962/.217 & -- & -- & .872/.594 \\
+\cellcolor{conventionred}Feature denoising L3 (R18) & \oodpos & Absolute improvement & .840/.548 & .895/.374 & .868/.461 & .880/.309 & .905/.330 & .975/.123 & .930/.346 & .922/.277 & .895/.369 \\
+\cellcolor{selectedblue!55}Feature denoising L4 (R18) & \idpos & Absolute improvement & .773/.740 & -- & -- & .979/.115 & -- & .893/.458 & -- & -- & .854/.514 \\
+\cellcolor{conventionred}Feature denoising L4 (R18) & \oodpos & Absolute improvement & .772/.721 & .778/.704 & .775/.713 & .980/.100 & .803/.648 & .912/.413 & .751/.793 & .862/.489 & .818/.601 \\
+\midrule
+Mahalanobis \cite{lee2018mahalanobis} & \oodpos & MDS & .836/.528 & .848/.470 & .842/.499 & .901/.273 & .849/.477 & .912/.260 & .927/.279 & .897/.322 & .870/.411 \\
+$k$-NN \cite{sun2022knn} & \oodpos & KNN & .897/.376 & .916/.304 & .906/.340 & .943/.201 & .918/.304 & .927/.226 & .932/.241 & .930/.243 & .918/.291 \\
+PixMix \cite{hendrycks2022pixmix} & \oodpos & MSP & .919/.289 & .943/.210 & .931/.250 & .917/.274 & .941/.211 & .979/.101 & .989/.066 & .957/.163 & .944/.206 \\
+ReAct \cite{sun2021react} & \oodpos & ReAct & .859/.674 & .883/.597 & .871/.636 & .928/.338 & .903/.442 & .891/.502 & .894/.514 & .904/.449 & .888/.542 \\
+ASH \cite{djurisic2023ash} & \oodpos & ASH & .741/.873 & .764/.863 & .753/.868 & .832/.700 & .799/.779 & .735/.836 & .775/.846 & .785/.790 & .769/.829 \\
+ViM \cite{wang2022vim} & \oodpos & ViM & .877/.492 & .896/.405 & .887/.448 & .948/.184 & .895/.414 & .945/.193 & .952/.211 & .935/.251 & .911/.349 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{CIFAR-10 as the ID dataset. Cells report AUROC/FPR@95 under the stated positive-class convention.}
+\label{tab:openood-cifar10-full}
+\end{table}
+\end{landscape}
+
+\clearpage
+\begin{landscape}
+\begin{table}[H]
+\centering
+\tiny
+\setlength{\tabcolsep}{2.25pt}
+\renewcommand{\arraystretch}{1.08}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}>{\columncolor{conventionred}\bfseries}L{2.45cm}>{\columncolor{rowblue!20}}c>{\columncolor{rowblue!20}}L{1.65cm}
+>{\columncolor{neargreen}}c>{\columncolor{neargreen}}c>{\columncolor{nearaverage}\bfseries}c
+>{\columncolor{farorange}}c>{\columncolor{farorange}}c>{\columncolor{farorange}}c>{\columncolor{farorange}}c
+>{\columncolor{faraverage}\bfseries}c>{\columncolor{macroblue}\bfseries}c@{}}
+\toprule
+\cellcolor{rowblue!35}Variant & \cellcolor{rowblue!35}Conv. & \cellcolor{rowblue!35}Selected OOD score &
+\multicolumn{3}{>{\columncolor{neargreen}}c}{Near-OOD} &
+\multicolumn{5}{>{\columncolor{farorange}}c}{Far-OOD} & \cellcolor{macroblue}Balanced \\
+\cmidrule(lr){4-6}\cmidrule(lr){7-11}
+\cellcolor{rowblue!35} & \cellcolor{rowblue!35} & \cellcolor{rowblue!35} & CIFAR-10 & TIN & Average & MNIST & Places365 & SVHN & Textures & Average & Macro \\
+\midrule
+\cellcolor{selectedblue!55}Teacher MSP (R18) & \idpos & MSP & .792/.794 & -- & -- & .701/.956 & -- & .806/.812 & -- & -- & .773/.839 \\
+\cellcolor{conventionred}Teacher MSP (R18) & \oodpos & MSP & .790/.593 & .833/.484 & .811/.538 & .776/.556 & .802/.545 & .795/.545 & .781/.603 & .788/.562 & .800/.550 \\
+\cellcolor{selectedblue!55}Teacher energy (R18) & \idpos & Energy & .795/.800 & -- & -- & .695/.974 & -- & .829/.771 & -- & -- & .778/.836 \\
+\cellcolor{conventionred}Teacher energy (R18) & \oodpos & Energy & .793/.597 & .835/.483 & .814/.540 & .780/.553 & .801/.554 & .816/.521 & .789/.605 & .796/.558 & .805/.549 \\
+\cellcolor{selectedblue!55}Teacher MSP (R50) & \idpos & MSP & .792/.781 & -- & -- & .811/.823 & -- & .758/.793 & -- & -- & .788/.795 \\
+\cellcolor{conventionred}Teacher MSP (R50) & \oodpos & MSP & .790/.618 & .819/.541 & .804/.580 & .820/.437 & .786/.632 & .741/.729 & .766/.675 & .778/.618 & .791/.599 \\
+\cellcolor{selectedblue!55}Teacher energy (R50) & \idpos & Energy & .801/.774 & -- & -- & .878/.670 & -- & .783/.766 & -- & -- & .816/.746 \\
+\cellcolor{conventionred}Teacher energy (R50) & \oodpos & Energy & .799/.645 & .828/.580 & .813/.613 & .878/.366 & .781/.705 & .773/.712 & .779/.686 & .803/.617 & .808/.615 \\
+\midrule
+\cellcolor{selectedblue!55}Affine pixels (R50) & \idpos & Student energy & .779/.797 & -- & -- & .875/.698 & -- & .925/.431 & -- & -- & .839/.681 \\
+\cellcolor{conventionred}Affine pixels (R50) & \oodpos & Student energy & .777/.715 & .817/.596 & .797/.656 & .886/.334 & .770/.716 & .929/.248 & .797/.623 & .846/.480 & .821/.568 \\
+\cellcolor{selectedblue!55}Channel clipping (R18) & \idpos & Student energy & .751/.842 & -- & -- & .797/.879 & -- & .940/.340 & -- & -- & .810/.726 \\
+\cellcolor{conventionred}Channel clipping (R18) & \oodpos & Student energy & .749/.699 & .829/.508 & .789/.604 & .865/.392 & .807/.575 & .937/.256 & .858/.547 & .867/.442 & .828/.523 \\
+\cellcolor{selectedblue!55}Feature denoising L2 (R18) & \idpos & Absolute improvement & .552/.950 & -- & -- & .881/.545 & -- & .900/.421 & -- & -- & .721/.717 \\
+\cellcolor{conventionred}Feature denoising L2 (R18) & \oodpos & Absolute improvement & .553/.894 & .536/.898 & .545/.896 & .916/.322 & .571/.879 & .914/.372 & .408/.999 & .702/.643 & .623/.770 \\
+\cellcolor{selectedblue!55}Feature denoising L3 (R18) & \idpos & Absolute improvement & .504/.967 & -- & -- & .994/.022 & -- & .936/.283 & -- & -- & .734/.560 \\
+\cellcolor{conventionred}Feature denoising L3 (R18) & \oodpos & Absolute improvement & .505/.930 & .556/.892 & .531/.911 & .988/.053 & .616/.836 & .928/.353 & .613/.989 & .786/.558 & .658/.734 \\
+\cellcolor{selectedblue!55}Feature denoising L4 (R18) & \idpos & Absolute improvement & .774/.825 & -- & -- & .621/.981 & -- & .806/.760 & -- & -- & .744/.848 \\
+\cellcolor{conventionred}Feature denoising L4 (R18) & \oodpos & Absolute improvement & .769/.631 & .780/.568 & .775/.599 & .716/.646 & .758/.631 & .784/.579 & .743/.696 & .750/.638 & .762/.619 \\
+\midrule
+Mahalanobis \cite{lee2018mahalanobis} & \oodpos & MDS & .559/.880 & .615/.790 & .587/.835 & .675/.717 & .631/.796 & .707/.672 & .763/.705 & .694/.723 & .640/.779 \\
+$k$-NN \cite{sun2022knn} & \oodpos & KNN & .770/.728 & .833/.496 & .802/.612 & .824/.486 & .794/.607 & .842/.517 & .837/.536 & .824/.536 & .813/.574 \\
+PixMix \cite{hendrycks2022pixmix} & \oodpos & MSP & .766/.622 & .832/.515 & .799/.568 & .696/.703 & .814/.551 & .934/.308 & .918/.375 & .841/.484 & .820/.526 \\
+ReAct \cite{sun2021react} & \oodpos & ReAct & .787/.613 & .829/.515 & .808/.564 & .784/.560 & .800/.553 & .830/.504 & .802/.550 & .804/.542 & .806/.553 \\
+ASH \cite{djurisic2023ash} & \oodpos & ASH & .765/.681 & .799/.634 & .782/.657 & .772/.666 & .788/.630 & .856/.460 & .807/.613 & .806/.592 & .794/.625 \\
+ViM \cite{wang2022vim} & \oodpos & ViM & .722/.706 & .778/.547 & .750/.626 & .819/.483 & .758/.616 & .831/.462 & .859/.469 & .817/.507 & .783/.567 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{CIFAR-100 as the ID dataset. Cells report AUROC/FPR@95 under the stated positive-class convention.}
+\label{tab:openood-cifar100-full}
+\end{table}
+\end{landscape}
+
+\clearpage
+\begin{landscape}
+\begin{table}[H]
+\centering
+\tiny
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}>{\columncolor{conventionred}\bfseries}L{2.5cm}>{\columncolor{rowblue!20}}c>{\columncolor{rowblue!20}}L{1.75cm}
+>{\columncolor{neargreen}}c>{\columncolor{neargreen}}c>{\columncolor{nearaverage}\bfseries}c
+>{\columncolor{farorange}}c>{\columncolor{farorange}}c>{\columncolor{farorange}}c
+>{\columncolor{faraverage}\bfseries}c>{\columncolor{macroblue}\bfseries}c@{}}
+\toprule
+\cellcolor{rowblue!35}Variant & \cellcolor{rowblue!35}Conv. & \cellcolor{rowblue!35}Selected OOD score &
+\multicolumn{3}{>{\columncolor{neargreen}}c}{Near-OOD} &
+\multicolumn{4}{>{\columncolor{farorange}}c}{Far-OOD} & \cellcolor{macroblue}Balanced \\
+\cmidrule(lr){4-6}\cmidrule(lr){7-10}
+\cellcolor{rowblue!35} & \cellcolor{rowblue!35} & \cellcolor{rowblue!35} & SSB-hard & NINCO & Average & iNaturalist & Textures & OpenImage-O & Average & Macro \\
+\midrule
+\cellcolor{selectedblue!55}Teacher MSP & \idpos & MSP & .804/.726 & .862/.648 & .833/.687 & .931/.398 & .883/.496 & .892/.564 & .902/.486 & .867/.586 \\
+\cellcolor{conventionred}Teacher MSP & \oodpos & MSP & .804/.660 & .862/.445 & .833/.552 & .931/.257 & .883/.453 & .892/.353 & .902/.355 & .867/.454 \\
+\cellcolor{selectedblue!55}Teacher energy & \idpos & Energy & .798/.730 & .853/.661 & .826/.695 & .932/.414 & .906/.413 & .896/.558 & .911/.462 & .868/.579 \\
+\cellcolor{conventionred}Teacher energy & \oodpos & Energy & .798/.695 & .853/.494 & .826/.595 & .932/.237 & .906/.429 & .896/.355 & .911/.340 & .868/.467 \\
+\midrule
+\cellcolor{selectedblue!55}Affine pixels & \idpos & Student energy & .791/.736 & .844/.685 & .817/.711 & .921/.473 & .907/.410 & .889/.578 & .906/.487 & .862/.599 \\
+\cellcolor{conventionred}Affine pixels & \oodpos & Student energy & .791/.712 & .844/.512 & .817/.612 & .921/.270 & .907/.414 & .889/.382 & .906/.355 & .862/.484 \\
+\cellcolor{selectedblue!55}Channel clipping & \idpos & Student energy & .770/.760 & .830/.695 & .800/.728 & .919/.450 & .913/.389 & .877/.605 & .903/.481 & .852/.604 \\
+\cellcolor{conventionred}Channel clipping & \oodpos & Student energy & .770/.735 & .830/.568 & .800/.651 & .919/.291 & .913/.372 & .877/.401 & .903/.355 & .852/.503 \\
+\cellcolor{selectedblue!55}Spatial clipping & \idpos & Energy gap & .797/.734 & .852/.664 & .825/.699 & .931/.423 & .905/.420 & .895/.563 & .910/.469 & .868/.584 \\
+\cellcolor{conventionred}Spatial clipping & \oodpos & Energy gap & .797/.695 & .852/.495 & .825/.595 & .931/.238 & .905/.429 & .895/.355 & .910/.341 & .868/.468 \\
+\cellcolor{selectedblue!55}Feature denoising, layer 2 & \idpos & Absolute improvement & .628/.896 & .617/.843 & .623/.869 & .446/.984 & .608/.782 & .489/.915 & .515/.894 & .569/.882 \\
+\cellcolor{conventionred}Feature denoising, layer 2 & \oodpos & Absolute improvement & .628/.886 & .617/.923 & .623/.904 & .446/.938 & .608/.997 & .489/.973 & .515/.970 & .569/.937 \\
+\cellcolor{selectedblue!55}Feature denoising, layer 3 & \idpos & Absolute improvement & .642/.894 & .695/.797 & .668/.845 & .745/.733 & .707/.673 & .621/.849 & .691/.752 & .680/.799 \\
+\cellcolor{conventionred}Feature denoising, layer 3 & \oodpos & Absolute improvement & .642/.848 & .695/.826 & .668/.837 & .745/.766 & .707/.978 & .621/.909 & .691/.885 & .680/.861 \\
+\cellcolor{selectedblue!55}Feature denoising, layer 4 & \idpos & Absolute improvement & .722/.797 & .761/.755 & .742/.776 & .869/.556 & .908/.367 & .847/.607 & .875/.510 & .808/.643 \\
+\cellcolor{conventionred}Feature denoising, layer 4 & \oodpos & Absolute improvement & .723/.782 & .762/.713 & .742/.747 & .871/.474 & .908/.444 & .847/.540 & .875/.486 & .809/.617 \\
+\midrule
+Mahalanobis \cite{lee2018mahalanobis} & \oodpos & MDS & .584/.837 & .655/.746 & .619/.791 & .750/.585 & .792/.582 & .699/.683 & .747/.617 & .683/.704 \\
+$k$-NN \cite{sun2022knn} & \oodpos & KNN & .770/.737 & .861/.466 & .816/.602 & .940/.245 & .953/.244 & .902/.329 & .932/.273 & .874/.437 \\
+PixMix \cite{hendrycks2022pixmix} & \oodpos & MSP & .788/.678 & .855/.463 & .822/.570 & .925/.273 & .898/.444 & .884/.371 & .902/.363 & .862/.467 \\
+ReAct \cite{sun2021react} & \oodpos & ReAct & .790/.715 & .848/.535 & .819/.625 & .937/.230 & .929/.297 & .904/.329 & .923/.285 & .871/.455 \\
+ASH \cite{djurisic2023ash} & \oodpos & ASH & .795/.721 & .852/.576 & .824/.649 & .951/.225 & .948/.257 & .918/.337 & .939/.273 & .881/.461 \\
+ViM \cite{wang2022vim} & \oodpos & ViM & .740/.713 & .833/.471 & .787/.592 & .910/.273 & .946/.204 & .882/.339 & .913/.272 & .850/.432 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Selected ResNet-18 variants and published OpenOOD baselines on ImageNet-200. Cells report AUROC/FPR@95 under the stated positive-class convention.}
+\label{tab:openood-imagenet200-full}
+\end{table}
+\end{landscape}
